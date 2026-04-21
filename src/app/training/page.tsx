@@ -9,7 +9,7 @@ const CATEGORIES = [...new Set(TRAINING_MODULES.map(m => m.category))]
 export default function TrainingPage() {
   return (
     <>
-      <TopBar title="BC Training" />
+      <TopBar title="NovaPOS Training" />
       <main className="flex-1 p-6 overflow-auto">
         {/* Hero */}
         <div className="mb-8">
@@ -19,10 +19,10 @@ export default function TrainingPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-zinc-100 leading-tight">
-                Business Central Training Center
+                NovaPOS Core Finance Training Center
               </h1>
               <p className="text-sm text-zinc-500 mt-0.5">
-                Master the D365 Business Central finance workflows
+                Master the NovaPOS Core Finance finance workflows
               </p>
             </div>
           </div>
@@ -65,7 +65,7 @@ export default function TrainingPage() {
 
             <div className="ml-auto text-right hidden sm:block">
               <p className="text-xs text-zinc-600 uppercase tracking-wide font-medium">Source</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Microsoft Dynamics 365 Finance Docs</p>
+              <p className="text-xs text-zinc-500 mt-0.5">NovaPOS Flex Finance Docs</p>
             </div>
           </div>
         </div>

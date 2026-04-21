@@ -104,7 +104,7 @@ export default async function CustomersPage() {
         <section>
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-zinc-100">Sales Pipeline Overview</h2>
-            <p className="text-sm text-zinc-500">D365-style CRM summary derived from loyalty & spend data</p>
+            <p className="text-sm text-zinc-500">NovaPOS-style CRM summary derived from loyalty & spend data</p>
           </div>
 
           {/* Tier breakdown + avg visits */}

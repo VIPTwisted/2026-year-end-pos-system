@@ -101,7 +101,7 @@ export default async function HRPage() {
           </Card>
         </div>
 
-        {/* Workforce Summary — D365 HR analytics pattern */}
+        {/* Workforce Summary — NovaPOS HR analytics pattern */}
         <Card>
           <CardContent className="pt-5 pb-4">
             <div className="flex flex-col gap-4">

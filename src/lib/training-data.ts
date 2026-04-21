@@ -35,7 +35,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
     category: 'Core Finance',
     estimatedMinutes: 15,
     overview:
-      'The General Ledger is the financial backbone of every legal entity in Dynamics 365 Finance. For each legal entity, you must configure the chart of accounts, account structures, fiscal calendar, and currencies on the Ledger page. You can share a single chart of accounts across multiple legal entities to simplify maintenance, while using legal entity overrides for entity-specific exceptions.',
+      'The General Ledger is the financial backbone of every legal entity in NovaPOS Flex Finance. For each legal entity, you must configure the chart of accounts, account structures, fiscal calendar, and currencies on the Ledger page. You can share a single chart of accounts across multiple legal entities to simplify maintenance, while using legal entity overrides for entity-specific exceptions.',
     concepts: [
       {
         term: 'Chart of Accounts',
@@ -149,7 +149,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
     category: 'Core Finance',
     estimatedMinutes: 10,
     overview:
-      'Financial dimensions in Dynamics 365 Finance add analytical layers to main accounts, enabling detailed reporting by cost center, department, project, or any custom segment your organization defines. Activating a new dimension triggers a database schema change that adds columns to the DimensionAttributeValueCombination and DimensionAttributeValueSet tables, so activation must be performed during scheduled maintenance in production environments.',
+      'Financial dimensions in NovaPOS Flex Finance add analytical layers to main accounts, enabling detailed reporting by cost center, department, project, or any custom segment your organization defines. Activating a new dimension triggers a database schema change that adds columns to the DimensionAttributeValueCombination and DimensionAttributeValueSet tables, so activation must be performed during scheduled maintenance in production environments.',
     concepts: [
       {
         term: 'Financial Dimension',
@@ -251,7 +251,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
     category: 'Operations',
     estimatedMinutes: 20,
     overview:
-      'Accounts Payable in Dynamics 365 Finance covers the full vendor payment lifecycle: vendor setup, purchase orders, invoice entry, three-way matching, and payment processing. Before configuring AP, prerequisite setup in General Ledger (payment journals, exchange rates) and Cash and Bank Management (bank accounts) must be completed. Invoice matching policies — two-way or three-way — ensure vendors are paid only after purchase orders and product receipts are reconciled against the invoice.',
+      'Accounts Payable in NovaPOS Flex Finance covers the full vendor payment lifecycle: vendor setup, purchase orders, invoice entry, three-way matching, and payment processing. Before configuring AP, prerequisite setup in General Ledger (payment journals, exchange rates) and Cash and Bank Management (bank accounts) must be completed. Invoice matching policies — two-way or three-way — ensure vendors are paid only after purchase orders and product receipts are reconciled against the invoice.',
     concepts: [
       {
         term: 'Vendor Groups',
@@ -286,7 +286,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
       {
         term: 'Invoice Capture Solution',
         definition:
-          'An automated feature in Dynamics 365 Finance that creates vendor invoices directly from digital invoice images (PDF, scanned documents) using optical character recognition and AI extraction, reducing manual data entry.',
+          'An automated feature in NovaPOS Flex Finance that creates vendor invoices directly from digital invoice images (PDF, scanned documents) using optical character recognition and AI extraction, reducing manual data entry.',
       },
       {
         term: 'Pending Vendor Invoices',
@@ -351,7 +351,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
           'Two-way matching validates the vendor invoice against the purchase order lines only — quantities and prices must match the PO. Three-way matching adds an additional validation layer: the invoice must also match the product receipt lines, confirming that the items were physically received before payment is authorized. Three-way matching is recommended for all goods purchases and fixed asset acquisitions to prevent paying for items that were ordered but never received.',
       },
       {
-        question: 'What are the different ways to enter a vendor invoice in BC/D365?',
+        question: 'What are the different ways to enter a vendor invoice in BC/NovaPOS?',
         answer:
           'There are five primary methods: (1) Vendor invoice register — fast entry for non-PO invoices, creates an accrual; (2) Vendor invoice journal — single-step entry for non-PO invoices; (3) Vendor invoice pool — entry for non-PO invoices that will be matched to POs later; (4) Open/Pending vendor invoices pages — for invoices from confirmed purchase orders; (5) Invoice capture solution — automated creation from digital invoice images.',
       },
@@ -375,7 +375,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
     category: 'Operations',
     estimatedMinutes: 20,
     overview:
-      'Accounts Receivable in Dynamics 365 Finance manages the full customer billing and collections lifecycle. You can create customer invoices from sales orders, packing slips, or as free-text invoices that are not tied to a sales order. The Credit and Collections module extends AR with credit limit controls, blocking rules, and a centralized Collections workspace where collections agents manage overdue accounts and initiate collection activities.',
+      'Accounts Receivable in NovaPOS Flex Finance manages the full customer billing and collections lifecycle. You can create customer invoices from sales orders, packing slips, or as free-text invoices that are not tied to a sales order. The Credit and Collections module extends AR with credit limit controls, blocking rules, and a centralized Collections workspace where collections agents manage overdue accounts and initiate collection activities.',
     concepts: [
       {
         term: 'Customer Posting Profile',
@@ -400,7 +400,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
       {
         term: 'Collections Page',
         definition:
-          'A centralized workspace in Dynamics 365 Finance where collections managers view and manage accounts receivable collections information. Collections agents access customer lists generated by predefined collection criteria or navigate directly from the Customers page.',
+          'A centralized workspace in NovaPOS Flex Finance where collections managers view and manage accounts receivable collections information. Collections agents access customer lists generated by predefined collection criteria or navigate directly from the Customers page.',
       },
       {
         term: 'Blocking Rules',
@@ -499,7 +499,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
     category: 'Period Close',
     estimatedMinutes: 10,
     overview:
-      'Fiscal calendars in Dynamics 365 Finance provide the time framework for all financial activity: posting, budgeting, and fixed asset depreciation. Each fiscal calendar contains one or more fiscal years, and each fiscal year contains multiple periods. Fiscal calendars are independent of the calendar year — they can start on any date — and can be shared across legal entities or kept entity-specific. Period status controls whether transactions can be posted into a given period.',
+      'Fiscal calendars in NovaPOS Flex Finance provide the time framework for all financial activity: posting, budgeting, and fixed asset depreciation. Each fiscal calendar contains one or more fiscal years, and each fiscal year contains multiple periods. Fiscal calendars are independent of the calendar year — they can start on any date — and can be shared across legal entities or kept entity-specific. Period status controls whether transactions can be posted into a given period.',
     concepts: [
       {
         term: 'Fiscal Calendar',
@@ -607,7 +607,7 @@ export const TRAINING_MODULES: TrainingModule[] = [
     category: 'Period Close',
     estimatedMinutes: 25,
     overview:
-      'The Year-End Close process in Dynamics 365 Finance transfers net income or loss to retained earnings, generates opening balances for the new fiscal year, and optionally creates detailed opening entries for each unsettled ledger transaction. Beginning in version 10.0.40, the Awareness between ledger settlement and year-end close enhancements ensure that only unsettled transactions are included in the opening balance, preventing settled transactions from being revalued a second time during foreign currency revaluation in the new year.',
+      'The Year-End Close process in NovaPOS Flex Finance transfers net income or loss to retained earnings, generates opening balances for the new fiscal year, and optionally creates detailed opening entries for each unsettled ledger transaction. Beginning in version 10.0.40, the Awareness between ledger settlement and year-end close enhancements ensure that only unsettled transactions are included in the opening balance, preventing settled transactions from being revalued a second time during foreign currency revaluation in the new year.',
     concepts: [
       {
         term: 'Year-End Close Template',

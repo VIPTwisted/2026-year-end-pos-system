@@ -168,11 +168,11 @@ export default async function ServicePage() {
           )}
         </section>
 
-        {/* ── Case Resolution Stats (D365 Knowledge/Analytics) ── */}
+        {/* ── Case Resolution Stats (NovaPOS Knowledge/Analytics) ── */}
         <section>
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-zinc-100">Case Resolution Stats</h2>
-            <p className="text-sm text-zinc-500">D365-style knowledge base analytics across all {totalCases} cases</p>
+            <p className="text-sm text-zinc-500">NovaPOS-style knowledge base analytics across all {totalCases} cases</p>
           </div>
 
           <div className="grid grid-cols-3 gap-4 mb-5">

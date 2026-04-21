@@ -70,7 +70,7 @@ const STATUS_CONFIG: Record<
 const modules: BCModule[] = [
   {
     name: 'POS Terminal',
-    d365: 'D365 Commerce',
+    d365: 'NovaPOS Commerce',
     route: '/pos',
     status: 'built',
     description: 'Cart, checkout, payments, receipts, tax calculation',
@@ -78,7 +78,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Products',
-    d365: 'D365 Commerce',
+    d365: 'NovaPOS Commerce',
     route: '/products',
     status: 'built',
     description: 'Product catalog, SKU/barcode, categories, pricing',
@@ -86,7 +86,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Inventory',
-    d365: 'D365 Supply Chain',
+    d365: 'NovaPOS Supply Chain',
     route: '/inventory',
     status: 'built',
     description: 'Multi-store stock, DDMRP reorder alerts, valuation',
@@ -94,7 +94,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Warehouse',
-    d365: 'D365 Supply Chain (WMS)',
+    d365: 'NovaPOS Supply Chain (WMS)',
     route: '/warehouse',
     status: 'built',
     description: '5-level bin hierarchy, movement journal, inventory states',
@@ -102,7 +102,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Customers',
-    d365: 'D365 Sales',
+    d365: 'NovaPOS Sales',
     route: '/customers',
     status: 'built',
     description: 'Customer profiles, loyalty tiers, LTV, visit history',
@@ -110,7 +110,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Orders',
-    d365: 'D365 Commerce',
+    d365: 'NovaPOS Commerce',
     route: '/orders',
     status: 'built',
     description: 'Order lifecycle, payment tracking, multi-store',
@@ -118,7 +118,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Purchasing',
-    d365: 'D365 Supply Chain',
+    d365: 'NovaPOS Supply Chain',
     route: '/purchasing',
     status: 'built',
     description: 'Purchase orders, supplier management, receiving',
@@ -126,7 +126,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Customer Service',
-    d365: 'D365 Customer Service',
+    d365: 'NovaPOS Customer Service',
     route: '/service',
     status: 'built',
     description: 'Case management, SLA tracking, priority routing',
@@ -134,7 +134,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Marketing',
-    d365: 'D365 Marketing',
+    d365: 'NovaPOS Marketing',
     route: '/marketing',
     status: 'built',
     description: 'Campaign management, email/SMS/social, open rate tracking',
@@ -142,7 +142,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'HR & Shifts',
-    d365: 'D365 Human Resources',
+    d365: 'NovaPOS Human Resources',
     route: '/hr',
     status: 'built',
     description: 'Employee profiles, shift scheduling, compensation',
@@ -150,7 +150,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Field Service',
-    d365: 'D365 Field Service',
+    d365: 'NovaPOS Field Service',
     route: '/field-service',
     status: 'built',
     description: 'Work orders, dispatch board, technician scheduling',
@@ -158,7 +158,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Stores / HQ',
-    d365: 'Business Central',
+    d365: 'NovaPOS Core Finance',
     route: '/stores',
     status: 'built',
     description: 'Multi-store management, per-store KPIs, tax config',
@@ -166,7 +166,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Finance (GL)',
-    d365: 'D365 Finance',
+    d365: 'NovaPOS Finance',
     route: '/finance',
     status: 'built',
     description: 'Chart of accounts, journal entries, GL balances',
@@ -174,7 +174,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'AR / Receivables',
-    d365: 'D365 Finance',
+    d365: 'NovaPOS Finance',
     route: '/ar',
     status: 'built',
     description: 'Customer invoices, AR aging, payment settlements',
@@ -182,7 +182,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Vendors / AP',
-    d365: 'Business Central',
+    d365: 'NovaPOS Core Finance',
     route: '/vendors',
     status: 'built',
     description: 'Vendor management, AP invoices, payment runs',
@@ -190,7 +190,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Bank Management',
-    d365: 'Business Central',
+    d365: 'NovaPOS Core Finance',
     route: '/bank',
     status: 'built',
     description: 'Bank accounts, statements, balance tracking',
@@ -198,7 +198,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Fiscal Calendar',
-    d365: 'Business Central',
+    d365: 'NovaPOS Core Finance',
     route: '/fiscal',
     status: 'built',
     description: 'Fiscal years, period management, open/close cycles',
@@ -206,7 +206,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Year-End Close',
-    d365: 'Business Central',
+    d365: 'NovaPOS Core Finance',
     route: '/year-end',
     status: 'built',
     description: 'Automated closing vouchers, retained earnings transfer',
@@ -214,7 +214,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'GL Journal',
-    d365: 'D365 Finance',
+    d365: 'NovaPOS Finance',
     route: '/finance/gl',
     status: 'built',
     description: 'Manual journal entries, double-entry validation',
@@ -222,7 +222,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Posting Profiles',
-    d365: 'Business Central',
+    d365: 'NovaPOS Core Finance',
     route: '/finance/posting-profiles',
     status: 'built',
     description: 'Module posting rules, debit/credit account mapping',
@@ -230,7 +230,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Bank Reconciliation',
-    d365: 'Business Central',
+    d365: 'NovaPOS Core Finance',
     route: '/bank/reconcile',
     status: 'built',
     description: 'Statement import, line matching, GL reconciliation',
@@ -238,15 +238,15 @@ const modules: BCModule[] = [
   },
   {
     name: 'Budget Management',
-    d365: 'D365 Finance',
+    d365: 'NovaPOS Finance',
     route: '/budget',
     status: 'built',
     description: 'Budget planning, variance analysis, period budgets',
     icon: <PiggyBank className="w-5 h-5" />,
   },
   {
-    name: 'BC Training Center',
-    d365: 'Business Central',
+    name: 'NovaPOS Training Center',
+    d365: 'NovaPOS Core Finance',
     route: '/training',
     status: 'built',
     description: 'Guided walkthroughs, module documentation, onboarding',
@@ -254,7 +254,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Cost Accounting',
-    d365: 'D365 Finance',
+    d365: 'NovaPOS Finance',
     route: null,
     status: 'planned',
     description: 'Cost centers, overhead allocation, profitability analysis',
@@ -262,7 +262,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Fixed Assets',
-    d365: 'D365 Finance',
+    d365: 'NovaPOS Finance',
     route: null,
     status: 'planned',
     description: 'Asset register, depreciation schedules, disposal',
@@ -270,7 +270,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Payroll',
-    d365: 'D365 Human Resources',
+    d365: 'NovaPOS Human Resources',
     route: null,
     status: 'planned',
     description: 'Payroll runs, tax withholding, direct deposit',
@@ -278,7 +278,7 @@ const modules: BCModule[] = [
   },
   {
     name: 'Tax Management',
-    d365: 'D365 Finance',
+    d365: 'NovaPOS Finance',
     route: null,
     status: 'planned',
     description: 'Sales tax, VAT configuration, filing reports',
@@ -295,16 +295,16 @@ const progressPct = Math.round(((builtCount + partialCount * 0.5) / totalCount) 
 export default function D365MapPage() {
   return (
     <>
-      <TopBar title="D365 Business Central Module Map" />
+      <TopBar title="NovaPOS Module Map" />
       <main className="flex-1 p-6 overflow-auto">
 
         {/* Hero header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">
-            D365 Business Central Module Map
+            NovaPOS Module Map
           </h1>
           <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
-            Full-stack Microsoft Dynamics 365 / Business Central equivalent built on Next.js 15 + Prisma +
+            Full-stack NovaPOS Flex / NovaPOS Core Finance equivalent built on Next.js 15 + Prisma +
             PostgreSQL — self-hosted at a fraction of the $180K+/yr enterprise license cost.
           </p>
         </div>
@@ -414,8 +414,8 @@ export default function D365MapPage() {
 
         {/* Footer */}
         <p className="text-xs text-zinc-700 mt-8 text-center">
-          D365 Commerce · D365 Sales · D365 Supply Chain (WMS) · D365 Customer Service · D365 Finance ·
-          D365 Marketing · D365 Field Service · D365 Human Resources · Business Central
+          NovaPOS Commerce · NovaPOS Sales · NovaPOS Supply Chain (WMS) · NovaPOS Customer Service · NovaPOS Finance ·
+          NovaPOS Marketing · NovaPOS Field Service · NovaPOS Human Resources · NovaPOS Core Finance
         </p>
       </main>
     </>

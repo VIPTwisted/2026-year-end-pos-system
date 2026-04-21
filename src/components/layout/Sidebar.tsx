@@ -34,13 +34,13 @@ const NAV = [
   { label: 'Bank Accounts', href: '/bank', icon: CreditCard },
   { label: 'Fiscal Calendar', href: '/fiscal', icon: CalendarDays },
   { label: 'Year-End Close', href: '/year-end', icon: CheckSquare },
-  { label: 'BC Training', href: '/training', icon: GraduationCap },
+  { label: 'NovaPOS Training', href: '/training', icon: GraduationCap },
   { label: 'Marketing', href: '/marketing', icon: Megaphone },
   { label: 'Field Service', href: '/field-service', icon: Wrench },
   { label: 'HR & Shifts', href: '/hr', icon: Users },
   { label: 'Payroll', href: '/hr/payroll', icon: Banknote },
   { label: 'Stores / HQ', href: '/stores', icon: Store },
-  { label: 'D365 Map', href: '/d365-map', icon: Map },
+  { label: 'NovaPOS Module Map', href: '/d365-map', icon: Map },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]
 
@@ -50,10 +50,10 @@ export function Sidebar() {
     <aside className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col h-screen sticky top-0">
       <div className="p-5 border-b border-zinc-800">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">P</div>
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">N</div>
           <div>
-            <div className="text-sm font-bold text-zinc-100">[PLATFORM SUITE]</div>
-            <div className="text-xs text-zinc-500">Enterprise Edition</div>
+            <div className="text-sm font-bold text-zinc-100">NovaPOS</div>
+            <div className="text-xs text-zinc-500">Enterprise Platform</div>
           </div>
         </div>
       </div>
@@ -79,8 +79,8 @@ export function Sidebar() {
         })}
       </nav>
       <div className="p-4 border-t border-zinc-800">
-        <div className="text-xs text-zinc-600">Year-End Final Project 2026</div>
-        <div className="text-xs text-zinc-700">VIPTwisted x Claude</div>
+        <div className="text-xs text-zinc-600">NovaPOS Platform v1.0</div>
+        <div className="text-xs text-zinc-700">Powered by NovaPOS</div>
       </div>
     </aside>
   )

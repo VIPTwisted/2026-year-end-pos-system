@@ -278,7 +278,7 @@ export default async function InventoryPage() {
           </Card>
         )}
 
-        {/* ── Demand Intelligence section (D365 AI Forecasting stub) ─────────── */}
+        {/* ── Demand Intelligence section (NovaPOS AI Forecasting stub) ─────────── */}
         {inventory.length > 0 && (
           <Card className="border-zinc-700">
             <CardHeader className="pb-3">

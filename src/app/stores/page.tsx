@@ -154,12 +154,12 @@ export default async function StoresPage() {
           )}
         </div>
 
-        {/* Cross-Store Comparison — D365 Business Central multi-company analytics pattern */}
+        {/* Cross-Store Comparison — NovaPOS Core Finance multi-company analytics pattern */}
         {stores.length > 0 && (
           <div>
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-zinc-100">Cross-Store Comparison</h2>
-              <p className="text-sm text-zinc-500">D365 Business Central — company analytics view</p>
+              <p className="text-sm text-zinc-500">NovaPOS Core Finance — company analytics view</p>
             </div>
             <Card>
               <CardContent className="pt-5 pb-2 px-0">
@@ -242,11 +242,11 @@ export default async function StoresPage() {
           </div>
         )}
 
-        {/* Platform Health — Business Central system status pattern */}
+        {/* Platform Health — NovaPOS Core Finance system status pattern */}
         <div>
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-zinc-100">Platform Health</h2>
-            <p className="text-sm text-zinc-500">Business Central system status</p>
+            <p className="text-sm text-zinc-500">NovaPOS Core Finance system status</p>
           </div>
           <Card>
             <CardContent className="pt-5 pb-5 space-y-3">

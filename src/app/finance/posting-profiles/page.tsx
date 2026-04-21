@@ -41,7 +41,7 @@ export default async function PostingProfilesPage() {
               <p className="text-sm text-zinc-400">
                 Posting profiles define which GL accounts are automatically debited and credited when transactions
                 are posted. Each module (AP, AR, Inventory, Bank, Payroll) has its own profile with rules that
-                map transaction types to specific chart-of-accounts entries — mirroring Business Central&apos;s
+                map transaction types to specific chart-of-accounts entries — mirroring NovaPOS Core Finance&apos;s
                 General Posting Setup.
               </p>
             </div>

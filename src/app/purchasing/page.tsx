@@ -102,12 +102,12 @@ export default async function PurchasingPage() {
           </Card>
         </div>
 
-        {/* Supplier Scorecard — D365 Supplier Performance */}
+        {/* Supplier Scorecard — NovaPOS Supplier Performance */}
         {supplierScores.length > 0 && (
           <>
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-zinc-100">Supplier Scorecard</h2>
-              <p className="text-sm text-zinc-500">D365 Supply Chain · supplier performance analytics</p>
+              <p className="text-sm text-zinc-500">NovaPOS Supply Chain · supplier performance analytics</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">

@@ -154,12 +154,12 @@ export default async function MarketingPage() {
           </div>
         )}
 
-        {/* D365 Marketing Intelligence — Campaign Analytics */}
+        {/* NovaPOS Marketing Intelligence — Campaign Analytics */}
         {campaigns.length > 0 && (
           <>
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-zinc-100">Campaign Analytics</h2>
-              <p className="text-sm text-zinc-500">D365 Marketing Intelligence · computed from live campaign data</p>
+              <p className="text-sm text-zinc-500">NovaPOS Marketing Intelligence · computed from live campaign data</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

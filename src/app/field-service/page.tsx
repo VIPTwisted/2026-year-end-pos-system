@@ -125,7 +125,7 @@ export default async function FieldServicePage() {
           </Card>
         </div>
 
-        {/* Dispatch Board — D365 Field Service scheduling pattern */}
+        {/* Dispatch Board — NovaPOS Field Service scheduling pattern */}
         <div className="mb-6">
           <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-3">
             Dispatch Board
