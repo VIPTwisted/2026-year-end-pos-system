@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Warehouse,
   Building2, HeadphonesIcon, DollarSign, Megaphone, Wrench,
-  Settings, ChevronRight, Store
+  Settings, ChevronRight, Store, Map
 } from 'lucide-react'
 
 const NAV = [
@@ -23,6 +23,7 @@ const NAV = [
   { label: 'Field Service', href: '/field-service', icon: Wrench },
   { label: 'HR & Shifts', href: '/hr', icon: Users },
   { label: 'Stores / HQ', href: '/stores', icon: Store },
+  { label: 'D365 Map', href: '/d365-map', icon: Map },
   { label: 'Settings', href: '/settings', icon: Settings },
 ]
 

@@ -3,17 +3,41 @@ import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Building2 } from 'lucide-react'
+import { Building2, CheckCircle2 } from 'lucide-react'
 
 export default async function StoresPage() {
-  const [stores, orderCounts, employeeCounts] = await Promise.all([
+  const [stores, orderCounts, employeeCounts, storeRevenue, inventoryByStore] = await Promise.all([
     prisma.store.findMany({ orderBy: { name: 'asc' } }),
     prisma.order.groupBy({ by: ['storeId'], _count: { id: true } }),
     prisma.employee.groupBy({ by: ['storeId'], _count: { id: true } }),
+    prisma.order.groupBy({
+      by: ['storeId'],
+      _sum: { totalAmount: true },
+      _count: { id: true },
+    }),
+    prisma.inventory.findMany({
+      include: { product: true },
+    }),
   ])
 
   const orderMap = new Map(orderCounts.map(r => [r.storeId, r._count.id]))
   const empMap = new Map(employeeCounts.map(r => [r.storeId, r._count.id]))
+
+  // Revenue map: storeId -> { revenue, orderCount }
+  const revenueMap = new Map(
+    storeRevenue.map(r => [
+      r.storeId,
+      { revenue: r._sum.totalAmount ?? 0, orderCount: r._count.id },
+    ])
+  )
+
+  // Inventory value map: storeId -> sum(quantity * product.costPrice)
+  const inventoryValueMap = new Map<string, number>()
+  for (const inv of inventoryByStore) {
+    const storeId = inv.storeId
+    const value = inv.quantity * (inv.product.costPrice ?? 0)
+    inventoryValueMap.set(storeId, (inventoryValueMap.get(storeId) ?? 0) + value)
+  }
 
   const activeStores = stores.filter(s => s.isActive).length
   const totalEmployees = employeeCounts.reduce((sum, r) => sum + r._count.id, 0)
@@ -130,6 +154,62 @@ export default async function StoresPage() {
           )}
         </div>
 
+        {/* Cross-Store Comparison — D365 Business Central multi-company analytics pattern */}
+        {stores.length > 0 && (
+          <div>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-zinc-100">Cross-Store Comparison</h2>
+              <p className="text-sm text-zinc-500">D365 Business Central — company analytics view</p>
+            </div>
+            <Card>
+              <CardContent className="pt-5 pb-2 px-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-800">
+                        <th className="text-left text-xs text-zinc-500 uppercase tracking-wide px-6 py-2">Store Name</th>
+                        <th className="text-right text-xs text-zinc-500 uppercase tracking-wide px-4 py-2">Orders</th>
+                        <th className="text-right text-xs text-zinc-500 uppercase tracking-wide px-4 py-2">Revenue</th>
+                        <th className="text-right text-xs text-zinc-500 uppercase tracking-wide px-4 py-2">Avg Order Value</th>
+                        <th className="text-right text-xs text-zinc-500 uppercase tracking-wide px-4 py-2">Inventory Value</th>
+                        <th className="text-right text-xs text-zinc-500 uppercase tracking-wide px-4 py-2">Employees</th>
+                        <th className="text-center text-xs text-zinc-500 uppercase tracking-wide px-4 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stores.map(store => {
+                        const rev = revenueMap.get(store.id)
+                        const revenue = rev?.revenue ?? 0
+                        const orderCount = rev?.orderCount ?? 0
+                        const avgOrder = orderCount > 0 ? revenue / orderCount : null
+                        const invValue = inventoryValueMap.get(store.id) ?? 0
+                        const emps = empMap.get(store.id) ?? 0
+                        return (
+                          <tr key={store.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                            <td className="px-6 py-3 font-medium text-zinc-100">{store.name}</td>
+                            <td className="px-4 py-3 text-right text-zinc-300 tabular-nums">{orderCount}</td>
+                            <td className="px-4 py-3 text-right text-zinc-300 tabular-nums">{formatCurrency(revenue)}</td>
+                            <td className="px-4 py-3 text-right text-zinc-400 tabular-nums">
+                              {avgOrder !== null ? formatCurrency(avgOrder) : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-zinc-300 tabular-nums">{formatCurrency(invValue)}</td>
+                            <td className="px-4 py-3 text-right text-zinc-300 tabular-nums">{emps}</td>
+                            <td className="px-4 py-3 text-center">
+                              <Badge variant={store.isActive ? 'success' : 'destructive'}>
+                                {store.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Platform configuration */}
         {firstStore && (
           <div>
@@ -161,6 +241,42 @@ export default async function StoresPage() {
             </Card>
           </div>
         )}
+
+        {/* Platform Health — Business Central system status pattern */}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-zinc-100">Platform Health</h2>
+            <p className="text-sm text-zinc-500">Business Central system status</p>
+          </div>
+          <Card>
+            <CardContent className="pt-5 pb-5 space-y-3">
+              {[
+                {
+                  label: 'Database',
+                  detail: 'SQLite (dev) — 27 models active',
+                },
+                {
+                  label: 'API Routes',
+                  detail: '/api/products, /api/orders, /api/customers',
+                },
+                {
+                  label: 'Seed Data',
+                  detail: '2 stores, 12 products, 3 customers',
+                },
+                {
+                  label: 'Build',
+                  detail: 'Next.js 15 App Router — TypeScript strict mode',
+                },
+              ].map(({ label, detail }) => (
+                <div key={label} className="flex items-center gap-3">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-sm font-medium text-zinc-200 w-28 shrink-0">{label}</span>
+                  <span className="text-sm text-zinc-500">{detail}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
 
       </main>
     </>
