@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
+import bcrypt from 'bcryptjs'
 
 const adapter = new PrismaLibSql({ url: 'file:prisma/dev.db' })
 const prisma = new PrismaClient({ adapter })
@@ -40,39 +41,50 @@ async function main() {
   console.log('Stores:', storeMain.name, '|', storeNorth.name)
 
   // ─── Users ───────────────────────────────────────────────────────────────────
+  const adminHash     = await bcrypt.hash('Admin1234!', 10)
+  const managerHash   = await bcrypt.hash('Manager1234!', 10)
+  const cashierHash   = await bcrypt.hash('Cashier1234!', 10)
+  const accountHash   = await bcrypt.hash('Account1234!', 10)
+
+  // Demo auth users (NextAuth credentials)
+  await prisma.user.upsert({ where: { email: 'admin@bc.local' }, update: {}, create: { email: 'admin@bc.local', name: 'Platform Admin', role: 'admin', passwordHash: adminHash } })
+  await prisma.user.upsert({ where: { email: 'manager@bc.local' }, update: {}, create: { email: 'manager@bc.local', name: 'Store Manager', role: 'manager', passwordHash: managerHash } })
+  await prisma.user.upsert({ where: { email: 'cashier@bc.local' }, update: {}, create: { email: 'cashier@bc.local', name: 'POS Cashier', role: 'cashier', passwordHash: cashierHash } })
+  await prisma.user.upsert({ where: { email: 'accountant@bc.local' }, update: {}, create: { email: 'accountant@bc.local', name: 'Finance Accountant', role: 'accountant', passwordHash: accountHash } })
+
   const userAdmin = await prisma.user.upsert({
     where: { id: 'user-admin' },
-    update: {},
+    update: { passwordHash: adminHash },
     create: {
       id: 'user-admin',
       email: 'admin@store.local',
       name: 'Admin User',
       role: 'admin',
-      passwordHash: 'hashed_admin_pw',
+      passwordHash: adminHash,
     },
   })
 
   const userCashier = await prisma.user.upsert({
     where: { id: 'user-cashier' },
-    update: {},
+    update: { passwordHash: cashierHash },
     create: {
       id: 'user-cashier',
       email: 'cashier@store.local',
       name: 'Jane Doe',
       role: 'cashier',
-      passwordHash: 'hashed_cashier_pw',
+      passwordHash: cashierHash,
     },
   })
 
   const userEmp3 = await prisma.user.upsert({
     where: { id: 'user-emp3' },
-    update: {},
+    update: { passwordHash: cashierHash },
     create: {
       id: 'user-emp3',
       email: 'emp3@store.local',
       name: 'Carlos Rodriguez',
       role: 'cashier',
-      passwordHash: 'hashed_emp3_pw',
+      passwordHash: cashierHash,
     },
   })
   console.log('Users:', userAdmin.name, '|', userCashier.name, '|', userEmp3.name)

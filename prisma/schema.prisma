@@ -149,6 +149,8 @@ model Customer {
   paymentSettlements CustomerPaymentSettlement[]
   campaignContacts   CampaignContact[]
   workOrders         WorkOrder[]
+  contacts           Contact[]
+  opportunities      Opportunity[]
 }
 
 model Order {
@@ -1140,4 +1142,190 @@ model CampaignContact {
   customer Customer @relation(fields: [customerId], references: [id])
 
   @@unique([campaignId, customerId])
+}
+
+// ─── Approval Workflows ───────────────────────────────────────────────────────
+
+model ApprovalWorkflow {
+  id          String   @id @default(cuid())
+  name        String
+  entityType  String   // PURCHASE_ORDER | VENDOR_INVOICE | SALES_ORDER | JOURNAL_ENTRY | BUDGET | CUSTOMER
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  steps    ApprovalStep[]
+  requests ApprovalRequest[]
+}
+
+model ApprovalStep {
+  id           String  @id @default(cuid())
+  workflowId   String
+  stepOrder    Int
+  approverRole String  // admin | manager | accountant
+  approverName String?
+  isRequired   Boolean @default(true)
+
+  workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalRequest {
+  id          String   @id @default(cuid())
+  workflowId  String
+  entityType  String
+  entityId    String
+  entityRef   String
+  requestedBy String
+  currentStep Int      @default(1)
+  status      String   @default("pending") // pending | approved | rejected | cancelled
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+  actions  ApprovalAction[]
+}
+
+model ApprovalAction {
+  id        String   @id @default(cuid())
+  requestId String
+  stepOrder Int
+  action    String   // approve | reject | comment
+  actorName String
+  actorRole String
+  comment   String?
+  createdAt DateTime @default(now())
+
+  request ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+// ─── CRM / Sales Opportunities ────────────────────────────────────────────────
+
+model Contact {
+  id         String   @id @default(cuid())
+  firstName  String
+  lastName   String
+  email      String?
+  phone      String?
+  company    String?
+  title      String?
+  customerId String?
+  notes      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  opportunities Opportunity[]
+}
+
+model SalesCycle {
+  id   String @id @default(cuid())
+  name String
+
+  stages        SalesCycleStage[]
+  opportunities Opportunity[]
+}
+
+model SalesCycleStage {
+  id          String  @id @default(cuid())
+  cycleId     String
+  name        String
+  stageOrder  Int
+  probability Float   @default(0)
+
+  cycle SalesCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+}
+
+model Opportunity {
+  id                String    @id @default(cuid())
+  title             String
+  contactId         String?
+  customerId        String?
+  salesCycleId      String?
+  currentStageId    String?
+  estimatedValue    Float     @default(0)
+  probability       Float     @default(0)
+  expectedCloseDate DateTime?
+  status            String    @default("open") // open | won | lost | cancelled
+  assignedTo        String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  contact    Contact?    @relation(fields: [contactId], references: [id])
+  customer   Customer?   @relation(fields: [customerId], references: [id])
+  salesCycle SalesCycle? @relation(fields: [salesCycleId], references: [id])
+}
+
+// ─── Deferrals ────────────────────────────────────────────────────────────────
+
+model DeferralTemplate {
+  id                String    @id @default(cuid())
+  name              String
+  deferralType      String    // REVENUE | EXPENSE
+  method            String    // STRAIGHT_LINE | EQUAL_PER_PERIOD | USER_DEFINED
+  periodsCount      Int       @default(12)
+  startDate         DateTime?
+  glAccountId       String?
+  deferralAccountId String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+
+  schedules DeferralSchedule[]
+}
+
+model DeferralSchedule {
+  id            String   @id @default(cuid())
+  templateId    String
+  entityType    String   // INVOICE | JOURNAL
+  entityId      String
+  entityRef     String
+  totalAmount   Float
+  deferredAmt   Float
+  recognizedAmt Float    @default(0)
+  status        String   @default("active") // active | completed | cancelled
+  startDate     DateTime
+  endDate       DateTime
+  createdAt     DateTime @default(now())
+
+  template DeferralTemplate @relation(fields: [templateId], references: [id])
+  lines    DeferralLine[]
+}
+
+model DeferralLine {
+  id         String    @id @default(cuid())
+  scheduleId String
+  periodDate DateTime
+  amount     Float
+  isPosted   Boolean   @default(false)
+  postedAt   DateTime?
+
+  schedule DeferralSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+}
+
+// ─── Multi-Currency ───────────────────────────────────────────────────────────
+
+model Currency {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  symbol        String
+  isBase        Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  exchangeRates CurrencyRate[]
+}
+
+model CurrencyRate {
+  id         String   @id @default(cuid())
+  currencyId String
+  rate       Float
+  rateDate   DateTime @default(now())
+  source     String   @default("manual") // manual | auto
+
+  currency Currency @relation(fields: [currencyId], references: [id])
+
+  @@index([currencyId, rateDate])
 }
