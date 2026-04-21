@@ -27,6 +27,8 @@ model Store {
   shifts         Shift[]
   purchaseOrders PurchaseOrder[]
   workOrders     WorkOrder[]
+  storeTasks     StoreTask[]
+  taskLists      TaskList[]
 }
 
 model User {
@@ -151,6 +153,7 @@ model Customer {
   workOrders         WorkOrder[]
   contacts           Contact[]
   opportunities      Opportunity[]
+  giftCards          GiftCard[]
 }
 
 model Order {
@@ -1328,4 +1331,113 @@ model CurrencyRate {
   currency Currency @relation(fields: [currencyId], references: [id])
 
   @@index([currencyId, rateDate])
+}
+
+// ─── Gift Cards ───────────────────────────────────────────────────────────────
+
+model GiftCard {
+  id             String   @id @default(cuid())
+  cardNumber     String   @unique
+  initialValue   Float
+  currentBalance Float
+  isActive       Boolean  @default(true)
+  customerId     String?
+  issuedAt       DateTime @default(now())
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  customer     Customer?            @relation(fields: [customerId], references: [id])
+  transactions GiftCardTransaction[]
+}
+
+model GiftCardTransaction {
+  id            String   @id @default(cuid())
+  giftCardId    String
+  type          String   // ISSUE | REDEEM | RELOAD | VOID | CASHOUT
+  amount        Float
+  balanceBefore Float
+  balanceAfter  Float
+  reference     String?
+  createdAt     DateTime @default(now())
+
+  giftCard GiftCard @relation(fields: [giftCardId], references: [id])
+}
+
+// ─── Shipping Methods ─────────────────────────────────────────────────────────
+
+model ShippingMethod {
+  id              String   @id @default(cuid())
+  name            String
+  code            String   @unique
+  carrier         String?  // UPS | FEDEX | USPS | LOCAL
+  serviceType     String?
+  baseRate        Float    @default(0)
+  perLbRate       Float    @default(0)
+  freeThreshold   Float?
+  estimatedDays   Int?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── Fraud Protection ─────────────────────────────────────────────────────────
+
+model FraudRule {
+  id        String   @id @default(cuid())
+  name      String
+  ruleType  String   // ORDER_AMOUNT | VELOCITY | IP_BLOCK | PAYMENT_METHOD
+  threshold Float?
+  action    String   @default("flag") // flag | block | review
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  alerts FraudAlert[]
+}
+
+model FraudAlert {
+  id         String   @id @default(cuid())
+  ruleId     String?
+  entityType String   // ORDER | CUSTOMER | PAYMENT
+  entityId   String
+  reason     String
+  severity   String   @default("medium") // low | medium | high | critical
+  status     String   @default("open")   // open | reviewed | dismissed | confirmed
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rule FraudRule? @relation(fields: [ruleId], references: [id])
+}
+
+// ─── Store Task Management ────────────────────────────────────────────────────
+
+model TaskList {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  storeId     String?
+  dueDate     DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store Store?      @relation(fields: [storeId], references: [id])
+  tasks StoreTask[]
+}
+
+model StoreTask {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  storeId     String?
+  assignedTo  String?
+  dueDate     DateTime?
+  priority    String   @default("medium") // low | medium | high | critical
+  status      String   @default("pending") // pending | in_progress | completed | cancelled
+  taskListId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store    Store?    @relation(fields: [storeId], references: [id])
+  taskList TaskList? @relation(fields: [taskListId], references: [id])
 }

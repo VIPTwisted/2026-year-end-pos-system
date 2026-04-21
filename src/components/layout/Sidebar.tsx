@@ -9,6 +9,7 @@ import {
   CreditCard, CalendarDays, CheckSquare, GraduationCap,
   ArrowDownCircle, PieChart, FileText, Sliders, BarChart3,
   Target, Percent, Banknote, Boxes, Calculator,
+  GitBranch, TrendingUp, Clock, Globe,
 } from 'lucide-react'
 
 const NAV = [
@@ -28,6 +29,8 @@ const NAV = [
   { label: 'Fixed Assets', href: '/finance/fixed-assets', icon: Boxes },
   { label: 'Cost Accounting', href: '/finance/cost-accounting', icon: Calculator },
   { label: 'Tax Management', href: '/finance/tax', icon: Percent },
+  { label: 'Deferrals', href: '/finance/deferrals', icon: Clock },
+  { label: 'Multi-Currency', href: '/finance/currency', icon: Globe },
   { label: 'Budget', href: '/budget', icon: PieChart },
   { label: 'Budget Plans', href: '/budget/plans', icon: Target },
   { label: 'AR / Receivables', href: '/ar', icon: ArrowDownCircle },
@@ -36,6 +39,8 @@ const NAV = [
   { label: 'Fiscal Calendar', href: '/fiscal', icon: CalendarDays },
   { label: 'Year-End Close', href: '/year-end', icon: CheckSquare },
   { label: 'NovaPOS Training', href: '/training', icon: GraduationCap },
+  { label: 'Approvals', href: '/approvals', icon: GitBranch },
+  { label: 'CRM Pipeline', href: '/crm', icon: TrendingUp },
   { label: 'Marketing', href: '/marketing', icon: Megaphone },
   { label: 'Field Service', href: '/field-service', icon: Wrench },
   { label: 'HR & Shifts', href: '/hr', icon: Users },
