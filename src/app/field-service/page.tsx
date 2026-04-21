@@ -3,7 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Wrench } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Wrench, Plus } from 'lucide-react'
+import Link from 'next/link'
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary' | 'outline'> = {
   new: 'secondary',
@@ -77,8 +79,19 @@ export default async function FieldServicePage() {
       <TopBar title="Field Service" />
       <main className="flex-1 p-6 overflow-auto">
 
+        {/* Page header with New WO button */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-zinc-100">Work Orders</h2>
+          <Link href="/field-service/new">
+            <Button size="sm" className="flex items-center gap-1.5">
+              <Plus className="w-3.5 h-3.5" />
+              New Work Order
+            </Button>
+          </Link>
+        </div>
+
         {/* KPI Row — 7 cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-7 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-7 gap-4 mb-6 mt-0">
           <Card>
             <CardContent className="pt-5 pb-4">
               <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Total WOs</p>
@@ -202,7 +215,14 @@ export default async function FieldServicePage() {
 
                   return (
                     <tr key={wo.id} className="hover:bg-zinc-900/50">
-                      <td className="py-3 pr-4 font-mono text-xs text-zinc-300">{wo.woNumber}</td>
+                      <td className="py-3 pr-4">
+                          <Link
+                            href={`/field-service/${wo.id}`}
+                            className="font-mono text-xs text-blue-400 hover:text-blue-300 transition-colors hover:underline"
+                          >
+                            {wo.woNumber}
+                          </Link>
+                        </td>
                       <td className="py-3 pr-4 text-zinc-400 text-xs">{formatDate(wo.createdAt)}</td>
                       <td className="py-3 pr-4 text-zinc-400">{wo.store?.name ?? '—'}</td>
                       <td className="py-3 pr-4 text-zinc-100 font-medium max-w-[200px] truncate">{wo.title}</td>

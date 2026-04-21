@@ -958,6 +958,168 @@ async function main() {
   })
   console.log('✅ Budget + Tax seed complete')
 
+  // ─── Cost Accounting ─────────────────────────────────────────────────────────
+  const costCenters = await Promise.all([
+    prisma.costCenter.upsert({
+      where: { code: 'OPERATIONS' },
+      update: {},
+      create: {
+        code: 'OPERATIONS',
+        name: 'Operations Department',
+        type: 'department',
+        description: 'Manages day-to-day store and warehouse operations',
+        isActive: true,
+      },
+    }),
+    prisma.costCenter.upsert({
+      where: { code: 'FINANCE' },
+      update: {},
+      create: {
+        code: 'FINANCE',
+        name: 'Finance & Accounting',
+        type: 'department',
+        description: 'Financial reporting, accounts payable and receivable',
+        isActive: true,
+      },
+    }),
+    prisma.costCenter.upsert({
+      where: { code: 'MARKETING' },
+      update: {},
+      create: {
+        code: 'MARKETING',
+        name: 'Marketing Department',
+        type: 'department',
+        description: 'Brand, campaigns, and customer acquisition',
+        isActive: true,
+      },
+    }),
+    prisma.costCenter.upsert({
+      where: { code: 'IT-OPS' },
+      update: {},
+      create: {
+        code: 'IT-OPS',
+        name: 'IT Operations Project',
+        type: 'project',
+        description: 'Technology infrastructure and software systems',
+        isActive: true,
+      },
+    }),
+  ])
+
+  const costCategories = await Promise.all([
+    prisma.costCategory.upsert({
+      where: { code: 'PERSONNEL' },
+      update: {},
+      create: {
+        code: 'PERSONNEL',
+        name: 'Personnel & Payroll',
+        type: 'personnel',
+        description: 'Salaries, wages, and payroll taxes',
+        isActive: true,
+      },
+    }),
+    prisma.costCategory.upsert({
+      where: { code: 'OVERHEAD' },
+      update: {},
+      create: {
+        code: 'OVERHEAD',
+        name: 'Facility Overhead',
+        type: 'overhead',
+        description: 'Rent, utilities, insurance, and facility costs',
+        isActive: true,
+      },
+    }),
+    prisma.costCategory.upsert({
+      where: { code: 'MARKETING-EXP' },
+      update: {},
+      create: {
+        code: 'MARKETING-EXP',
+        name: 'Marketing Expenses',
+        type: 'services',
+        description: 'Advertising, promotions, and marketing services',
+        isActive: true,
+      },
+    }),
+    prisma.costCategory.upsert({
+      where: { code: 'TECH' },
+      update: {},
+      create: {
+        code: 'TECH',
+        name: 'Technology & Equipment',
+        type: 'materials',
+        description: 'Hardware, software licenses, and tech supplies',
+        isActive: true,
+      },
+    }),
+  ])
+
+  const [ccOps, ccFin, ccMkt, ccIT] = costCenters
+  const [catPay, catOvh, catMkt, catTech] = costCategories
+
+  // Cost Budgets (FY2026, no period = annual)
+  const budgetPairs: Array<{ centerId: string; categoryId: string; amount: number }> = [
+    { centerId: ccOps.id, categoryId: catPay.id,  amount: 180000 },
+    { centerId: ccOps.id, categoryId: catOvh.id,  amount: 60000  },
+    { centerId: ccFin.id, categoryId: catPay.id,  amount: 120000 },
+    { centerId: ccMkt.id, categoryId: catMkt.id,  amount: 85000  },
+    { centerId: ccMkt.id, categoryId: catPay.id,  amount: 95000  },
+    { centerId: ccIT.id,  categoryId: catTech.id, amount: 45000  },
+    { centerId: ccIT.id,  categoryId: catPay.id,  amount: 110000 },
+  ]
+
+  for (const b of budgetPairs) {
+    const existingBudget = await prisma.costBudget.findFirst({
+      where: {
+        costCenterId: b.centerId,
+        costCategoryId: b.categoryId,
+        fiscalYear: 'FY2026',
+        periodNumber: null,
+      },
+    })
+    if (!existingBudget) {
+      await prisma.costBudget.create({
+        data: {
+          costCenterId: b.centerId,
+          costCategoryId: b.categoryId,
+          fiscalYear: 'FY2026',
+          periodNumber: null,
+          budgetAmount: b.amount,
+        },
+      })
+    }
+  }
+
+  // Cost Ledger Entries — realistic YTD actuals through April 2026
+  const ledgerEntries = [
+    { centerId: ccOps.id, categoryId: catPay.id,  amount: 58200,  desc: 'Q1 operations payroll',           date: '2026-03-31', period: 3 },
+    { centerId: ccOps.id, categoryId: catOvh.id,  amount: 19400,  desc: 'Q1 facility overhead — rent + utilities', date: '2026-03-31', period: 3 },
+    { centerId: ccFin.id, categoryId: catPay.id,  amount: 37800,  desc: 'Q1 finance department payroll',   date: '2026-03-31', period: 3 },
+    { centerId: ccMkt.id, categoryId: catMkt.id,  amount: 22500,  desc: 'Spring campaign ad spend',        date: '2026-04-15', period: 4 },
+    { centerId: ccMkt.id, categoryId: catPay.id,  amount: 29750,  desc: 'Q1 marketing payroll',            date: '2026-03-31', period: 3 },
+    { centerId: ccIT.id,  categoryId: catTech.id, amount: 14800,  desc: 'POS software license + hardware', date: '2026-02-28', period: 2 },
+  ]
+
+  for (const e of ledgerEntries) {
+    const existing = await prisma.costLedgerEntry.findFirst({
+      where: { costCenterId: e.centerId, costCategoryId: e.categoryId, description: e.desc },
+    })
+    if (!existing) {
+      await prisma.costLedgerEntry.create({
+        data: {
+          costCenterId:   e.centerId,
+          costCategoryId: e.categoryId,
+          amount:         e.amount,
+          description:    e.desc,
+          sourceType:     'manual',
+          fiscalYear:     'FY2026',
+          periodNumber:   e.period,
+          entryDate:      new Date(e.date),
+        },
+      })
+    }
+  }
+  console.log('✅ Cost Accounting seed complete')
+
   console.log('\nSeed complete! All models populated.')
 }
 

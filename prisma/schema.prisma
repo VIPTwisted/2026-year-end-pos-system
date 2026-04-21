@@ -142,11 +142,13 @@ model Customer {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  orders           Order[]
-  cases            ServiceCase[]
-  communications   Communication[]
-  arInvoices       CustomerInvoice[]
+  orders             Order[]
+  cases              ServiceCase[]
+  communications     Communication[]
+  arInvoices         CustomerInvoice[]
   paymentSettlements CustomerPaymentSettlement[]
+  campaignContacts   CampaignContact[]
+  workOrders         WorkOrder[]
 }
 
 model Order {
@@ -266,9 +268,10 @@ model PurchaseOrder {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  supplier Supplier           @relation(fields: [supplierId], references: [id])
-  store    Store               @relation(fields: [storeId], references: [id])
-  items    PurchaseOrderItem[]
+  supplier  Supplier            @relation(fields: [supplierId], references: [id])
+  store     Store                @relation(fields: [storeId], references: [id])
+  items     PurchaseOrderItem[]
+  receipts  PurchaseReceipt[]
 }
 
 model PurchaseOrderItem {
@@ -282,8 +285,9 @@ model PurchaseOrderItem {
   unitCost    Float
   lineTotal   Float
 
-  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
-  product       Product        @relation(fields: [productId], references: [id])
+  purchaseOrder PurchaseOrder        @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product       Product               @relation(fields: [productId], references: [id])
+  receiptLines  PurchaseReceiptLine[]
 }
 
 model ServiceCase {
@@ -337,6 +341,7 @@ model Campaign {
   status      String    @default("draft")
   subject     String?
   content     String?
+  budget      Float?
   startDate   DateTime?
   endDate     DateTime?
   targetCount Int       @default(0)
@@ -344,6 +349,8 @@ model Campaign {
   openCount   Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  contacts CampaignContact[]
 }
 
 model WorkOrder {
@@ -364,7 +371,9 @@ model WorkOrder {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  store Store @relation(fields: [storeId], references: [id])
+  store    Store           @relation(fields: [storeId], references: [id])
+  customer Customer?       @relation(fields: [customerId], references: [id])
+  lines    WorkOrderLine[]
 }
 
 // ─── General Ledger ───────────────────────────────────────────────────────────
@@ -1001,4 +1010,134 @@ model PayrollEntry {
 
   period   PayrollPeriod @relation(fields: [periodId], references: [id])
   employee Employee      @relation(fields: [employeeId], references: [id])
+}
+
+// ─── Cost Accounting ──────────────────────────────────────────────────────────
+
+model CostCenter {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  type        String   @default("department") // department | project | region | product_line
+  managerId   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  allocations CostAllocation[]
+  entries     CostLedgerEntry[]
+  budgets     CostBudget[]
+}
+
+model CostCategory {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  type        String   @default("overhead") // personnel | overhead | materials | services | capex
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  entries     CostLedgerEntry[]
+  budgets     CostBudget[]
+}
+
+model CostAllocation {
+  id           String  @id @default(cuid())
+  costCenterId String
+  accountId    String?
+  percentage   Float
+  description  String?
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+
+  costCenter CostCenter @relation(fields: [costCenterId], references: [id])
+}
+
+model CostLedgerEntry {
+  id             String   @id @default(cuid())
+  costCenterId   String
+  costCategoryId String
+  amount         Float
+  description    String?
+  sourceType     String   @default("manual") // manual | journal | payroll | fixed_asset | allocation
+  sourceId       String?
+  fiscalYear     String?
+  periodNumber   Int?
+  entryDate      DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  costCenter   CostCenter   @relation(fields: [costCenterId], references: [id])
+  costCategory CostCategory @relation(fields: [costCategoryId], references: [id])
+}
+
+model CostBudget {
+  id             String  @id @default(cuid())
+  costCenterId   String
+  costCategoryId String
+  fiscalYear     String
+  periodNumber   Int?
+  budgetAmount   Float
+
+  costCenter   CostCenter   @relation(fields: [costCenterId], references: [id])
+  costCategory CostCategory @relation(fields: [costCategoryId], references: [id])
+
+  @@unique([costCenterId, costCategoryId, fiscalYear, periodNumber])
+}
+
+// ─── Field Service Extensions ─────────────────────────────────────────────────
+
+model WorkOrderLine {
+  id          String  @id @default(cuid())
+  workOrderId String
+  lineType    String  @default("labor") // labor | part | expense
+  description String
+  quantity    Float   @default(1)
+  unitCost    Float   @default(0)
+  totalCost   Float   @default(0)
+  createdAt   DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+}
+
+// ─── Purchasing Extensions ────────────────────────────────────────────────────
+
+model PurchaseReceipt {
+  id              String   @id @default(cuid())
+  receiptNumber   String   @unique
+  purchaseOrderId String
+  receivedBy      String?
+  receivedAt      DateTime @default(now())
+  notes           String?
+
+  purchaseOrder PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
+  lines         PurchaseReceiptLine[]
+}
+
+model PurchaseReceiptLine {
+  id              String @id @default(cuid())
+  receiptId       String
+  poItemId        String
+  quantityReceived Float
+
+  receipt PurchaseReceipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  poItem  PurchaseOrderItem @relation(fields: [poItemId], references: [id])
+}
+
+// ─── Marketing Extensions ─────────────────────────────────────────────────────
+
+model CampaignContact {
+  id           String    @id @default(cuid())
+  campaignId   String
+  customerId   String
+  status       String    @default("pending") // pending | sent | opened | clicked | unsubscribed
+  sentAt       DateTime?
+  openedAt     DateTime?
+  createdAt    DateTime  @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([campaignId, customerId])
 }

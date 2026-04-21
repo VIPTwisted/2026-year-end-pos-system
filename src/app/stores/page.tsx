@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
@@ -102,7 +103,14 @@ export default async function StoresPage() {
                     <CardContent className="pt-5 flex flex-col flex-1">
                       {/* Card header */}
                       <div className="flex items-start justify-between mb-3">
-                        <h3 className="text-lg font-bold text-zinc-100 leading-tight">{store.name}</h3>
+                        <h3 className="text-lg font-bold leading-tight">
+                          <Link
+                            href={`/stores/${store.id}`}
+                            className="text-zinc-100 hover:text-emerald-400 transition-colors"
+                          >
+                            {store.name}
+                          </Link>
+                        </h3>
                         <Badge variant={store.isActive ? 'success' : 'destructive'}>
                           {store.isActive ? 'Active' : 'Inactive'}
                         </Badge>
@@ -186,7 +194,14 @@ export default async function StoresPage() {
                         const emps = empMap.get(store.id) ?? 0
                         return (
                           <tr key={store.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                            <td className="px-6 py-3 font-medium text-zinc-100">{store.name}</td>
+                            <td className="px-6 py-3 font-medium">
+                              <Link
+                                href={`/stores/${store.id}`}
+                                className="text-zinc-100 hover:text-emerald-400 transition-colors"
+                              >
+                                {store.name}
+                              </Link>
+                            </td>
                             <td className="px-4 py-3 text-right text-zinc-300 tabular-nums">{orderCount}</td>
                             <td className="px-4 py-3 text-right text-zinc-300 tabular-nums">{formatCurrency(revenue)}</td>
                             <td className="px-4 py-3 text-right text-zinc-400 tabular-nums">

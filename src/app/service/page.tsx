@@ -1,9 +1,11 @@
+import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { HeadphonesIcon, CheckCircle2, Clock, ShieldAlert, BarChart3 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { HeadphonesIcon, CheckCircle2, Clock, ShieldAlert, BarChart3, Plus } from 'lucide-react'
 
 const PRIORITY_VARIANT: Record<string, 'destructive' | 'warning' | 'default' | 'secondary'> = {
   critical: 'destructive',
@@ -89,9 +91,17 @@ export default async function ServicePage() {
 
         {/* ── Case Management Table ── */}
         <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-zinc-100">Case Management</h2>
-            <p className="text-sm text-zinc-500">{cases.length} cases</p>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-100">Case Management</h2>
+              <p className="text-sm text-zinc-500">{cases.length} cases</p>
+            </div>
+            <Button asChild>
+              <Link href="/service/new">
+                <Plus className="w-4 h-4 mr-1" />
+                New Case
+              </Link>
+            </Button>
           </div>
 
           {cases.length === 0 ? (
@@ -121,7 +131,14 @@ export default async function ServicePage() {
                 <tbody className="divide-y divide-zinc-800">
                   {cases.map(c => (
                     <tr key={c.id} className="hover:bg-zinc-900/50">
-                      <td className="py-3 pr-4 font-mono text-xs text-zinc-300">{c.caseNumber}</td>
+                      <td className="py-3 pr-4 font-mono text-xs">
+                        <Link
+                          href={`/service/${c.id}`}
+                          className="text-blue-400 hover:text-blue-300 hover:underline"
+                        >
+                          {c.caseNumber}
+                        </Link>
+                      </td>
                       <td className="py-3 pr-4 text-zinc-400 text-xs whitespace-nowrap">
                         {formatDate(c.createdAt)}
                       </td>

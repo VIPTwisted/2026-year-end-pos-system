@@ -8,7 +8,7 @@ import {
   Settings, ChevronRight, Store, Map,
   CreditCard, CalendarDays, CheckSquare, GraduationCap,
   ArrowDownCircle, PieChart, FileText, Sliders, BarChart3,
-  Target, Percent, Banknote, Boxes,
+  Target, Percent, Banknote, Boxes, Calculator,
 } from 'lucide-react'
 
 const NAV = [
@@ -26,6 +26,7 @@ const NAV = [
   { label: 'GL Journal', href: '/finance/gl', icon: FileText },
   { label: 'Posting Profiles', href: '/finance/posting-profiles', icon: Sliders },
   { label: 'Fixed Assets', href: '/finance/fixed-assets', icon: Boxes },
+  { label: 'Cost Accounting', href: '/finance/cost-accounting', icon: Calculator },
   { label: 'Tax Management', href: '/finance/tax', icon: Percent },
   { label: 'Budget', href: '/budget', icon: PieChart },
   { label: 'Budget Plans', href: '/budget/plans', icon: Target },
@@ -38,6 +39,7 @@ const NAV = [
   { label: 'Marketing', href: '/marketing', icon: Megaphone },
   { label: 'Field Service', href: '/field-service', icon: Wrench },
   { label: 'HR & Shifts', href: '/hr', icon: Users },
+  { label: 'Employees', href: '/hr/employees', icon: Users },
   { label: 'Payroll', href: '/hr/payroll', icon: Banknote },
   { label: 'Stores / HQ', href: '/stores', icon: Store },
   { label: 'NovaPOS Module Map', href: '/d365-map', icon: Map },

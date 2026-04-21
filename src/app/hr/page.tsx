@@ -1,8 +1,10 @@
+import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Users, Calendar } from 'lucide-react'
 
 const SHIFT_VARIANT: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary'> = {
@@ -64,6 +66,20 @@ export default async function HRPage() {
     <>
       <TopBar title="HR & Workforce" />
       <main className="flex-1 p-6 overflow-auto space-y-8">
+
+        {/* Actions header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-zinc-100">HR & Workforce</h1>
+            <p className="text-sm text-zinc-500">Overview, shifts, and employee management</p>
+          </div>
+          <Link href="/hr/employees">
+            <Button size="sm" variant="outline">
+              <Users className="w-4 h-4 mr-1.5" />
+              Manage Employees
+            </Button>
+          </Link>
+        </div>
 
         {/* KPI row — 5 cards */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">

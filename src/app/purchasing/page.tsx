@@ -1,9 +1,11 @@
+import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Truck, Users } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Truck, Plus } from 'lucide-react'
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary' | 'outline'> = {
   draft: 'secondary',
@@ -174,9 +176,16 @@ export default async function PurchasingPage() {
         )}
 
         {/* PO Table */}
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-zinc-100">Purchase Orders</h2>
-          <p className="text-sm text-zinc-500">{pos.length} purchase orders</p>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-100">Purchase Orders</h2>
+            <p className="text-sm text-zinc-500">{pos.length} purchase orders</p>
+          </div>
+          <Link href="/purchasing/new">
+            <Button>
+              <Plus className="w-4 h-4 mr-1" />New PO
+            </Button>
+          </Link>
         </div>
 
         {pos.length === 0 ? (
@@ -184,7 +193,12 @@ export default async function PurchasingPage() {
             <CardContent className="flex flex-col items-center justify-center py-20 text-zinc-500">
               <Truck className="w-12 h-12 mb-4 opacity-30" />
               <p className="text-base font-medium text-zinc-300 mb-2">No Purchase Orders</p>
-              <p className="text-sm">Create your first PO to get started</p>
+              <p className="text-sm mb-4">Create your first PO to get started</p>
+              <Link href="/purchasing/new">
+                <Button>
+                  <Plus className="w-4 h-4 mr-1" />New Purchase Order
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         ) : (
@@ -205,7 +219,14 @@ export default async function PurchasingPage() {
               <tbody className="divide-y divide-zinc-800">
                 {pos.map(po => (
                   <tr key={po.id} className="hover:bg-zinc-900/50">
-                    <td className="py-3 pr-4 font-mono text-xs text-zinc-300">{po.poNumber}</td>
+                    <td className="py-3 pr-4 font-mono text-xs">
+                      <Link
+                        href={`/purchasing/${po.id}`}
+                        className="text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                      >
+                        {po.poNumber}
+                      </Link>
+                    </td>
                     <td className="py-3 pr-4 text-zinc-400 text-xs whitespace-nowrap">{formatDate(po.createdAt)}</td>
                     <td className="py-3 pr-4 text-zinc-300">{po.supplier?.name ?? '—'}</td>
                     <td className="py-3 pr-4 text-zinc-400">{po.store?.name ?? '—'}</td>

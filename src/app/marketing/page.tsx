@@ -1,9 +1,11 @@
+import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Megaphone, TrendingUp, Send, Percent } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Megaphone, TrendingUp, Send, Percent, Plus } from 'lucide-react'
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary' | 'outline'> = {
   draft: 'secondary',
@@ -90,6 +92,16 @@ export default async function MarketingPage() {
           </Card>
         </div>
 
+        {/* New Campaign Button */}
+        <div className="flex justify-end mb-4">
+          <Button asChild>
+            <Link href="/marketing/new">
+              <Plus className="w-4 h-4 mr-1" />
+              New Campaign
+            </Link>
+          </Button>
+        </div>
+
         {/* Table */}
         {campaigns.length === 0 ? (
           <Card>
@@ -123,7 +135,14 @@ export default async function MarketingPage() {
                       : '—'
                   return (
                     <tr key={c.id} className="hover:bg-zinc-900/50">
-                      <td className="py-3 pr-4 text-zinc-100 font-medium">{c.name}</td>
+                      <td className="py-3 pr-4 font-medium">
+                        <Link
+                          href={`/marketing/${c.id}`}
+                          className="text-blue-400 hover:text-blue-300 hover:underline"
+                        >
+                          {c.name}
+                        </Link>
+                      </td>
                       <td className="py-3 pr-4">
                         <Badge variant={TYPE_VARIANT[c.type] ?? 'default'}>{c.type}</Badge>
                       </td>
