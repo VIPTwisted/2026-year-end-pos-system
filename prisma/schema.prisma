@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  phone     String?
+  email     String?
+  taxRate   Float    @default(0.0825)
+  currency  String   @default("USD")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees      Employee[]
+  orders         Order[]
+  inventory      Inventory[]
+  shifts         Shift[]
+  purchaseOrders PurchaseOrder[]
+  workOrders     WorkOrder[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         String   @default("cashier")
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  employee Employee?
+}
+
+model Employee {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  storeId    String
+  firstName  String
+  lastName   String
+  position   String
+  department String?
+  hireDate   DateTime @default(now())
+  hourlyRate Float?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User      @relation(fields: [userId], references: [id])
+  store  Store     @relation(fields: [storeId], references: [id])
+  shifts Shift[]
+}
+
+model Shift {
+  id         String   @id @default(cuid())
+  employeeId String
+  storeId    String
+  startTime  DateTime
+  endTime    DateTime
+  status     String   @default("scheduled")
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  store    Store    @relation(fields: [storeId], references: [id])
+}
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  parentId  String?
+  color     String?
+  icon      String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  parent   ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryTree")
+  products Product[]
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  sku          String   @unique
+  barcode      String?  @unique
+  name         String
+  description  String?
+  categoryId   String?
+  costPrice    Float    @default(0)
+  salePrice    Float    @default(0)
+  unit         String   @default("each")
+  taxable      Boolean  @default(true)
+  trackStock   Boolean  @default(true)
+  isActive     Boolean  @default(true)
+  imageUrl     String?
+  supplierId   String?
+  reorderPoint Int?
+  reorderQty   Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category           ProductCategory?    @relation(fields: [categoryId], references: [id])
+  supplier           Supplier?           @relation(fields: [supplierId], references: [id])
+  inventory          Inventory[]
+  orderItems         OrderItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+}
+
+model Customer {
+  id             String   @id @default(cuid())
+  firstName      String
+  lastName       String
+  email          String?  @unique
+  phone          String?
+  address        String?
+  city           String?
+  state          String?
+  zip            String?
+  loyaltyPoints  Int      @default(0)
+  totalSpent     Float    @default(0)
+  visitCount     Int      @default(0)
+  notes          String?
+  tags           String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders         Order[]
+  cases          ServiceCase[]
+  communications Communication[]
+}
+
+model Order {
+  id             String   @id @default(cuid())
+  orderNumber    String   @unique
+  storeId        String
+  customerId     String?
+  status         String   @default("pending")
+  subtotal       Float    @default(0)
+  taxAmount      Float    @default(0)
+  discountAmount Float    @default(0)
+  totalAmount    Float    @default(0)
+  paymentMethod  String?
+  amountTendered Float?
+  changeDue      Float?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  store    Store     @relation(fields: [storeId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String
+  productName String
+  sku         String
+  quantity    Float
+  unitPrice   Float
+  discount    Float   @default(0)
+  taxAmount   Float   @default(0)
+  lineTotal   Float
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  orderId   String
+  method    String
+  amount    Float
+  reference String?
+  status    String   @default("completed")
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Inventory {
+  id        String   @id @default(cuid())
+  productId String
+  storeId   String
+  quantity  Float    @default(0)
+  reserved  Float    @default(0)
+  location  String?
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+  store   Store   @relation(fields: [storeId], references: [id])
+
+  @@unique([productId, storeId])
+}
+
+model InventoryTransaction {
+  id        String   @id @default(cuid())
+  productId String
+  storeId   String
+  type      String
+  quantity  Float
+  beforeQty Float
+  afterQty  Float
+  reference String?
+  notes     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+}
+
+model Supplier {
+  id           String   @id @default(cuid())
+  name         String
+  contactName  String?
+  email        String?
+  phone        String?
+  address      String?
+  city         String?
+  state        String?
+  zip          String?
+  paymentTerms String?
+  notes        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id           String    @id @default(cuid())
+  poNumber     String    @unique
+  supplierId   String
+  storeId      String
+  status       String    @default("draft")
+  subtotal     Float     @default(0)
+  taxAmount    Float     @default(0)
+  shippingCost Float     @default(0)
+  totalAmount  Float     @default(0)
+  expectedDate DateTime?
+  receivedDate DateTime?
+  notes        String?
+  createdBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  supplier Supplier           @relation(fields: [supplierId], references: [id])
+  store    Store               @relation(fields: [storeId], references: [id])
+  items    PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id          String  @id @default(cuid())
+  poId        String
+  productId   String
+  productName String
+  sku         String
+  orderedQty  Float
+  receivedQty Float   @default(0)
+  unitCost    Float
+  lineTotal   Float
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id])
+}
+
+model ServiceCase {
+  id          String    @id @default(cuid())
+  caseNumber  String    @unique
+  customerId  String
+  subject     String
+  description String?
+  status      String    @default("open")
+  priority    String    @default("medium")
+  category    String?
+  assignedTo  String?
+  resolvedAt  DateTime?
+  slaBreached Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  customer Customer   @relation(fields: [customerId], references: [id])
+  notes    CaseNote[]
+}
+
+model CaseNote {
+  id        String   @id @default(cuid())
+  caseId    String
+  authorId  String?
+  content   String
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  case ServiceCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model Communication {
+  id         String   @id @default(cuid())
+  customerId String
+  channel    String
+  direction  String
+  subject    String?
+  content    String?
+  status     String   @default("sent")
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+}
+
+model Campaign {
+  id          String    @id @default(cuid())
+  name        String
+  type        String
+  status      String    @default("draft")
+  subject     String?
+  content     String?
+  startDate   DateTime?
+  endDate     DateTime?
+  targetCount Int       @default(0)
+  sentCount   Int       @default(0)
+  openCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model WorkOrder {
+  id           String    @id @default(cuid())
+  woNumber     String    @unique
+  storeId      String
+  customerId   String?
+  title        String
+  description  String?
+  status       String    @default("new")
+  priority     String    @default("medium")
+  assignedTo   String?
+  scheduledAt  DateTime?
+  completedAt  DateTime?
+  estimatedHrs Float?
+  actualHrs    Float?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id])
+}
+
+model Account {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  type      String
+  subtype   String?
+  balance   Float    @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  journalLines JournalLine[]
+}
+
+model JournalEntry {
+  id          String   @id @default(cuid())
+  reference   String
+  description String?
+  date        DateTime @default(now())
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  lines JournalLine[]
+}
+
+model JournalLine {
+  id        String  @id @default(cuid())
+  entryId   String
+  accountId String
+  debit     Float   @default(0)
+  credit    Float   @default(0)
+  memo      String?
+
+  entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account Account      @relation(fields: [accountId], references: [id])
+}
