@@ -13,6 +13,7 @@ const NAV = [
   { label: 'POS Terminal', href: '/pos', icon: ShoppingCart },
   { label: 'Products', href: '/products', icon: Package },
   { label: 'Inventory', href: '/inventory', icon: Warehouse },
+  { label: 'Warehouse', href: '/warehouse', icon: Warehouse },
   { label: 'Customers', href: '/customers', icon: Users },
   { label: 'Orders', href: '/orders', icon: ShoppingCart },
   { label: 'Purchasing', href: '/purchasing', icon: Building2 },
