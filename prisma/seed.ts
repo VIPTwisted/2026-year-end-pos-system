@@ -617,6 +617,137 @@ async function main() {
   })
   console.log('WMS Bins: 3 seeded')
 
+  // ── Business Central Finance Seeds ──────────────────────────────────────────
+
+  // Vendor Groups
+  const vendorGroups = await Promise.all([
+    prisma.vendorGroup.upsert({ where: { code: 'MERCH' }, update: {}, create: { code: 'MERCH', name: 'Merchandise Suppliers', defaultPayTerms: 'Net30' } }),
+    prisma.vendorGroup.upsert({ where: { code: 'SVCS' }, update: {}, create: { code: 'SVCS', name: 'Services & Utilities', defaultPayTerms: 'Net15' } }),
+    prisma.vendorGroup.upsert({ where: { code: 'TECH' }, update: {}, create: { code: 'TECH', name: 'Technology & Software', defaultPayTerms: 'Net45' } }),
+  ])
+
+  // Vendors
+  const vendors = await Promise.all([
+    prisma.vendor.upsert({ where: { vendorCode: 'V-GLO-001' }, update: {}, create: { vendorCode: 'V-GLO-001', name: 'Global Imports LLC', vendorGroupId: vendorGroups[0].id, email: 'ap@globalimports.com', paymentTerms: 'Net30', paymentMethod: 'ACH', creditLimit: 50000, isActive: true } }),
+    prisma.vendor.upsert({ where: { vendorCode: 'V-TEC-002' }, update: {}, create: { vendorCode: 'V-TEC-002', name: 'TechSoft Solutions', vendorGroupId: vendorGroups[2].id, email: 'billing@techsoft.com', paymentTerms: 'Net45', paymentMethod: 'Wire', creditLimit: 25000, isActive: true } }),
+    prisma.vendor.upsert({ where: { vendorCode: 'V-UTL-003' }, update: {}, create: { vendorCode: 'V-UTL-003', name: 'City Power & Water', vendorGroupId: vendorGroups[1].id, email: 'accounts@citypw.gov', paymentTerms: 'Net15', paymentMethod: 'Check', isActive: true } }),
+  ])
+
+  // Vendor Invoices (some open, some paid)
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
+  const tenDaysFromNow = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000)
+  const overdueDate = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000)
+
+  await prisma.vendorInvoice.upsert({
+    where: { invoiceNumber: 'VINV-SEED-001' },
+    update: {},
+    create: {
+      invoiceNumber: 'VINV-SEED-001', vendorId: vendors[0].id,
+      invoiceDate: thirtyDaysAgo, dueDate: tenDaysFromNow,
+      subtotal: 12500, taxAmount: 1031.25, totalAmount: 13531.25, paidAmount: 0,
+      status: 'posted', matchingStatus: 'two_way',
+      lines: { create: [
+        { description: 'Holiday merchandise lot A', quantity: 500, unitPrice: 15, lineAmount: 7500, taxAmount: 618.75 },
+        { description: 'Holiday merchandise lot B', quantity: 250, unitPrice: 20, lineAmount: 5000, taxAmount: 412.50 },
+      ]}
+    }
+  })
+
+  await prisma.vendorInvoice.upsert({
+    where: { invoiceNumber: 'VINV-SEED-002' },
+    update: {},
+    create: {
+      invoiceNumber: 'VINV-SEED-002', vendorId: vendors[1].id,
+      invoiceDate: fifteenDaysAgo, dueDate: overdueDate,
+      subtotal: 4800, taxAmount: 396, totalAmount: 5196, paidAmount: 0,
+      status: 'posted', matchingStatus: 'none',
+      lines: { create: [
+        { description: 'POS Software Annual License', quantity: 1, unitPrice: 3600, lineAmount: 3600, taxAmount: 297 },
+        { description: 'Hardware Support Contract', quantity: 1, unitPrice: 1200, lineAmount: 1200, taxAmount: 99 },
+      ]}
+    }
+  })
+
+  await prisma.vendorInvoice.upsert({
+    where: { invoiceNumber: 'VINV-SEED-003' },
+    update: {},
+    create: {
+      invoiceNumber: 'VINV-SEED-003', vendorId: vendors[2].id,
+      invoiceDate: thirtyDaysAgo, dueDate: overdueDate,
+      subtotal: 850, taxAmount: 0, totalAmount: 850, paidAmount: 850,
+      status: 'paid', matchingStatus: 'two_way',
+      lines: { create: [
+        { description: 'Monthly utilities - March 2026', quantity: 1, unitPrice: 850, lineAmount: 850, taxAmount: 0 },
+      ]}
+    }
+  })
+
+  // Bank Accounts
+  await prisma.bankAccount.upsert({
+    where: { accountCode: 'BANK-CHK-001' },
+    update: {},
+    create: {
+      accountCode: 'BANK-CHK-001', bankName: 'First National Bank',
+      accountNumber: '****4521', accountType: 'checking',
+      currentBalance: 87450.22, isActive: true, isPrimary: true
+    }
+  })
+
+  await prisma.bankAccount.upsert({
+    where: { accountCode: 'BANK-SAV-001' },
+    update: {},
+    create: {
+      accountCode: 'BANK-SAV-001', bankName: 'First National Bank',
+      accountNumber: '****7832', accountType: 'savings',
+      currentBalance: 125000.00, isActive: true, isPrimary: false
+    }
+  })
+
+  // Fiscal Year 2026
+  await prisma.fiscalYear.upsert({
+    where: { name: 'FY2026' },
+    update: {},
+    create: {
+      name: 'FY2026', startDate: new Date('2026-01-01'), endDate: new Date('2026-12-31'), status: 'open',
+      periods: { create: [
+        { periodNumber: 1,  name: 'Jan 2026', startDate: new Date('2026-01-01'), endDate: new Date('2026-01-31'), status: 'closed' },
+        { periodNumber: 2,  name: 'Feb 2026', startDate: new Date('2026-02-01'), endDate: new Date('2026-02-28'), status: 'closed' },
+        { periodNumber: 3,  name: 'Mar 2026', startDate: new Date('2026-03-01'), endDate: new Date('2026-03-31'), status: 'closed' },
+        { periodNumber: 4,  name: 'Apr 2026', startDate: new Date('2026-04-01'), endDate: new Date('2026-04-30'), status: 'open' },
+        { periodNumber: 5,  name: 'May 2026', startDate: new Date('2026-05-01'), endDate: new Date('2026-05-31'), status: 'open' },
+        { periodNumber: 6,  name: 'Jun 2026', startDate: new Date('2026-06-01'), endDate: new Date('2026-06-30'), status: 'open' },
+        { periodNumber: 7,  name: 'Jul 2026', startDate: new Date('2026-07-01'), endDate: new Date('2026-07-31'), status: 'open' },
+        { periodNumber: 8,  name: 'Aug 2026', startDate: new Date('2026-08-01'), endDate: new Date('2026-08-31'), status: 'open' },
+        { periodNumber: 9,  name: 'Sep 2026', startDate: new Date('2026-09-01'), endDate: new Date('2026-09-30'), status: 'open' },
+        { periodNumber: 10, name: 'Oct 2026', startDate: new Date('2026-10-01'), endDate: new Date('2026-10-31'), status: 'open' },
+        { periodNumber: 11, name: 'Nov 2026', startDate: new Date('2026-11-01'), endDate: new Date('2026-11-30'), status: 'open' },
+        { periodNumber: 12, name: 'Dec 2026', startDate: new Date('2026-12-01'), endDate: new Date('2026-12-31'), status: 'open' },
+      ]}
+    }
+  })
+
+  // Fiscal Year 2025 (prior year, closed)
+  await prisma.fiscalYear.upsert({
+    where: { name: 'FY2025' },
+    update: {},
+    create: {
+      name: 'FY2025', startDate: new Date('2025-01-01'), endDate: new Date('2025-12-31'), status: 'closed',
+      closedAt: new Date('2026-01-15'),
+      periods: { create: Array.from({ length: 12 }, (_, i) => ({
+        periodNumber: i + 1,
+        name: new Date(2025, i, 1).toLocaleString('en-US', { month: 'short' }) + ' 2025',
+        startDate: new Date(2025, i, 1),
+        endDate: new Date(2025, i + 1, 0),
+        status: 'closed',
+        closedAt: new Date('2026-01-15')
+      }))}
+    }
+  })
+
+  console.log('✅ BC Finance seed data complete')
+
   console.log('\nSeed complete! All models populated.')
 }
 

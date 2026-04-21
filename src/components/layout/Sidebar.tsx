@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Warehouse,
   Building2, HeadphonesIcon, DollarSign, Megaphone, Wrench,
-  Settings, ChevronRight, Store, Map
+  Settings, ChevronRight, Store, Map,
+  CreditCard, CalendarDays, CheckSquare, GraduationCap,
 } from 'lucide-react'
 
 const NAV = [
@@ -19,6 +20,11 @@ const NAV = [
   { label: 'Purchasing', href: '/purchasing', icon: Building2 },
   { label: 'Customer Service', href: '/service', icon: HeadphonesIcon },
   { label: 'Finance', href: '/finance', icon: DollarSign },
+  { label: 'Vendors / AP', href: '/vendors', icon: Building2 },
+  { label: 'Bank Accounts', href: '/bank', icon: CreditCard },
+  { label: 'Fiscal Calendar', href: '/fiscal', icon: CalendarDays },
+  { label: 'Year-End Close', href: '/year-end', icon: CheckSquare },
+  { label: 'BC Training', href: '/training', icon: GraduationCap },
   { label: 'Marketing', href: '/marketing', icon: Megaphone },
   { label: 'Field Service', href: '/field-service', icon: Wrench },
   { label: 'HR & Shifts', href: '/hr', icon: Users },

@@ -28,3 +28,42 @@ export function generateCaseNumber() {
 export function generateWONumber() {
   return `WO-${Date.now().toString(36).toUpperCase()}`
 }
+
+export function generateVendorCode(name: string) {
+  return `V-${name.slice(0, 3).toUpperCase()}-${Date.now().toString(36).toUpperCase().slice(-4)}`
+}
+
+export function generateInvoiceNumber(prefix: string) {
+  return `${prefix}-${Date.now().toString(36).toUpperCase()}`
+}
+
+export function generatePaymentNumber() {
+  return `VPAY-${Date.now().toString(36).toUpperCase()}`
+}
+
+export function getDaysOverdue(dueDate: Date | string): number {
+  const due = new Date(dueDate)
+  const now = new Date()
+  return Math.max(0, Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)))
+}
+
+export function isOverdue(dueDate: Date | string, status: string): boolean {
+  if (['paid', 'cancelled'].includes(status)) return false
+  return new Date(dueDate) < new Date()
+}
+
+export function getStatusColor(status: string): string {
+  const map: Record<string, string> = {
+    draft: 'text-zinc-400',
+    posted: 'text-blue-400',
+    paid: 'text-emerald-400',
+    partial: 'text-amber-400',
+    cancelled: 'text-red-400',
+    open: 'text-emerald-400',
+    closed: 'text-zinc-500',
+    on_hold: 'text-amber-400',
+    pending: 'text-blue-400',
+    reconciled: 'text-emerald-400',
+  }
+  return map[status] ?? 'text-zinc-400'
+}

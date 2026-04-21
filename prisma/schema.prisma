@@ -135,13 +135,17 @@ model Customer {
   visitCount     Int      @default(0)
   notes          String?
   tags           String?
+  creditLimit    Float    @default(0)
+  creditStatus   String   @default("good")  // good | warning | hold
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  orders         Order[]
-  cases          ServiceCase[]
-  communications Communication[]
+  orders           Order[]
+  cases            ServiceCase[]
+  communications   Communication[]
+  arInvoices       CustomerInvoice[]
+  paymentSettlements CustomerPaymentSettlement[]
 }
 
 model Order {
@@ -362,17 +366,24 @@ model WorkOrder {
   store Store @relation(fields: [storeId], references: [id])
 }
 
-model Account {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
-  type      String
-  subtype   String?
-  balance   Float    @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+// ─── General Ledger ───────────────────────────────────────────────────────────
 
-  journalLines JournalLine[]
+model Account {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  type              String   // asset | liability | equity | revenue | expense
+  subtype           String?
+  mainAccountType   String?  // BC: balance_sheet | profit_loss (drives year-end behavior)
+  openingAccountId  String?  // BC: where balance transfers to on year-end close
+  balance           Float    @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  journalLines    JournalLine[]
+  bankAccounts    BankAccount[]
+  postingDebits   PostingRule[]  @relation("PostingRuleDebit")
+  postingCredits  PostingRule[]  @relation("PostingRuleCredit")
 }
 
 model JournalEntry {
@@ -380,6 +391,7 @@ model JournalEntry {
   reference   String
   description String?
   date        DateTime @default(now())
+  status      String   @default("posted")  // posted | reversed
   createdBy   String?
   createdAt   DateTime @default(now())
 
@@ -398,27 +410,312 @@ model JournalLine {
   account Account      @relation(fields: [accountId], references: [id])
 }
 
-// ─── Warehouse Management System (Phase 2) ───────────────────────────────────
-// Architecture: Location → Zone → Rack → Bin → BinContent (5-level hierarchy)
-// Sourced from BC Business Central AL + WarehouseControlSystem C# MVVM forensic parse
+// ─── Business Central: Vendor / AP ───────────────────────────────────────────
+
+model VendorGroup {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  name            String
+  defaultPayTerms String?  // Net30 | Net60 | COD
+  description     String?
+  createdAt       DateTime @default(now())
+
+  vendors Vendor[]
+}
+
+model Vendor {
+  id             String   @id @default(cuid())
+  vendorCode     String   @unique
+  name           String
+  vendorGroupId  String?
+  email          String?
+  phone          String?
+  address        String?
+  city           String?
+  state          String?
+  zip            String?
+  taxId          String?
+  paymentTerms   String?  // Net30 | Net60 | Net15 | COD | Immediate
+  paymentMethod  String?  // Check | ACH | Wire | Cash
+  currency       String   @default("USD")
+  creditLimit    Float?
+  isActive       Boolean  @default(true)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vendorGroup     VendorGroup?           @relation(fields: [vendorGroupId], references: [id])
+  invoices        VendorInvoice[]
+  payments        VendorPayment[]
+}
+
+model VendorInvoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  vendorId        String
+  invoiceDate     DateTime
+  dueDate         DateTime
+  postingDate     DateTime @default(now())
+  subtotal        Float
+  taxAmount       Float    @default(0)
+  totalAmount     Float
+  paidAmount      Float    @default(0)
+  status          String   @default("draft")   // draft | posted | matched | paid | partial | cancelled
+  matchingStatus  String   @default("none")    // none | two_way | three_way
+  poId            String?
+  journalEntryId  String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vendor      Vendor                    @relation(fields: [vendorId], references: [id])
+  lines       VendorInvoiceLine[]
+  settlements VendorPaymentSettlement[]
+}
+
+model VendorInvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  productId   String?
+  accountCode String?
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+  lineAmount  Float
+  taxAmount   Float   @default(0)
+
+  invoice VendorInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model VendorPayment {
+  id             String   @id @default(cuid())
+  paymentNumber  String   @unique
+  vendorId       String
+  paymentDate    DateTime
+  amount         Float
+  paymentMethod  String   @default("Check")  // Check | ACH | Wire | Cash
+  bankAccountId  String?
+  checkNumber    String?
+  status         String   @default("draft")  // draft | posted | cleared | voided
+  journalEntryId String?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  vendor      Vendor                    @relation(fields: [vendorId], references: [id])
+  bankAccount BankAccount?              @relation(fields: [bankAccountId], references: [id])
+  settlements VendorPaymentSettlement[]
+}
+
+model VendorPaymentSettlement {
+  id            String   @id @default(cuid())
+  paymentId     String
+  invoiceId     String
+  settledAmount Float
+  discountTaken Float    @default(0)
+  settledAt     DateTime @default(now())
+
+  payment VendorPayment @relation(fields: [paymentId], references: [id])
+  invoice VendorInvoice @relation(fields: [invoiceId], references: [id])
+}
+
+// ─── Business Central: Customer / AR ─────────────────────────────────────────
+
+model CustomerInvoice {
+  id             String   @id @default(cuid())
+  invoiceNumber  String   @unique
+  customerId     String
+  orderId        String?
+  invoiceDate    DateTime
+  dueDate        DateTime
+  postingDate    DateTime @default(now())
+  subtotal       Float
+  taxAmount      Float    @default(0)
+  totalAmount    Float
+  paidAmount     Float    @default(0)
+  status         String   @default("draft")  // draft | posted | paid | partial | cancelled
+  invoiceType    String   @default("sales")  // sales | free_text
+  journalEntryId String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  customer    Customer                    @relation(fields: [customerId], references: [id])
+  lines       CustomerInvoiceLine[]
+  settlements CustomerPaymentSettlement[]
+}
+
+model CustomerInvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  productId   String?
+  accountCode String?
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+  lineAmount  Float
+  taxAmount   Float   @default(0)
+
+  invoice CustomerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model CustomerPaymentSettlement {
+  id            String   @id @default(cuid())
+  customerId    String
+  invoiceId     String
+  paymentRef    String?
+  settledAmount Float
+  discountTaken Float    @default(0)
+  settledAt     DateTime @default(now())
+
+  customer Customer        @relation(fields: [customerId], references: [id])
+  invoice  CustomerInvoice @relation(fields: [invoiceId], references: [id])
+}
+
+// ─── Business Central: Bank & Cash Management ─────────────────────────────────
+
+model BankAccount {
+  id             String   @id @default(cuid())
+  accountCode    String   @unique
+  bankName       String
+  accountNumber  String
+  accountType    String   @default("checking")  // checking | savings
+  currency       String   @default("USD")
+  currentBalance Float    @default(0)
+  glAccountId    String?
+  isActive       Boolean  @default(true)
+  isPrimary      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  glAccount      Account?          @relation(fields: [glAccountId], references: [id])
+  statements     BankStatement[]
+  vendorPayments VendorPayment[]
+}
+
+model BankStatement {
+  id             String   @id @default(cuid())
+  bankAccountId  String
+  statementDate  DateTime
+  openingBalance Float
+  closingBalance Float
+  status         String   @default("pending")  // pending | in_progress | reconciled
+  importedAt     DateTime @default(now())
+  reconciledAt   DateTime?
+
+  bankAccount BankAccount         @relation(fields: [bankAccountId], references: [id])
+  lines       BankStatementLine[]
+}
+
+model BankStatementLine {
+  id              String   @id @default(cuid())
+  statementId     String
+  transactionDate DateTime
+  description     String
+  amount          Float
+  transactionType String   @default("deposit")  // deposit | withdrawal | fee | interest
+  reference       String?
+  matchingStatus  String   @default("unmatched")  // unmatched | matched | manual
+  matchedToId     String?
+  createdAt       DateTime @default(now())
+
+  statement BankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+}
+
+// ─── Business Central: Fiscal Calendar & Year-End Close ──────────────────────
+
+model FiscalYear {
+  id         String   @id @default(cuid())
+  name       String   @unique  // e.g., FY2026
+  startDate  DateTime
+  endDate    DateTime
+  status     String   @default("open")  // open | closing | closed | archived
+  closedAt   DateTime?
+  closedBy   String?
+  createdAt  DateTime @default(now())
+
+  periods      FiscalPeriod[]
+  yearEndClose YearEndClose?
+}
+
+model FiscalPeriod {
+  id           String   @id @default(cuid())
+  fiscalYearId String
+  periodNumber Int
+  name         String
+  startDate    DateTime
+  endDate      DateTime
+  status       String   @default("open")  // open | closed | on_hold
+  closedAt     DateTime?
+
+  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id])
+
+  @@unique([fiscalYearId, periodNumber])
+}
+
+model YearEndClose {
+  id                        String   @id @default(cuid())
+  fiscalYearId              String   @unique
+  closingDate               DateTime
+  status                    String   @default("pending")  // pending | in_progress | completed | reversed
+  retainedEarningsAccountId String?
+  openingVoucherId          String?
+  closingVoucherId          String?
+  totalRevenue              Float    @default(0)
+  totalExpenses             Float    @default(0)
+  netIncome                 Float    @default(0)
+  completedAt               DateTime?
+  completedBy               String?
+  notes                     String?
+  createdAt                 DateTime @default(now())
+
+  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id])
+}
+
+// ─── Business Central: Posting Profiles ──────────────────────────────────────
+
+model PostingProfile {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  module      String   // AP | AR | INVENTORY | BANK | PAYROLL
+  description String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  rules PostingRule[]
+}
+
+model PostingRule {
+  id              String  @id @default(cuid())
+  profileId       String
+  transactionType String  // VendorInvoice | CustomerInvoice | VendorPayment | CustomerPayment | Inventory | etc.
+  debitAccountId  String?
+  creditAccountId String?
+  applicableTo    String? // ALL | group code
+
+  profile       PostingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  debitAccount  Account?       @relation("PostingRuleDebit", fields: [debitAccountId], references: [id])
+  creditAccount Account?       @relation("PostingRuleCredit", fields: [creditAccountId], references: [id])
+}
+
+// ─── Warehouse Management System ─────────────────────────────────────────────
 
 model WmsLocation {
-  id               String   @id @default(cuid())
-  locationCode     String   @unique
-  name             String
-  address          String?
-  city             String?
-  state            String?
-  // Workflow flags from WCS: control what steps are required
-  requireReceive   Boolean  @default(false)
-  requireShipment  Boolean  @default(false)
-  requirePick      Boolean  @default(false)
-  requirePutaway   Boolean  @default(false)
-  binMandatory     Boolean  @default(true)
-  isCrossDock      Boolean  @default(false)
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(cuid())
+  locationCode    String   @unique
+  name            String
+  address         String?
+  city            String?
+  state           String?
+  requireReceive  Boolean  @default(false)
+  requireShipment Boolean  @default(false)
+  requirePick     Boolean  @default(false)
+  requirePutaway  Boolean  @default(false)
+  binMandatory    Boolean  @default(true)
+  isCrossDock     Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   zones            WmsZone[]
   warehouseEntries WmsEntry[]
@@ -429,8 +726,7 @@ model WmsZone {
   locationCode String
   zoneCode     String
   name         String
-  zoneType     String   @default("STORAGE") // STORAGE | RECEIVING | SHIPPING | QUARANTINE | WIP | CROSS_DOCK
-  // 2D visual layout coordinates (for warehouse map UI)
+  zoneType     String   @default("STORAGE")
   layoutLeft   Float?
   layoutTop    Float?
   layoutWidth  Float?
@@ -451,11 +747,9 @@ model WmsRack {
   zoneCode     String
   rackCode     String
   name         String?
-  // 3D bin addressing: sections (X) × levels (Y) × depth (Z)
   sections     Int      @default(1)
   levels       Int      @default(1)
   depth        Int      @default(1)
-  // Bin numbering strategy (configurable prefix/separator/direction/digits)
   binPrefix    String?
   binSeparator String   @default("-")
   reverseDir   Boolean  @default(false)
@@ -475,7 +769,7 @@ model WmsBin {
   rackCode     String?
   binCode      String
   description  String?
-  binType      String   @default("STORAGE") // STORAGE | RECEIVE | SHIP | STAGE | QC
+  binType      String   @default("STORAGE")
   maxVolume    Float?
   maxWeight    Float?
   isEmpty      Boolean  @default(true)
@@ -483,31 +777,28 @@ model WmsBin {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  rack     WmsRack?     @relation(fields: [locationCode, zoneCode, rackCode], references: [locationCode, zoneCode, rackCode])
+  rack     WmsRack?        @relation(fields: [locationCode, zoneCode, rackCode], references: [locationCode, zoneCode, rackCode])
   contents WmsBinContent[]
 
   @@unique([locationCode, zoneCode, binCode])
 }
 
 model WmsBinContent {
-  id           String   @id @default(cuid())
-  locationCode String
-  zoneCode     String
-  binCode      String
-  productId    String
-  lotNumber    String?
-  serialNumber String?
-  // Current on-hand quantity
-  quantity     Float    @default(0)
-  // 4 transient quantity states from WCS BinContent model
-  pickQty      Float    @default(0)   // committed to a pick order
-  putawayQty   Float    @default(0)   // inbound, not yet shelved
-  posAdjmtQty  Float    @default(0)   // positive adjustment in progress
-  negAdjmtQty  Float    @default(0)   // negative adjustment (write-off) in progress
-  // Inventory state from WCS: AVAILABLE | QUARANTINE | WIP | PICK_QUEUE | PUTAWAY_QUEUE | ADJUSTMENT_QUEUE
-  state        String   @default("AVAILABLE")
-  unitOfMeasure String  @default("each")
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  locationCode  String
+  zoneCode      String
+  binCode       String
+  productId     String
+  lotNumber     String?
+  serialNumber  String?
+  quantity      Float    @default(0)
+  pickQty       Float    @default(0)
+  putawayQty    Float    @default(0)
+  posAdjmtQty   Float    @default(0)
+  negAdjmtQty   Float    @default(0)
+  state         String   @default("AVAILABLE")
+  unitOfMeasure String   @default("each")
+  updatedAt     DateTime @updatedAt
 
   bin     WmsBin  @relation(fields: [locationCode, zoneCode, binCode], references: [locationCode, zoneCode, binCode])
   product Product @relation(fields: [productId], references: [id])
@@ -515,13 +806,12 @@ model WmsBinContent {
   @@unique([locationCode, zoneCode, binCode, productId, lotNumber, serialNumber])
 }
 
-// Warehouse movement journal — every stock movement creates an entry
 model WmsEntry {
   id             String   @id @default(cuid())
   entryNumber    String   @unique
   locationCode   String
   productId      String
-  entryType      String   // RECEIVE | PICK | PUTAWAY | TRANSFER | ADJUST_POS | ADJUST_NEG | WRITE_OFF | CROSS_DOCK
+  entryType      String
   fromBinCode    String?
   toBinCode      String?
   fromZoneCode   String?
@@ -529,9 +819,8 @@ model WmsEntry {
   quantity       Float
   lotNumber      String?
   serialNumber   String?
-  referenceType  String?  // ORDER | PO | TRANSFER | MANUAL
+  referenceType  String?
   referenceId    String?
-  // BC pattern: truck/shipment tracking on ledger entries
   truckNumber    String?
   shipmentNumber String?
   notes          String?
@@ -542,7 +831,6 @@ model WmsEntry {
   product  Product     @relation(fields: [productId], references: [id])
 }
 
-// Family category (BC pattern: items grouped by family beyond standard category)
 model FamilyCategory {
   id          String   @id @default(cuid())
   code        String   @unique
