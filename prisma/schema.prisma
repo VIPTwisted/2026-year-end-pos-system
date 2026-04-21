@@ -116,6 +116,8 @@ model Product {
   inventory          Inventory[]
   orderItems         OrderItem[]
   purchaseOrderItems PurchaseOrderItem[]
+  wmsBinContents     WmsBinContent[]
+  wmsEntries         WmsEntry[]
 }
 
 model Customer {
@@ -394,4 +396,161 @@ model JournalLine {
 
   entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   account Account      @relation(fields: [accountId], references: [id])
+}
+
+// ─── Warehouse Management System (Phase 2) ───────────────────────────────────
+// Architecture: Location → Zone → Rack → Bin → BinContent (5-level hierarchy)
+// Sourced from BC Business Central AL + WarehouseControlSystem C# MVVM forensic parse
+
+model WmsLocation {
+  id               String   @id @default(cuid())
+  locationCode     String   @unique
+  name             String
+  address          String?
+  city             String?
+  state            String?
+  // Workflow flags from WCS: control what steps are required
+  requireReceive   Boolean  @default(false)
+  requireShipment  Boolean  @default(false)
+  requirePick      Boolean  @default(false)
+  requirePutaway   Boolean  @default(false)
+  binMandatory     Boolean  @default(true)
+  isCrossDock      Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  zones            WmsZone[]
+  warehouseEntries WmsEntry[]
+}
+
+model WmsZone {
+  id           String   @id @default(cuid())
+  locationCode String
+  zoneCode     String
+  name         String
+  zoneType     String   @default("STORAGE") // STORAGE | RECEIVING | SHIPPING | QUARANTINE | WIP | CROSS_DOCK
+  // 2D visual layout coordinates (for warehouse map UI)
+  layoutLeft   Float?
+  layoutTop    Float?
+  layoutWidth  Float?
+  layoutHeight Float?
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  location WmsLocation @relation(fields: [locationCode], references: [locationCode])
+  racks    WmsRack[]
+
+  @@unique([locationCode, zoneCode])
+}
+
+model WmsRack {
+  id           String   @id @default(cuid())
+  locationCode String
+  zoneCode     String
+  rackCode     String
+  name         String?
+  // 3D bin addressing: sections (X) × levels (Y) × depth (Z)
+  sections     Int      @default(1)
+  levels       Int      @default(1)
+  depth        Int      @default(1)
+  // Bin numbering strategy (configurable prefix/separator/direction/digits)
+  binPrefix    String?
+  binSeparator String   @default("-")
+  reverseDir   Boolean  @default(false)
+  digitCount   Int      @default(2)
+  createdAt    DateTime @default(now())
+
+  zone WmsZone @relation(fields: [locationCode, zoneCode], references: [locationCode, zoneCode])
+  bins WmsBin[]
+
+  @@unique([locationCode, zoneCode, rackCode])
+}
+
+model WmsBin {
+  id           String   @id @default(cuid())
+  locationCode String
+  zoneCode     String
+  rackCode     String?
+  binCode      String
+  description  String?
+  binType      String   @default("STORAGE") // STORAGE | RECEIVE | SHIP | STAGE | QC
+  maxVolume    Float?
+  maxWeight    Float?
+  isEmpty      Boolean  @default(true)
+  isBlocked    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rack     WmsRack?     @relation(fields: [locationCode, zoneCode, rackCode], references: [locationCode, zoneCode, rackCode])
+  contents WmsBinContent[]
+
+  @@unique([locationCode, zoneCode, binCode])
+}
+
+model WmsBinContent {
+  id           String   @id @default(cuid())
+  locationCode String
+  zoneCode     String
+  binCode      String
+  productId    String
+  lotNumber    String?
+  serialNumber String?
+  // Current on-hand quantity
+  quantity     Float    @default(0)
+  // 4 transient quantity states from WCS BinContent model
+  pickQty      Float    @default(0)   // committed to a pick order
+  putawayQty   Float    @default(0)   // inbound, not yet shelved
+  posAdjmtQty  Float    @default(0)   // positive adjustment in progress
+  negAdjmtQty  Float    @default(0)   // negative adjustment (write-off) in progress
+  // Inventory state from WCS: AVAILABLE | QUARANTINE | WIP | PICK_QUEUE | PUTAWAY_QUEUE | ADJUSTMENT_QUEUE
+  state        String   @default("AVAILABLE")
+  unitOfMeasure String  @default("each")
+  updatedAt    DateTime @updatedAt
+
+  bin     WmsBin  @relation(fields: [locationCode, zoneCode, binCode], references: [locationCode, zoneCode, binCode])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([locationCode, zoneCode, binCode, productId, lotNumber, serialNumber])
+}
+
+// Warehouse movement journal — every stock movement creates an entry
+model WmsEntry {
+  id             String   @id @default(cuid())
+  entryNumber    String   @unique
+  locationCode   String
+  productId      String
+  entryType      String   // RECEIVE | PICK | PUTAWAY | TRANSFER | ADJUST_POS | ADJUST_NEG | WRITE_OFF | CROSS_DOCK
+  fromBinCode    String?
+  toBinCode      String?
+  fromZoneCode   String?
+  toZoneCode     String?
+  quantity       Float
+  lotNumber      String?
+  serialNumber   String?
+  referenceType  String?  // ORDER | PO | TRANSFER | MANUAL
+  referenceId    String?
+  // BC pattern: truck/shipment tracking on ledger entries
+  truckNumber    String?
+  shipmentNumber String?
+  notes          String?
+  postedBy       String?
+  postedAt       DateTime @default(now())
+
+  location WmsLocation @relation(fields: [locationCode], references: [locationCode])
+  product  Product     @relation(fields: [productId], references: [id])
+}
+
+// Family category (BC pattern: items grouped by family beyond standard category)
+model FamilyCategory {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  parentCode  String?
+  createdAt   DateTime @default(now())
+
+  parent   FamilyCategory?  @relation("FamilyCategoryTree", fields: [parentCode], references: [code])
+  children FamilyCategory[] @relation("FamilyCategoryTree")
 }
