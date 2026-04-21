@@ -41,8 +41,8 @@ export default function LoginPage() {
           <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4">
             <Building2 className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-zinc-100">Platform Suite</h1>
-          <p className="text-sm text-zinc-500 mt-1">Enterprise Resource Platform</p>
+          <h1 className="text-xl font-bold text-zinc-100">NovaPOS</h1>
+          <p className="text-sm text-zinc-500 mt-1">Enterprise ERP & Commerce Platform</p>
         </div>
 
         {/* Card */}

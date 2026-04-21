@@ -9,8 +9,8 @@ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: '[Platform Suite] — Enterprise',
-  description: 'Year-End Final Project 2026 — Full Enterprise Platform',
+  title: 'NovaPOS — Enterprise Platform',
+  description: 'NovaPOS — Full Enterprise ERP & Commerce Platform',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
