@@ -56,9 +56,10 @@ model Employee {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user   User      @relation(fields: [userId], references: [id])
-  store  Store     @relation(fields: [storeId], references: [id])
-  shifts Shift[]
+  user           User          @relation(fields: [userId], references: [id])
+  store          Store         @relation(fields: [storeId], references: [id])
+  shifts         Shift[]
+  payrollEntries PayrollEntry[]
 }
 
 model Shift {
@@ -384,6 +385,8 @@ model Account {
   bankAccounts    BankAccount[]
   postingDebits   PostingRule[]  @relation("PostingRuleDebit")
   postingCredits  PostingRule[]  @relation("PostingRuleCredit")
+  budgetEntries   BudgetEntry[]
+  taxCodes        TaxCode[]
 }
 
 model JournalEntry {
@@ -841,4 +844,161 @@ model FamilyCategory {
 
   parent   FamilyCategory?  @relation("FamilyCategoryTree", fields: [parentCode], references: [code])
   children FamilyCategory[] @relation("FamilyCategoryTree")
+}
+
+// ─── Fixed Assets ─────────────────────────────────────────────────────────────
+
+model FixedAssetGroup {
+  id                 String   @id @default(cuid())
+  code               String   @unique
+  name               String
+  depreciationMethod String   @default("straight_line") // straight_line | declining_balance | sum_of_years
+  usefulLifeYears    Int      @default(5)
+  salvageValuePct    Float    @default(0.1)
+  glAssetAccountId   String?
+  glDeprecAccountId  String?
+  glAccumAccountId   String?
+  createdAt          DateTime @default(now())
+
+  assets FixedAsset[]
+}
+
+model FixedAsset {
+  id                 String   @id @default(cuid())
+  assetNumber        String   @unique
+  name               String
+  description        String?
+  groupId            String
+  acquisitionDate    DateTime
+  acquisitionCost    Float
+  salvageValue       Float    @default(0)
+  usefulLifeYears    Int
+  depreciationMethod String   @default("straight_line")
+  currentBookValue   Float
+  accumulatedDeprec  Float    @default(0)
+  status             String   @default("active") // active | disposed | fully_depreciated
+  location           String?
+  serialNumber       String?
+  notes              String?
+  disposedAt         DateTime?
+  disposalAmount     Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  group              FixedAssetGroup       @relation(fields: [groupId], references: [id])
+  depreciationLines  AssetDepreciation[]
+}
+
+model AssetDepreciation {
+  id                     String   @id @default(cuid())
+  assetId                String
+  fiscalYear             String
+  periodNumber           Int
+  depreciationAmount     Float
+  accumulatedDepreciation Float
+  bookValueAfter         Float
+  journalEntryId         String?
+  postedAt               DateTime @default(now())
+
+  asset FixedAsset @relation(fields: [assetId], references: [id])
+
+  @@unique([assetId, fiscalYear, periodNumber])
+}
+
+// ─── Budget ───────────────────────────────────────────────────────────────────
+
+model BudgetPlan {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  fiscalYear   String   // e.g., FY2026
+  status       String   @default("draft") // draft | active | closed
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entries BudgetEntry[]
+}
+
+model BudgetEntry {
+  id           String   @id @default(cuid())
+  budgetPlanId String
+  accountId    String
+  periodNumber Int?     // null = annual budget
+  budgetAmount Float    @default(0)
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  budgetPlan BudgetPlan @relation(fields: [budgetPlanId], references: [id], onDelete: Cascade)
+  account    Account    @relation(fields: [accountId], references: [id])
+
+  @@unique([budgetPlanId, accountId, periodNumber])
+}
+
+// ─── Tax Management ───────────────────────────────────────────────────────────
+
+model TaxCode {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  rate          Float    // percentage e.g. 8.25
+  taxType       String   @default("sales") // sales | use | vat | exempt | withholding
+  glAccountId   String?
+  isActive      Boolean  @default(true)
+  description   String?
+  createdAt     DateTime @default(now())
+
+  glAccount    Account?         @relation(fields: [glAccountId], references: [id])
+  transactions TaxTransaction[]
+}
+
+model TaxTransaction {
+  id             String   @id @default(cuid())
+  taxCodeId      String
+  sourceType     String   // order | vendor_invoice | customer_invoice | manual
+  sourceId       String
+  taxableAmount  Float
+  taxAmount      Float
+  taxDate        DateTime @default(now())
+  fiscalYear     String?
+  periodNumber   Int?
+
+  taxCode TaxCode @relation(fields: [taxCodeId], references: [id])
+}
+
+// ─── Payroll ──────────────────────────────────────────────────────────────────
+
+model PayrollPeriod {
+  id          String   @id @default(cuid())
+  name        String
+  startDate   DateTime
+  endDate     DateTime
+  payDate     DateTime
+  status      String   @default("open") // open | processing | posted | closed
+  fiscalYear  String?
+  createdAt   DateTime @default(now())
+
+  entries PayrollEntry[]
+}
+
+model PayrollEntry {
+  id              String   @id @default(cuid())
+  periodId        String
+  employeeId      String
+  regularHours    Float    @default(0)
+  overtimeHours   Float    @default(0)
+  hourlyRate      Float
+  grossPay        Float
+  federalTax      Float    @default(0)
+  stateTax        Float    @default(0)
+  socialSecurity  Float    @default(0)
+  medicare        Float    @default(0)
+  otherDeductions Float    @default(0)
+  netPay          Float
+  status          String   @default("draft") // draft | approved | paid
+  journalEntryId  String?
+  createdAt       DateTime @default(now())
+
+  period   PayrollPeriod @relation(fields: [periodId], references: [id])
+  employee Employee      @relation(fields: [employeeId], references: [id])
 }

@@ -748,6 +748,216 @@ async function main() {
 
   console.log('✅ BC Finance seed data complete')
 
+  // ─── Payroll ─────────────────────────────────────────────────────────────────
+  const employees = await prisma.employee.findMany({ where: { isActive: true } })
+  const payPeriod = await prisma.payrollPeriod.upsert({
+    where: { id: 'seed-payroll-period-1' },
+    update: {},
+    create: {
+      id: 'seed-payroll-period-1',
+      name: 'April 2026 Payroll',
+      startDate: new Date('2026-04-01'),
+      endDate: new Date('2026-04-15'),
+      payDate: new Date('2026-04-19'),
+      status: 'open',
+      fiscalYear: 'FY2026',
+    },
+  })
+  for (const emp of employees) {
+    const rate = emp.hourlyRate ?? 15
+    const gross = 80 * rate
+    const net = gross * (1 - 0.22 - 0.05 - 0.062 - 0.0145)
+    await prisma.payrollEntry.upsert({
+      where: { id: `seed-pe-${emp.id}` },
+      update: {},
+      create: {
+        id: `seed-pe-${emp.id}`,
+        periodId: payPeriod.id,
+        employeeId: emp.id,
+        regularHours: 80,
+        overtimeHours: 0,
+        hourlyRate: rate,
+        grossPay: gross,
+        federalTax: gross * 0.22,
+        stateTax: gross * 0.05,
+        socialSecurity: gross * 0.062,
+        medicare: gross * 0.0145,
+        otherDeductions: 0,
+        netPay: net,
+        status: 'draft',
+      },
+    })
+  }
+  console.log('✅ Payroll seed complete')
+
+  // ─── Fixed Asset Groups ──────────────────────────────────────────────────────
+  const faGroups = await Promise.all([
+    prisma.fixedAssetGroup.upsert({
+      where: { code: 'EQUIP' },
+      update: {},
+      create: {
+        code: 'EQUIP',
+        name: 'Equipment',
+        depreciationMethod: 'straight_line',
+        usefulLifeYears: 5,
+        salvageValuePct: 0.1,
+      },
+    }),
+    prisma.fixedAssetGroup.upsert({
+      where: { code: 'TECH' },
+      update: {},
+      create: {
+        code: 'TECH',
+        name: 'Technology & Computers',
+        depreciationMethod: 'declining_balance',
+        usefulLifeYears: 3,
+        salvageValuePct: 0.05,
+      },
+    }),
+    prisma.fixedAssetGroup.upsert({
+      where: { code: 'FURN' },
+      update: {},
+      create: {
+        code: 'FURN',
+        name: 'Furniture & Fixtures',
+        depreciationMethod: 'straight_line',
+        usefulLifeYears: 7,
+        salvageValuePct: 0.1,
+      },
+    }),
+  ])
+
+  // ─── Fixed Assets ────────────────────────────────────────────────────────────
+  await prisma.fixedAsset.upsert({
+    where: { assetNumber: 'FA-001' },
+    update: {},
+    create: {
+      assetNumber: 'FA-001',
+      name: 'POS Terminal System',
+      groupId: faGroups[1].id,
+      acquisitionDate: new Date('2025-01-15'),
+      acquisitionCost: 8500,
+      salvageValue: 425,
+      usefulLifeYears: 3,
+      depreciationMethod: 'declining_balance',
+      currentBookValue: 6800,
+      accumulatedDeprec: 1700,
+      status: 'active',
+      location: 'Store Floor',
+    },
+  })
+
+  await prisma.fixedAsset.upsert({
+    where: { assetNumber: 'FA-002' },
+    update: {},
+    create: {
+      assetNumber: 'FA-002',
+      name: 'Display Shelving Units',
+      groupId: faGroups[2].id,
+      acquisitionDate: new Date('2024-06-01'),
+      acquisitionCost: 12000,
+      salvageValue: 1200,
+      usefulLifeYears: 7,
+      depreciationMethod: 'straight_line',
+      currentBookValue: 9771.43,
+      accumulatedDeprec: 2228.57,
+      status: 'active',
+      location: 'Sales Floor',
+    },
+  })
+
+  await prisma.fixedAsset.upsert({
+    where: { assetNumber: 'FA-003' },
+    update: {},
+    create: {
+      assetNumber: 'FA-003',
+      name: 'Warehouse Forklift',
+      groupId: faGroups[0].id,
+      acquisitionDate: new Date('2023-03-10'),
+      acquisitionCost: 45000,
+      salvageValue: 4500,
+      usefulLifeYears: 5,
+      depreciationMethod: 'straight_line',
+      currentBookValue: 27000,
+      accumulatedDeprec: 18000,
+      status: 'active',
+      location: 'Warehouse',
+    },
+  })
+  console.log('✅ Fixed Assets seed complete')
+
+  // ─── Budget Plan ─────────────────────────────────────────────────────────────
+  const bp = await prisma.budgetPlan.upsert({
+    where: { code: 'BP-FY2026' },
+    update: {},
+    create: {
+      code: 'BP-FY2026',
+      name: 'FY2026 Operating Budget',
+      fiscalYear: 'FY2026',
+      status: 'active',
+      description: 'Annual operating budget for fiscal year 2026',
+    },
+  })
+
+  // Budget Entries (revenue + expense accounts)
+  const [revenueAccts, expenseAccts] = await Promise.all([
+    prisma.account.findMany({ where: { type: 'revenue' } }),
+    prisma.account.findMany({ where: { type: 'expense' } }),
+  ])
+  for (const acct of [...revenueAccts, ...expenseAccts]) {
+    const existing = await prisma.budgetEntry.findFirst({
+      where: { budgetPlanId: bp.id, accountId: acct.id, periodNumber: null },
+    })
+    if (!existing) await prisma.budgetEntry.create({
+      data: {
+        budgetPlanId: bp.id,
+        accountId: acct.id,
+        budgetAmount: acct.type === 'revenue' ? 150000 : 80000,
+        periodNumber: null,
+      },
+    })
+  }
+  console.log(`Budget Plan seeded: ${bp.code} with ${revenueAccts.length + expenseAccts.length} entries`)
+
+  // ─── Tax Codes ───────────────────────────────────────────────────────────────
+  await prisma.taxCode.upsert({
+    where: { code: 'TX-SALES' },
+    update: {},
+    create: {
+      code: 'TX-SALES',
+      name: 'State Sales Tax',
+      rate: 8.25,
+      taxType: 'sales',
+      isActive: true,
+      description: 'Standard state sales tax',
+    },
+  })
+  await prisma.taxCode.upsert({
+    where: { code: 'TX-EXEMPT' },
+    update: {},
+    create: {
+      code: 'TX-EXEMPT',
+      name: 'Tax Exempt',
+      rate: 0,
+      taxType: 'exempt',
+      isActive: true,
+      description: 'Tax exempt items',
+    },
+  })
+  await prisma.taxCode.upsert({
+    where: { code: 'TX-USE' },
+    update: {},
+    create: {
+      code: 'TX-USE',
+      name: 'Use Tax',
+      rate: 8.25,
+      taxType: 'use',
+      isActive: true,
+      description: 'Use tax on out-of-state purchases',
+    },
+  })
+  console.log('✅ Budget + Tax seed complete')
+
   console.log('\nSeed complete! All models populated.')
 }
 

@@ -7,7 +7,8 @@ import {
   Building2, HeadphonesIcon, DollarSign, Megaphone, Wrench,
   Settings, ChevronRight, Store, Map,
   CreditCard, CalendarDays, CheckSquare, GraduationCap,
-  ArrowDownCircle, PieChart, FileText, Sliders,
+  ArrowDownCircle, PieChart, FileText, Sliders, BarChart3,
+  Target, Percent, Banknote, Boxes,
 } from 'lucide-react'
 
 const NAV = [
@@ -21,9 +22,13 @@ const NAV = [
   { label: 'Purchasing', href: '/purchasing', icon: Building2 },
   { label: 'Customer Service', href: '/service', icon: HeadphonesIcon },
   { label: 'Finance', href: '/finance', icon: DollarSign },
+  { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'GL Journal', href: '/finance/gl', icon: FileText },
   { label: 'Posting Profiles', href: '/finance/posting-profiles', icon: Sliders },
+  { label: 'Fixed Assets', href: '/finance/fixed-assets', icon: Boxes },
+  { label: 'Tax Management', href: '/finance/tax', icon: Percent },
   { label: 'Budget', href: '/budget', icon: PieChart },
+  { label: 'Budget Plans', href: '/budget/plans', icon: Target },
   { label: 'AR / Receivables', href: '/ar', icon: ArrowDownCircle },
   { label: 'Vendors / AP', href: '/vendors', icon: Building2 },
   { label: 'Bank Accounts', href: '/bank', icon: CreditCard },
@@ -33,6 +38,7 @@ const NAV = [
   { label: 'Marketing', href: '/marketing', icon: Megaphone },
   { label: 'Field Service', href: '/field-service', icon: Wrench },
   { label: 'HR & Shifts', href: '/hr', icon: Users },
+  { label: 'Payroll', href: '/hr/payroll', icon: Banknote },
   { label: 'Stores / HQ', href: '/stores', icon: Store },
   { label: 'D365 Map', href: '/d365-map', icon: Map },
   { label: 'Settings', href: '/settings', icon: Settings },
