@@ -1,231 +1,421 @@
 import { TopBar } from '@/components/layout/TopBar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, Clock, Circle } from 'lucide-react'
+import Link from 'next/link'
+import {
+  ShoppingCart,
+  Package,
+  Boxes,
+  Warehouse,
+  Users,
+  ClipboardList,
+  ShoppingBag,
+  Headphones,
+  Megaphone,
+  UserCheck,
+  Wrench,
+  Building2,
+  BarChart3,
+  Receipt,
+  Building,
+  Landmark,
+  CalendarDays,
+  RefreshCw,
+  BookOpen,
+  Tags,
+  ArrowLeftRight,
+  PiggyBank,
+  GraduationCap,
+  Calculator,
+  HardDrive,
+  DollarSign,
+  FileCheck,
+  ExternalLink,
+} from 'lucide-react'
 
-type ModuleStatus = 'built' | 'coming_soon'
+type ModuleStatus = 'built' | 'partial' | 'planned'
 
-interface ModuleMapping {
+interface BCModule {
+  name: string
   d365: string
-  ours: string
-  route: string
+  route: string | null
   status: ModuleStatus
-  features: string[]
+  description: string
+  icon: React.ReactNode
 }
 
-const modules: ModuleMapping[] = [
+const STATUS_CONFIG: Record<
+  ModuleStatus,
+  { label: string; badgeVariant: 'success' | 'warning' | 'secondary'; dot: string; card: string }
+> = {
+  built: {
+    label: 'Built',
+    badgeVariant: 'success',
+    dot: 'bg-emerald-400',
+    card: 'border-zinc-800 hover:border-emerald-800/60',
+  },
+  partial: {
+    label: 'Partial',
+    badgeVariant: 'warning',
+    dot: 'bg-amber-400',
+    card: 'border-zinc-800 hover:border-amber-800/60',
+  },
+  planned: {
+    label: 'Planned',
+    badgeVariant: 'secondary',
+    dot: 'bg-zinc-600',
+    card: 'border-zinc-800/50 opacity-70',
+  },
+}
+
+const modules: BCModule[] = [
   {
+    name: 'POS Terminal',
     d365: 'D365 Commerce',
-    ours: 'POS Terminal',
     route: '/pos',
     status: 'built',
-    features: ['Cart & checkout', 'Payment processing', 'Receipt generation', 'Tax calculation'],
+    description: 'Cart, checkout, payments, receipts, tax calculation',
+    icon: <ShoppingCart className="w-5 h-5" />,
   },
   {
+    name: 'Products',
     d365: 'D365 Commerce',
-    ours: 'Products',
     route: '/products',
     status: 'built',
-    features: ['Product catalog', 'SKU/barcode', 'Category tree', 'Pricing'],
+    description: 'Product catalog, SKU/barcode, categories, pricing',
+    icon: <Package className="w-5 h-5" />,
   },
   {
-    d365: 'D365 Sales',
-    ours: 'Customers / CRM',
-    route: '/customers',
-    status: 'built',
-    features: ['Customer profiles', 'Loyalty tiers', 'LTV tracking', 'Visit history'],
-  },
-  {
+    name: 'Inventory',
     d365: 'D365 Supply Chain',
-    ours: 'Inventory',
     route: '/inventory',
     status: 'built',
-    features: ['Multi-store stock', 'DDMRP reorder alerts', 'Stock valuation', 'Demand intelligence'],
+    description: 'Multi-store stock, DDMRP reorder alerts, valuation',
+    icon: <Boxes className="w-5 h-5" />,
   },
   {
-    d365: 'D365 Supply Chain',
-    ours: 'Purchasing',
-    route: '/purchasing',
-    status: 'built',
-    features: ['Purchase orders', 'Supplier management', 'Receiving', 'PO status tracking'],
-  },
-  {
-    d365: 'D365 Customer Service',
-    ours: 'Customer Service',
-    route: '/service',
-    status: 'built',
-    features: ['Case management', 'SLA tracking', 'Priority routing', 'Resolution analytics'],
-  },
-  {
-    d365: 'D365 Finance',
-    ours: 'Finance',
-    route: '/finance',
-    status: 'built',
-    features: ['Chart of accounts', 'Journal entries', 'AR aging', 'GL balances'],
-  },
-  {
-    d365: 'D365 Marketing',
-    ours: 'Marketing',
-    route: '/marketing',
-    status: 'built',
-    features: ['Campaign management', 'Email/SMS/Social', 'Open rate tracking', 'Audience targeting'],
-  },
-  {
-    d365: 'D365 Field Service',
-    ours: 'Field Service',
-    route: '/field-service',
-    status: 'built',
-    features: ['Work orders', 'Dispatch board', 'Technician scheduling', 'Efficiency tracking'],
-  },
-  {
-    d365: 'D365 Human Resources',
-    ours: 'HR & Workforce',
-    route: '/hr',
-    status: 'built',
-    features: ['Employee profiles', 'Shift scheduling', 'Compensation planning', 'Dept analytics'],
-  },
-  {
-    d365: 'Business Central',
-    ours: 'Stores / HQ',
-    route: '/stores',
-    status: 'built',
-    features: ['Multi-store management', 'Per-store KPIs', 'Tax configuration', 'Platform config'],
-  },
-  {
+    name: 'Warehouse',
     d365: 'D365 Supply Chain (WMS)',
-    ours: 'Warehouse',
     route: '/warehouse',
     status: 'built',
-    features: ['5-level bin hierarchy', 'Location/zone/rack/bin', 'Movement journal', 'Inventory states'],
+    description: '5-level bin hierarchy, movement journal, inventory states',
+    icon: <Warehouse className="w-5 h-5" />,
   },
   {
-    d365: 'D365 Contact Center',
-    ours: 'Contact Center',
-    route: '/contact-center',
-    status: 'coming_soon',
-    features: ['Omnichannel routing', 'Skill-based assignment', 'IVR integration', 'Sentiment analysis'],
+    name: 'Customers',
+    d365: 'D365 Sales',
+    route: '/customers',
+    status: 'built',
+    description: 'Customer profiles, loyalty tiers, LTV, visit history',
+    icon: <Users className="w-5 h-5" />,
   },
   {
-    d365: 'D365 Project Operations',
-    ours: 'Project Operations',
-    route: '/projects',
-    status: 'coming_soon',
-    features: ['Project tracking', 'Resource scheduling', 'Time & expense', 'Revenue recognition'],
+    name: 'Orders',
+    d365: 'D365 Commerce',
+    route: '/orders',
+    status: 'built',
+    description: 'Order lifecycle, payment tracking, multi-store',
+    icon: <ClipboardList className="w-5 h-5" />,
+  },
+  {
+    name: 'Purchasing',
+    d365: 'D365 Supply Chain',
+    route: '/purchasing',
+    status: 'built',
+    description: 'Purchase orders, supplier management, receiving',
+    icon: <ShoppingBag className="w-5 h-5" />,
+  },
+  {
+    name: 'Customer Service',
+    d365: 'D365 Customer Service',
+    route: '/service',
+    status: 'built',
+    description: 'Case management, SLA tracking, priority routing',
+    icon: <Headphones className="w-5 h-5" />,
+  },
+  {
+    name: 'Marketing',
+    d365: 'D365 Marketing',
+    route: '/marketing',
+    status: 'built',
+    description: 'Campaign management, email/SMS/social, open rate tracking',
+    icon: <Megaphone className="w-5 h-5" />,
+  },
+  {
+    name: 'HR & Shifts',
+    d365: 'D365 Human Resources',
+    route: '/hr',
+    status: 'built',
+    description: 'Employee profiles, shift scheduling, compensation',
+    icon: <UserCheck className="w-5 h-5" />,
+  },
+  {
+    name: 'Field Service',
+    d365: 'D365 Field Service',
+    route: '/field-service',
+    status: 'built',
+    description: 'Work orders, dispatch board, technician scheduling',
+    icon: <Wrench className="w-5 h-5" />,
+  },
+  {
+    name: 'Stores / HQ',
+    d365: 'Business Central',
+    route: '/stores',
+    status: 'built',
+    description: 'Multi-store management, per-store KPIs, tax config',
+    icon: <Building2 className="w-5 h-5" />,
+  },
+  {
+    name: 'Finance (GL)',
+    d365: 'D365 Finance',
+    route: '/finance',
+    status: 'built',
+    description: 'Chart of accounts, journal entries, GL balances',
+    icon: <BarChart3 className="w-5 h-5" />,
+  },
+  {
+    name: 'AR / Receivables',
+    d365: 'D365 Finance',
+    route: '/ar',
+    status: 'built',
+    description: 'Customer invoices, AR aging, payment settlements',
+    icon: <Receipt className="w-5 h-5" />,
+  },
+  {
+    name: 'Vendors / AP',
+    d365: 'Business Central',
+    route: '/vendors',
+    status: 'built',
+    description: 'Vendor management, AP invoices, payment runs',
+    icon: <Building className="w-5 h-5" />,
+  },
+  {
+    name: 'Bank Management',
+    d365: 'Business Central',
+    route: '/bank',
+    status: 'built',
+    description: 'Bank accounts, statements, balance tracking',
+    icon: <Landmark className="w-5 h-5" />,
+  },
+  {
+    name: 'Fiscal Calendar',
+    d365: 'Business Central',
+    route: '/fiscal',
+    status: 'built',
+    description: 'Fiscal years, period management, open/close cycles',
+    icon: <CalendarDays className="w-5 h-5" />,
+  },
+  {
+    name: 'Year-End Close',
+    d365: 'Business Central',
+    route: '/year-end',
+    status: 'built',
+    description: 'Automated closing vouchers, retained earnings transfer',
+    icon: <RefreshCw className="w-5 h-5" />,
+  },
+  {
+    name: 'GL Journal',
+    d365: 'D365 Finance',
+    route: '/finance/gl',
+    status: 'built',
+    description: 'Manual journal entries, double-entry validation',
+    icon: <BookOpen className="w-5 h-5" />,
+  },
+  {
+    name: 'Posting Profiles',
+    d365: 'Business Central',
+    route: '/finance/posting-profiles',
+    status: 'built',
+    description: 'Module posting rules, debit/credit account mapping',
+    icon: <Tags className="w-5 h-5" />,
+  },
+  {
+    name: 'Bank Reconciliation',
+    d365: 'Business Central',
+    route: '/bank/reconcile',
+    status: 'built',
+    description: 'Statement import, line matching, GL reconciliation',
+    icon: <ArrowLeftRight className="w-5 h-5" />,
+  },
+  {
+    name: 'Budget Management',
+    d365: 'D365 Finance',
+    route: '/budget',
+    status: 'built',
+    description: 'Budget planning, variance analysis, period budgets',
+    icon: <PiggyBank className="w-5 h-5" />,
+  },
+  {
+    name: 'BC Training Center',
+    d365: 'Business Central',
+    route: '/training',
+    status: 'built',
+    description: 'Guided walkthroughs, module documentation, onboarding',
+    icon: <GraduationCap className="w-5 h-5" />,
+  },
+  {
+    name: 'Cost Accounting',
+    d365: 'D365 Finance',
+    route: null,
+    status: 'planned',
+    description: 'Cost centers, overhead allocation, profitability analysis',
+    icon: <Calculator className="w-5 h-5" />,
+  },
+  {
+    name: 'Fixed Assets',
+    d365: 'D365 Finance',
+    route: null,
+    status: 'planned',
+    description: 'Asset register, depreciation schedules, disposal',
+    icon: <HardDrive className="w-5 h-5" />,
+  },
+  {
+    name: 'Payroll',
+    d365: 'D365 Human Resources',
+    route: null,
+    status: 'planned',
+    description: 'Payroll runs, tax withholding, direct deposit',
+    icon: <DollarSign className="w-5 h-5" />,
+  },
+  {
+    name: 'Tax Management',
+    d365: 'D365 Finance',
+    route: null,
+    status: 'planned',
+    description: 'Sales tax, VAT configuration, filing reports',
+    icon: <FileCheck className="w-5 h-5" />,
   },
 ]
 
 const builtCount = modules.filter(m => m.status === 'built').length
-const plannedCount = modules.filter(m => m.status === 'coming_soon').length
+const partialCount = modules.filter(m => m.status === 'partial').length
+const plannedCount = modules.filter(m => m.status === 'planned').length
+const totalCount = modules.length
+const progressPct = Math.round(((builtCount + partialCount * 0.5) / totalCount) * 100)
 
-export default async function D365MapPage() {
+export default function D365MapPage() {
   return (
     <>
-      <TopBar title="Platform Architecture — D365 Reference Map" />
+      <TopBar title="D365 Business Central Module Map" />
       <main className="flex-1 p-6 overflow-auto">
 
+        {/* Hero header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">
+            D365 Business Central Module Map
+          </h1>
+          <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
+            Full-stack Microsoft Dynamics 365 / Business Central equivalent built on Next.js 15 + Prisma +
+            PostgreSQL — self-hosted at a fraction of the $180K+/yr enterprise license cost.
+          </p>
+        </div>
+
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Modules Built</p>
-              <p className="text-2xl font-bold text-emerald-400">{builtCount}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Planned</p>
-              <p className="text-2xl font-bold text-zinc-400">{plannedCount}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Prisma Models</p>
-              <p className="text-2xl font-bold text-sky-400">27</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Stack</p>
-              <p className="text-sm font-semibold text-zinc-100 mt-1">Next.js 15 + TypeScript</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Built</p>
+            <p className="text-2xl font-bold text-emerald-400">{builtCount}</p>
+            <p className="text-xs text-zinc-600 mt-0.5">live modules</p>
+          </div>
+          {partialCount > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Partial</p>
+              <p className="text-2xl font-bold text-amber-400">{partialCount}</p>
+              <p className="text-xs text-zinc-600 mt-0.5">in progress</p>
+            </div>
+          )}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Planned</p>
+            <p className="text-2xl font-bold text-zinc-400">{plannedCount}</p>
+            <p className="text-xs text-zinc-600 mt-0.5">on roadmap</p>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Total Modules</p>
+            <p className="text-2xl font-bold text-zinc-100">{totalCount}</p>
+            <p className="text-xs text-zinc-600 mt-0.5">BC coverage</p>
+          </div>
         </div>
 
-        {/* Subtitle Card */}
-        <Card className="bg-zinc-900 border-zinc-800 mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base text-zinc-100">Microsoft Dynamics 365 Coverage</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-sm text-zinc-400">
-              This platform is a full-stack clone of Microsoft Dynamics 365. Each module below maps to an official D365
-              product. Built on Next.js 15, Prisma ORM, and PostgreSQL — replacing a $180K+/year enterprise license with
-              a self-hosted, fully customizable alternative.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Module Map Table */}
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-zinc-900 border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide sticky top-0 z-10">
-                <th className="text-left px-4 py-3 font-medium">D365 Product</th>
-                <th className="text-left px-4 py-3 font-medium">Our Module</th>
-                <th className="text-left px-4 py-3 font-medium">Route</th>
-                <th className="text-center px-4 py-3 font-medium">Status</th>
-                <th className="text-left px-4 py-3 font-medium">Key Features Implemented</th>
-              </tr>
-            </thead>
-            <tbody>
-              {modules.map((mod, idx) => (
-                <tr
-                  key={mod.route}
-                  className={idx % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-900'}
-                >
-                  <td className="px-4 py-3 text-zinc-400 whitespace-nowrap text-xs font-mono">
-                    {mod.d365}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-100 font-semibold whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {mod.status === 'built' ? (
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      ) : (
-                        <Clock className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                      )}
-                      {mod.ours}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-sky-400 whitespace-nowrap">
-                    {mod.route}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {mod.status === 'built' ? (
-                      <Badge variant="success">✓ Live</Badge>
-                    ) : (
-                      <Badge variant="secondary">Planned</Badge>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <ul className="space-y-0.5">
-                      {mod.features.map(f => (
-                        <li key={f} className="text-xs text-zinc-400 flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-zinc-600 shrink-0" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Progress Bar */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-zinc-400 font-medium">Project Progress</span>
+            <span className="text-xs font-bold text-zinc-100">{progressPct}%</span>
+          </div>
+          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <p className="text-xs text-zinc-600 mt-2">
+            {builtCount} built · {plannedCount} planned · {totalCount} total
+          </p>
         </div>
 
-        {/* Footer note */}
-        <p className="text-xs text-zinc-600 mt-4 text-center">
-          D365 Commerce · D365 Sales · D365 Supply Chain · D365 Customer Service · D365 Finance · D365 Marketing ·
-          D365 Field Service · D365 Human Resources · Business Central · D365 Contact Center · D365 Project Operations
+        {/* Module Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {modules.map(mod => {
+            const cfg = STATUS_CONFIG[mod.status]
+            const cardContent = (
+              <div
+                className={`group relative bg-zinc-900 border rounded-xl p-4 transition-all ${cfg.card} ${
+                  mod.route ? 'cursor-pointer' : 'cursor-default'
+                }`}
+              >
+                {/* Status dot */}
+                <span className={`absolute top-3 right-3 w-2 h-2 rounded-full ${cfg.dot}`} />
+
+                {/* Icon + name */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div
+                    className={`p-2 rounded-lg shrink-0 ${
+                      mod.status === 'built'
+                        ? 'bg-emerald-950/50 text-emerald-400'
+                        : mod.status === 'partial'
+                        ? 'bg-amber-950/50 text-amber-400'
+                        : 'bg-zinc-800 text-zinc-500'
+                    }`}
+                  >
+                    {mod.icon}
+                  </div>
+                  <div className="min-w-0 flex-1 pr-4">
+                    <p className="text-sm font-semibold text-zinc-100 leading-tight">{mod.name}</p>
+                    <p className="text-xs text-zinc-600 mt-0.5 font-mono truncate">{mod.d365}</p>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <p className="text-xs text-zinc-400 leading-relaxed mb-3">{mod.description}</p>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between">
+                  <Badge variant={cfg.badgeVariant} className="text-xs">
+                    {mod.status === 'built' ? 'Live' : mod.status === 'partial' ? 'Partial' : 'Planned'}
+                  </Badge>
+                  {mod.route && mod.status !== 'planned' && (
+                    <span className="text-xs text-zinc-600 font-mono group-hover:text-blue-400 transition-colors flex items-center gap-1">
+                      {mod.route}
+                      <ExternalLink className="w-3 h-3" />
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+
+            return mod.route && mod.status !== 'planned' ? (
+              <Link key={mod.name} href={mod.route}>
+                {cardContent}
+              </Link>
+            ) : (
+              <div key={mod.name}>{cardContent}</div>
+            )
+          })}
+        </div>
+
+        {/* Footer */}
+        <p className="text-xs text-zinc-700 mt-8 text-center">
+          D365 Commerce · D365 Sales · D365 Supply Chain (WMS) · D365 Customer Service · D365 Finance ·
+          D365 Marketing · D365 Field Service · D365 Human Resources · Business Central
         </p>
       </main>
     </>

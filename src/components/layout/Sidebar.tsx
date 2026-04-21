@@ -7,6 +7,7 @@ import {
   Building2, HeadphonesIcon, DollarSign, Megaphone, Wrench,
   Settings, ChevronRight, Store, Map,
   CreditCard, CalendarDays, CheckSquare, GraduationCap,
+  ArrowDownCircle, PieChart, FileText, Sliders,
 } from 'lucide-react'
 
 const NAV = [
@@ -20,6 +21,10 @@ const NAV = [
   { label: 'Purchasing', href: '/purchasing', icon: Building2 },
   { label: 'Customer Service', href: '/service', icon: HeadphonesIcon },
   { label: 'Finance', href: '/finance', icon: DollarSign },
+  { label: 'GL Journal', href: '/finance/gl', icon: FileText },
+  { label: 'Posting Profiles', href: '/finance/posting-profiles', icon: Sliders },
+  { label: 'Budget', href: '/budget', icon: PieChart },
+  { label: 'AR / Receivables', href: '/ar', icon: ArrowDownCircle },
   { label: 'Vendors / AP', href: '/vendors', icon: Building2 },
   { label: 'Bank Accounts', href: '/bank', icon: CreditCard },
   { label: 'Fiscal Calendar', href: '/fiscal', icon: CalendarDays },
