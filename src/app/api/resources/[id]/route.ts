@@ -3,7 +3,13 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const resource = await prisma.resource.findUnique({ where: { id } })
+  const resource = await prisma.resource.findUnique({
+    where: { id },
+    include: {
+      skills: { orderBy: { skillName: 'asc' } },
+      bookings: { orderBy: { startDate: 'asc' } },
+    },
+  })
   if (!resource) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(resource)
 }

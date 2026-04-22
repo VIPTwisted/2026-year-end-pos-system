@@ -19,6 +19,10 @@ export async function GET(req: NextRequest) {
 
   const resources = await prisma.resource.findMany({
     where,
+    include: {
+      skills: { orderBy: { skillName: 'asc' } },
+      bookings: { orderBy: { startDate: 'asc' } },
+    },
     orderBy: { name: 'asc' },
   })
   return NextResponse.json(resources)

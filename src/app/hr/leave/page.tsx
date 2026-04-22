@@ -8,17 +8,18 @@ const STATUS_VARIANT: Record<string, 'warning' | 'success' | 'destructive' | 'se
   pending: 'warning', approved: 'success', denied: 'destructive', cancelled: 'secondary',
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-amber-500', approved: 'bg-emerald-500', denied: 'bg-red-500', cancelled: 'bg-zinc-500',
+}
+
 export default async function LeavePage() {
   const now = new Date()
   const yearStart = new Date(now.getFullYear(), 0, 1)
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
   const [allRequests, leaveTypes] = await Promise.all([
-    prisma.leaveRequest.findMany({
-      include: { leaveType: true },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.leaveType.findMany({ orderBy: { name: 'asc' } }),
+    prisma.leaveRequest.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.leaveType.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
   ])
 
   const pending = allRequests.filter(r => r.status === 'pending')
@@ -35,16 +36,14 @@ export default async function LeavePage() {
     count: allRequests.filter(r => r.status === s).length,
   }))
 
-  const empIds = [...new Set(allRequests.map(r => r.employeeId))]
-  const employees = await prisma.employee.findMany({
-    where: { id: { in: empIds } },
-    select: { id: true, firstName: true, lastName: true },
-  })
+  const empIds = [...new Set(allRequests.map(r => r.employeeId).filter(Boolean) as string[])]
+  const employees = empIds.length > 0
+    ? await prisma.employee.findMany({
+        where: { id: { in: empIds } },
+        select: { id: true, firstName: true, lastName: true },
+      })
+    : []
   const empMap = Object.fromEntries(employees.map(e => [e.id, `${e.lastName}, ${e.firstName}`]))
-
-  const STATUS_COLORS: Record<string, string> = {
-    pending: 'bg-amber-500', approved: 'bg-emerald-500', denied: 'bg-red-500', cancelled: 'bg-zinc-500',
-  }
 
   return (
     <>
@@ -55,15 +54,23 @@ export default async function LeavePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[18px] font-semibold text-zinc-100">Leave &amp; Absence</h1>
-            <p className="text-[13px] text-zinc-500">Requests, balances, FMLA, and leave types</p>
+            <p className="text-[13px] text-zinc-500">Requests, balances, FMLA tracking, and leave types</p>
           </div>
-          <Link
-            href="/hr/leave/requests/new"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[13px] font-medium transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New Request
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/hr/leave/types"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[13px] font-medium transition-colors"
+            >
+              Leave Types
+            </Link>
+            <Link
+              href="/hr/leave/requests/new"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[13px] font-medium transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New Request
+            </Link>
+          </div>
         </div>
 
         {/* KPIs */}
@@ -81,10 +88,10 @@ export default async function LeavePage() {
           ))}
         </div>
 
-        {/* Status breakdown */}
+        {/* Status breakdown bar */}
         <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-5">
           <p className="text-[10px] uppercase tracking-widest text-zinc-500 border-b border-zinc-800/50 pb-1 mb-3">Requests by Status</p>
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap">
             {statusBreakdown.map(s => (
               <div key={s.status} className="flex items-center gap-2">
                 <div className={`w-2.5 h-2.5 rounded-full ${STATUS_COLORS[s.status]}`} />
@@ -102,11 +109,32 @@ export default async function LeavePage() {
           )}
         </div>
 
+        {/* Leave types quick view */}
+        {leaveTypes.length > 0 && (
+          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-5">
+            <p className="text-[10px] uppercase tracking-widest text-zinc-500 border-b border-zinc-800/50 pb-1 mb-3">Leave Types Active</p>
+            <div className="flex gap-2 flex-wrap">
+              {leaveTypes.map(lt => (
+                <span
+                  key={lt.id}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium bg-zinc-800 text-zinc-300"
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ background: lt.color }} />
+                  {lt.name}
+                  {lt.isFmlaEligible && (
+                    <span className="text-[10px] text-purple-400 ml-0.5">FMLA</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Pending requests */}
         <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
           <div className="px-5 py-4 border-b border-zinc-800/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-[18px] font-semibold text-zinc-100">Pending Requests</h2>
+              <h2 className="text-[15px] font-semibold text-zinc-100">Pending Requests</h2>
               {pending.length > 0 && (
                 <span className="bg-amber-500 text-white text-[11px] rounded-full px-1.5 py-0.5 font-medium">{pending.length}</span>
               )}
@@ -129,21 +157,27 @@ export default async function LeavePage() {
                     <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Leave Type</th>
                     <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Start</th>
                     <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">End</th>
+                    <th className="text-right px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Days</th>
                     <th className="text-right px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Hours</th>
                     <th className="text-center px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">FMLA</th>
                     <th className="text-center px-5 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pending.slice(0, 10).map(r => (
+                  {pending.slice(0, 15).map(r => (
                     <tr key={r.id} className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/20 transition-colors">
                       <td className="px-5 py-2">
-                        <Link href={`/hr/leave/requests/${r.id}`} className="font-mono text-blue-400 hover:underline text-[12px]">{r.requestNo}</Link>
+                        <Link href={`/hr/leave/requests/${r.id}`} className="font-mono text-blue-400 hover:underline text-[12px]">
+                          {r.requestNo.slice(0, 8).toUpperCase()}
+                        </Link>
                       </td>
-                      <td className="px-3 py-2 font-semibold text-zinc-100">{empMap[r.employeeId] ?? r.employeeId}</td>
-                      <td className="px-3 py-2 text-zinc-400">{r.leaveType.name}</td>
+                      <td className="px-3 py-2 font-semibold text-zinc-100">
+                        {empMap[r.employeeId ?? ''] ?? r.employeeName}
+                      </td>
+                      <td className="px-3 py-2 text-zinc-400">{r.leaveTypeName}</td>
                       <td className="px-3 py-2 text-zinc-500">{new Date(r.startDate).toLocaleDateString()}</td>
                       <td className="px-3 py-2 text-zinc-500">{new Date(r.endDate).toLocaleDateString()}</td>
+                      <td className="px-3 py-2 text-right text-zinc-300">{r.days}d</td>
                       <td className="px-3 py-2 text-right text-zinc-300">{r.hours}h</td>
                       <td className="px-3 py-2 text-center">
                         {r.isFmla && (
@@ -159,6 +193,54 @@ export default async function LeavePage() {
               </table>
             </div>
           )}
+        </div>
+
+        {/* Recent all requests */}
+        <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+          <div className="px-5 py-4 border-b border-zinc-800/50 flex items-center justify-between">
+            <h2 className="text-[15px] font-semibold text-zinc-100">All Recent Requests</h2>
+            <Link href="/hr/leave/requests" className="text-[12px] text-blue-400 hover:underline">View all</Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-zinc-800/50">
+                  <th className="text-left px-5 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Request #</th>
+                  <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Employee</th>
+                  <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Type</th>
+                  <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Period</th>
+                  <th className="text-right px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Days</th>
+                  <th className="text-center px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Status</th>
+                  <th className="text-left px-5 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center text-zinc-500 text-[13px]">No requests yet</td>
+                  </tr>
+                ) : allRequests.slice(0, 20).map(r => (
+                  <tr key={r.id} className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/20 transition-colors">
+                    <td className="px-5 py-2">
+                      <Link href={`/hr/leave/requests/${r.id}`} className="font-mono text-blue-400 hover:underline text-[12px]">
+                        {r.requestNo.slice(0, 8).toUpperCase()}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-zinc-200">{empMap[r.employeeId ?? ''] ?? r.employeeName}</td>
+                    <td className="px-3 py-2 text-zinc-400">{r.leaveTypeName}</td>
+                    <td className="px-3 py-2 text-zinc-500">
+                      {new Date(r.startDate).toLocaleDateString()} – {new Date(r.endDate).toLocaleDateString()}
+                    </td>
+                    <td className="px-3 py-2 text-right text-zinc-300">{r.days}d</td>
+                    <td className="px-3 py-2 text-center">
+                      <Badge variant={STATUS_VARIANT[r.status] ?? 'secondary'}>{r.status}</Badge>
+                    </td>
+                    <td className="px-5 py-2 text-zinc-500">{new Date(r.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
       </main>

@@ -1,0 +1,540 @@
+
+// ─── Conversation Messages & Transfers ───────────────────────────────────────
+
+model ConversationMessage {
+  id             String      @id @default(cuid())
+  conversationId String
+  direction      String      @default("inbound")
+  content        String
+  channel        String?
+  sentAt         DateTime    @default(now())
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model ConversationTransfer {
+  id             String      @id @default(cuid())
+  conversationId String
+  fromAgentId    String?
+  toAgentId      String?
+  reason         String?
+  transferredAt  DateTime    @default(now())
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+// ─── Number Series ────────────────────────────────────────────────────────────
+
+model NumberSeries {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  description   String?
+  prefix        String   @default("")
+  suffix        String   @default("")
+  startNumber   Int      @default(1)
+  currentNumber Int      @default(0)
+  increment     Int      @default(1)
+  minLength     Int      @default(6)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  logs NumberSeriesLog[]
+}
+
+model NumberSeriesLog {
+  id       String   @id @default(cuid())
+  seriesId String
+  number   Int
+  usedFor  String?
+  usedAt   DateTime @default(now())
+
+  series NumberSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+}
+
+// ─── Subcontracting ───────────────────────────────────────────────────────────
+
+model SubcontractingOrder {
+  id         String    @id @default(cuid())
+  orderNo    String    @unique @default(cuid())
+  supplierId String?
+  productId  String?
+  quantity   Float     @default(1)
+  unitCost   Float     @default(0)
+  dueDate    DateTime?
+  status     String    @default("open")
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+// ─── Transfer Lines ───────────────────────────────────────────────────────────
+
+model TransferLine {
+  id               String   @id @default(cuid())
+  transferOrderId  String
+  productId        String
+  quantity         Float    @default(1)
+  quantityShipped  Float    @default(0)
+  quantityReceived Float    @default(0)
+  unitCost         Float    @default(0)
+  notes            String?
+  createdAt        DateTime @default(now())
+
+  transferOrder TransferOrder @relation(fields: [transferOrderId], references: [id], onDelete: Cascade)
+}
+
+// ─── Fixed Asset Insurance & Maintenance ─────────────────────────────────────
+
+model FAInsurance {
+  id           String    @id @default(cuid())
+  assetId      String
+  provider     String
+  policyNumber String?
+  coverage     Float     @default(0)
+  premium      Float     @default(0)
+  startDate    DateTime?
+  endDate      DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+
+  asset FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+model FAMaintenanceLedger {
+  id              String    @id @default(cuid())
+  assetId         String
+  maintenanceDate DateTime  @default(now())
+  description     String
+  cost            Float     @default(0)
+  performedBy     String?
+  nextDueDate     DateTime?
+  createdAt       DateTime  @default(now())
+
+  asset FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+// ─── Product Variants ─────────────────────────────────────────────────────────
+
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  sku       String?
+  name      String
+  price     Float?
+  cost      Float?
+  barcode   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product                       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributes ProductVariantAttributeValue[]
+}
+
+model ProductVariantAttribute {
+  id        String   @id @default(cuid())
+  productId String
+  name      String
+  createdAt DateTime @default(now())
+
+  product Product                       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values  ProductVariantAttributeValue[]
+}
+
+model ProductVariantAttributeValue {
+  id          String @id @default(cuid())
+  variantId   String
+  attributeId String
+  value       String
+
+  variant   ProductVariant          @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  attribute ProductVariantAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+}
+
+// ─── Product Bundles & Kits ───────────────────────────────────────────────────
+
+model ProductBundle {
+  id          String   @id @default(cuid())
+  productId   String
+  name        String
+  description String?
+  price       Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product    Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  components BundleComponent[]
+}
+
+model BundleComponent {
+  id        String @id @default(cuid())
+  bundleId  String
+  productId String
+  quantity  Float  @default(1)
+
+  bundle ProductBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+}
+
+model ProductKit {
+  id          String   @id @default(cuid())
+  productId   String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  components KitComponent[]
+}
+
+model KitComponent {
+  id        String @id @default(cuid())
+  kitId     String
+  productId String
+  quantity  Float  @default(1)
+
+  kit ProductKit @relation(fields: [kitId], references: [id], onDelete: Cascade)
+}
+
+// ─── Resource ─────────────────────────────────────────────────────────────────
+
+model Resource {
+  id            String   @id @default(cuid())
+  name          String
+  type          String   @default("labor")
+  unitOfMeasure String   @default("hour")
+  unitCost      Float    @default(0)
+  isActive      Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── Blanket Sales Orders ─────────────────────────────────────────────────────
+
+model BlanketSalesOrder {
+  id         String    @id @default(cuid())
+  orderNo    String    @unique @default(cuid())
+  customerId String?
+  startDate  DateTime?
+  endDate    DateTime?
+  status     String    @default("open")
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  lines BlanketSalesLine[]
+}
+
+model BlanketSalesLine {
+  id         String   @id @default(cuid())
+  orderId    String
+  productId  String?
+  quantity   Float    @default(1)
+  unitPrice  Float    @default(0)
+  qtyShipped Float    @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  order BlanketSalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ─── SLA ─────────────────────────────────────────────────────────────────────
+
+model SLAPolicy {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items SLAItem[]
+}
+
+model SLAItem {
+  id             String    @id @default(cuid())
+  policyId       String
+  caseId         String?
+  priority       String    @default("normal")
+  responseTime   Int       @default(480)
+  resolutionTime Int       @default(1440)
+  breached       Boolean   @default(false)
+  breachedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  policy SLAPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+}
+
+// ─── Service Knowledge Base ───────────────────────────────────────────────────
+
+model KnowledgeArticle {
+  id         String   @id @default(cuid())
+  title      String
+  content    String
+  category   String?
+  tags       String?
+  views      Int      @default(0)
+  helpful    Int      @default(0)
+  notHelpful Int      @default(0)
+  status     String   @default("draft")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─── Service Queue ────────────────────────────────────────────────────────────
+
+model ServiceQueue {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  items ServiceQueueItem[]
+}
+
+model ServiceQueueItem {
+  id         String    @id @default(cuid())
+  queueId    String
+  caseId     String?
+  agentId    String?
+  priority   Int       @default(0)
+  status     String    @default("waiting")
+  assignedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  queue ServiceQueue @relation(fields: [queueId], references: [id], onDelete: Cascade)
+}
+
+// ─── Case Survey ─────────────────────────────────────────────────────────────
+
+model CaseSurvey {
+  id          String    @id @default(cuid())
+  caseId      String
+  rating      Int?
+  comment     String?
+  respondedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// ─── Service Contract ─────────────────────────────────────────────────────────
+
+model ServiceContract {
+  id         String    @id @default(cuid())
+  customerId String?
+  name       String
+  startDate  DateTime?
+  endDate    DateTime?
+  value      Float     @default(0)
+  status     String    @default("active")
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+// ─── Entitlement ─────────────────────────────────────────────────────────────
+
+model Entitlement {
+  id         String    @id @default(cuid())
+  customerId String?
+  productId  String?
+  type       String    @default("warranty")
+  startDate  DateTime?
+  endDate    DateTime?
+  status     String    @default("active")
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+// ─── Retail Statement ─────────────────────────────────────────────────────────
+
+model RetailStatement {
+  id          String    @id @default(cuid())
+  storeId     String
+  statementNo String    @unique @default(cuid())
+  startDate   DateTime?
+  endDate     DateTime?
+  totalCash   Float     @default(0)
+  totalCard   Float     @default(0)
+  totalSales  Float     @default(0)
+  status      String    @default("open")
+  postedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenderLines StatementTenderLine[]
+}
+
+model StatementTenderLine {
+  id          String  @id @default(cuid())
+  statementId String
+  tenderType  String
+  amount      Float   @default(0)
+  count       Int     @default(0)
+
+  statement RetailStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+}
+
+// ─── Timesheet ────────────────────────────────────────────────────────────────
+
+model TimeSheet {
+  id          String    @id @default(cuid())
+  employeeId  String?
+  periodStart DateTime?
+  periodEnd   DateTime?
+  status      String    @default("open")
+  totalHours  Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  lines TimeSheetLine[]
+}
+
+model TimeSheetLine {
+  id          String   @id @default(cuid())
+  sheetId     String
+  workDate    DateTime @default(now())
+  hours       Float    @default(0)
+  description String?
+  type        String   @default("regular")
+  createdAt   DateTime @default(now())
+
+  sheet TimeSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+}
+
+// ─── Trade Agreement ──────────────────────────────────────────────────────────
+
+model TradeAgreement {
+  id          String    @id @default(cuid())
+  name        String
+  type        String    @default("price")
+  customerId  String?
+  supplierId  String?
+  productId   String?
+  startDate   DateTime?
+  endDate     DateTime?
+  discountPct Float     @default(0)
+  price       Float?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── Warehouse Models ─────────────────────────────────────────────────────────
+
+model WarehouseBin {
+  id          String   @id @default(cuid())
+  code        String
+  zoneId      String?
+  description String?
+  maxWeight   Float?
+  maxVolume   Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  contents WmsBinContent[]
+}
+
+model WarehouseActivity {
+  id         String    @id @default(cuid())
+  type       String    @default("pick")
+  status     String    @default("open")
+  assignedTo String?
+  sourceNo   String?
+  dueDate    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  lines WarehouseActivityLine[]
+}
+
+model WarehouseActivityLine {
+  id              String   @id @default(cuid())
+  activityId      String
+  productId       String?
+  fromBinId       String?
+  toBinId         String?
+  quantity        Float    @default(1)
+  quantityHandled Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  activity WarehouseActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+}
+
+model WarehouseShipment {
+  id         String    @id @default(cuid())
+  shipmentNo String    @unique @default(cuid())
+  sourceNo   String?
+  status     String    @default("open")
+  shippedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  lines WarehouseShipmentLine[]
+}
+
+model WarehouseShipmentLine {
+  id              String   @id @default(cuid())
+  shipmentId      String
+  productId       String?
+  quantity        Float    @default(1)
+  quantityShipped Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  shipment WarehouseShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+}
+
+model WarehouseReceipt {
+  id         String    @id @default(cuid())
+  receiptNo  String    @unique @default(cuid())
+  sourceNo   String?
+  status     String    @default("open")
+  receivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model ItemTracking {
+  id        String   @id @default(cuid())
+  productId String
+  type      String   @default("lot")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// ─── Project Planning & Invoices ──────────────────────────────────────────────
+
+model ProjectPlanningLine {
+  id          String    @id @default(cuid())
+  projectId   String
+  description String
+  type        String    @default("resource")
+  quantity    Float     @default(1)
+  unitCost    Float     @default(0)
+  unitPrice   Float     @default(0)
+  plannedDate DateTime?
+  status      String    @default("open")
+  createdAt   DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProjectInvoice {
+  id         String    @id @default(cuid())
+  projectId  String
+  invoiceNo  String    @unique @default(cuid())
+  amount     Float     @default(0)
+  status     String    @default("draft")
+  invoicedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}

@@ -164,6 +164,10 @@ export const POS_OPERATIONS: Record<number, POSOperation> = {
   1306: { id: 1306, name: 'Discount Report', description: 'Shows all discounts applied in shift', group: 'shift', availableOnTransactionScreen: false, availableOnWelcomeScreen: true, availableOffline: false },
   1307: { id: 1307, name: 'Payment Method Report', description: 'Breakdown of sales by tender type', group: 'shift', availableOnTransactionScreen: false, availableOnWelcomeScreen: true, availableOffline: false },
 
+  // ─── Cash Management Operations (850–859) ───────────────────────────────────
+  850: { id: 850, name: 'Safe Drop', description: 'Records mid-shift cash removal to safe or bank', group: 'shift', availableOnTransactionScreen: true, availableOnWelcomeScreen: true, availableOffline: false },
+  851: { id: 851, name: 'Tender Declaration', description: 'Denomination-level cash count at shift close', group: 'shift', availableOnTransactionScreen: true, availableOnWelcomeScreen: true, availableOffline: false },
+
   // ─── Manager / Admin Operations (1400–1499) ──────────────────────────────────
   1400: { id: 1400, name: 'Override Price', description: 'Manager override for price changes', group: 'transaction', availableOnTransactionScreen: true, availableOnWelcomeScreen: false, availableOffline: true },
   1401: { id: 1401, name: 'Override Discount', description: 'Manager override for discount limits', group: 'discount', availableOnTransactionScreen: true, availableOnWelcomeScreen: false, availableOffline: true },

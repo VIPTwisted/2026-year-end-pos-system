@@ -70,7 +70,7 @@ export default function EcomHubPage() {
           <Globe className="w-6 h-6 text-blue-400" />
           <h1 className="text-2xl font-bold text-zinc-100">E-Commerce Hub</h1>
         </div>
-        <p className="text-zinc-400 text-sm">Dynamics 365 Commerce — storefront management</p>
+        <p className="text-zinc-400 text-sm">NovaPOS Commerce — storefront management</p>
       </div>
 
       <div className="grid grid-cols-5 gap-4">

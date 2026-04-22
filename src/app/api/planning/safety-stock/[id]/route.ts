@@ -8,14 +8,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const rule = await (prisma as any).safetyStockRule.update({
       where: { id },
       data: {
-        ...(body.productName !== undefined && { productName: body.productName }),
-        ...(body.locationName !== undefined && { locationName: body.locationName }),
-        ...(body.calculationMethod !== undefined && { calculationMethod: body.calculationMethod }),
-        ...(body.fixedQty !== undefined && { fixedQty: Number(body.fixedQty) }),
-        ...(body.daysOfSupply !== undefined && { daysOfSupply: Number(body.daysOfSupply) }),
-        ...(body.serviceLevel !== undefined && { serviceLevel: Number(body.serviceLevel) }),
-        ...(body.currentStock !== undefined && { currentStock: Number(body.currentStock) }),
-        ...(body.isActive !== undefined && { isActive: body.isActive }),
+        ...(body.productName  !== undefined && { productName:  body.productName }),
+        ...(body.sku          !== undefined && { sku:          body.sku }),
+        ...(body.storeName    !== undefined && { storeName:    body.storeName }),
+        ...(body.minQty       !== undefined && { minQty:       Number(body.minQty) }),
+        ...(body.maxQty       !== undefined && { maxQty:       Number(body.maxQty) }),
+        ...(body.reorderPoint !== undefined && { reorderPoint: Number(body.reorderPoint) }),
+        ...(body.reorderQty   !== undefined && { reorderQty:   Number(body.reorderQty) }),
+        ...(body.leadTimeDays !== undefined && { leadTimeDays: Number(body.leadTimeDays) }),
+        ...(body.isActive     !== undefined && { isActive:     body.isActive }),
       },
     })
     return NextResponse.json(rule)

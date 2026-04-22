@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-async function generateRequestNo() {
-  const year = new Date().getFullYear()
-  const count = await prisma.leaveRequest.count({
-    where: { requestNo: { startsWith: `LV-${year}-` } },
-  })
-  return `LV-${year}-${String(count + 1).padStart(4, '0')}`
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const employeeId = searchParams.get('employeeId')
@@ -22,7 +14,6 @@ export async function GET(req: NextRequest) {
   if (isFmla === 'true') where.isFmla = true
   const requests = await prisma.leaveRequest.findMany({
     where,
-    include: { leaveType: true, fmlaDetails: true },
     orderBy: { createdAt: 'desc' },
   })
   return NextResponse.json(requests)
@@ -30,36 +21,44 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const requestNo = await generateRequestNo()
+
+  // Look up leave type name if leaveTypeId provided
+  let leaveTypeName = 'Vacation'
+  if (body.leaveTypeId) {
+    const lt = await prisma.leaveType.findUnique({ where: { id: body.leaveTypeId } })
+    if (lt) leaveTypeName = lt.name
+  } else if (body.leaveType) {
+    leaveTypeName = body.leaveType
+  }
+
+  // Calculate days from dates
+  const start = new Date(body.startDate)
+  const end = new Date(body.endDate)
+  const diffMs = end.getTime() - start.getTime()
+  const days = body.halfDay ? 0.5 : Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1)
+  const hours = body.hours ?? days * 8
+
+  const employeeName = body.employeeName ?? (() => {
+    // Will be filled if we have employee lookup
+    return body.employeeId ?? 'Unknown'
+  })()
+
   const request = await prisma.leaveRequest.create({
     data: {
-      requestNo,
-      employeeId: body.employeeId,
-      leaveTypeId: body.leaveTypeId,
-      startDate: new Date(body.startDate),
-      endDate: new Date(body.endDate),
-      hours: body.hours,
+      employeeId: body.employeeId ?? null,
+      employeeName,
+      leaveTypeId: body.leaveTypeId ?? null,
+      leaveTypeName,
+      startDate: start,
+      endDate: end,
+      days,
+      hours,
       halfDay: body.halfDay ?? false,
       reason: body.reason ?? null,
       status: 'pending',
       isFmla: body.isFmla ?? false,
-      fmlaDetails: body.isFmla && body.fmlaDetails
-        ? {
-            create: {
-              employeeId: body.employeeId,
-              fmlaReason: body.fmlaDetails.fmlaReason,
-              certificationRequired: body.fmlaDetails.certificationRequired ?? true,
-              certificationReceived: body.fmlaDetails.certificationReceived ?? false,
-              certificationDueDate: body.fmlaDetails.certificationDueDate
-                ? new Date(body.fmlaDetails.certificationDueDate)
-                : null,
-              intermittent: body.fmlaDetails.intermittent ?? false,
-              reducedSchedule: body.fmlaDetails.reducedSchedule ?? false,
-            },
-          }
-        : undefined,
+      fmlaCase: body.fmlaDetails?.fmlaReason ?? null,
     },
-    include: { leaveType: true, fmlaDetails: true },
   })
   return NextResponse.json(request, { status: 201 })
 }

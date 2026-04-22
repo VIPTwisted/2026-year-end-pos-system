@@ -4,14 +4,14 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
-  const leaveType = searchParams.get('leaveType')
-  const employeeName = searchParams.get('employeeName')
+  const employeeId = searchParams.get('employeeId')
+  const isFmla = searchParams.get('isFmla')
 
   const requests = await prisma.leaveRequest.findMany({
     where: {
       ...(status ? { status } : {}),
-      ...(leaveType ? { leaveType } : {}),
-      ...(employeeName ? { employeeName: { contains: employeeName } } : {}),
+      ...(employeeId ? { employeeId } : {}),
+      ...(isFmla === 'true' ? { isFmla: true } : {}),
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -20,17 +20,20 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { employeeName, employeeId, leaveType, startDate, endDate, days, reason } = body
+  const { employeeName, employeeId, leaveTypeName, leaveTypeId, startDate, endDate, days, hours, reason, isFmla } = body
 
   const request = await prisma.leaveRequest.create({
     data: {
-      employeeName,
-      employeeId,
-      leaveType: leaveType ?? 'vacation',
+      employeeName: employeeName ?? 'Unknown',
+      employeeId: employeeId ?? null,
+      leaveTypeName: leaveTypeName ?? 'Vacation',
+      leaveTypeId: leaveTypeId ?? null,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       days: days ?? 1,
-      reason,
+      hours: hours ?? 8,
+      reason: reason ?? null,
+      isFmla: isFmla ?? false,
     },
   })
   return NextResponse.json(request, { status: 201 })

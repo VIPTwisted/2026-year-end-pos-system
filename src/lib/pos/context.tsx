@@ -13,6 +13,7 @@ export interface CartLine {
   taxable: boolean
   taxAmount: number
   lineTotal: number
+  serialNumber?: string
 }
 
 export interface PaymentLine {
@@ -58,6 +59,7 @@ type POSAction =
   | { type: 'SET_SUSPENDED'; value: boolean }
   | { type: 'RESTORE_TRANSACTION'; state: Partial<POSState> }
   | { type: 'RECALCULATE' }
+  | { type: 'SET_SERIAL'; lineId: string; serialNumber: string }
 
 const TAX_RATE = 0.0825
 
@@ -194,6 +196,14 @@ function posReducer(state: POSState, action: POSAction): POSState {
       const recalculated = state.cartLines.map(calcLine)
       return { ...state, cartLines: recalculated, ...recalcTotals(recalculated, state.totalDiscount) }
     }
+
+    case 'SET_SERIAL':
+      return {
+        ...state,
+        cartLines: state.cartLines.map(l =>
+          l.id === action.lineId ? { ...l, serialNumber: action.serialNumber } : l
+        ),
+      }
 
     default:
       return state

@@ -1017,27 +1017,6 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* ── Numpad ── */}
-          <div className="px-3 py-2.5 border-b border-zinc-800">
-            <div className="grid grid-cols-3 gap-1.5">
-              {['7','8','9','4','5','6','1','2','3','0','.','⌫'].map(k => (
-                <button
-                  key={k}
-                  onClick={() => handleNumpad(k === '⌫' ? 'backspace' : k)}
-                  className="h-11 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg text-base font-semibold text-zinc-100 transition-colors select-none"
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => handleNumpad('clear')}
-              className="mt-1.5 w-full h-8 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-xs text-zinc-400 font-medium transition-colors"
-            >
-              Clear
-            </button>
-          </div>
-
           {/* ── Action Grid ── */}
           <div className="flex-1 overflow-y-auto px-3 py-2.5">
             <div className="grid grid-cols-2 gap-1.5">
@@ -1068,6 +1047,27 @@ export default function POSPage() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* ── Numpad ── */}
+          <div className="px-3 py-2.5 border-t border-zinc-800 shrink-0">
+            <div className="grid grid-cols-3 gap-1.5">
+              {['7','8','9','4','5','6','1','2','3','0','.','⌫'].map(k => (
+                <button
+                  key={k}
+                  onClick={() => handleNumpad(k === '⌫' ? 'backspace' : k)}
+                  className="h-11 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-lg text-base font-semibold text-zinc-100 transition-colors select-none"
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => handleNumpad('clear')}
+              className="mt-1.5 w-full h-8 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-xs text-zinc-400 font-medium transition-colors"
+            >
+              Clear
+            </button>
           </div>
         </div>
       </div>

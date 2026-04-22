@@ -72,7 +72,7 @@ export default function NewWorkflowPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/approval-workflows', {
+      const res = await fetch('/api/approvals/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -12,13 +12,13 @@ export async function POST(req: NextRequest) {
     data: {
       code: body.code,
       name: body.name,
-      category: body.category ?? 'vacation',
-      isPaid: body.isPaid ?? true,
-      accrualEnabled: body.accrualEnabled ?? false,
       accrualRate: body.accrualRate ?? 0,
       maxBalance: body.maxBalance ?? null,
       requiresApproval: body.requiresApproval ?? true,
-      advanceAllowed: body.advanceAllowed ?? false,
+      isFmlaEligible: body.isFmlaEligible ?? false,
+      isPaid: body.isPaid ?? true,
+      color: body.color ?? '#3b82f6',
+      isActive: body.isActive ?? true,
     },
   })
   return NextResponse.json(leaveType, { status: 201 })

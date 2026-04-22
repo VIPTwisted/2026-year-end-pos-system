@@ -12,7 +12,6 @@ export default async function ZonesPage() {
     prisma.warehouseZone.findMany({
       include: {
         store: { select: { id: true, name: true } },
-        _count: { select: { bins: true } },
       },
       orderBy: [{ storeId: 'asc' }, { rankNo: 'asc' }, { code: 'asc' }],
     }),
@@ -59,7 +58,7 @@ export default async function ZonesPage() {
                           <Badge variant="outline" className="text-xs font-mono">{z.binTypeCode}</Badge>
                         </td>
                         <td className="px-4 py-3 text-right text-zinc-500 tabular-nums text-xs">{z.rankNo}</td>
-                        <td className="px-4 py-3 text-right text-zinc-200 tabular-nums font-semibold text-xs">{z._count.bins}</td>
+                        <td className="px-4 py-3 text-right text-zinc-200 tabular-nums font-semibold text-xs">{z.binCount}</td>
                       </tr>
                     ))}
                   </tbody>

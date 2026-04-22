@@ -109,7 +109,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-[11px] text-zinc-700 mt-6">
-          Microsoft Dynamics 365 Business Central — NovaPOS Edition
+          NovaPOS Enterprise Platform
         </p>
       </div>
     </div>

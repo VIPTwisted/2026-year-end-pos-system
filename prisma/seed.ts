@@ -349,7 +349,6 @@ async function main() {
       subject: 'Wireless earbuds stopped charging after 2 weeks',
       status: 'in_progress',
       priority: 'high',
-      category: 'Product Defect',
       assignedTo: 'Marcus Thompson',
     },
   })
@@ -364,7 +363,6 @@ async function main() {
       subject: 'Loyalty points not applied to last transaction',
       status: 'open',
       priority: 'medium',
-      category: 'Billing',
     },
   })
 
@@ -378,28 +376,13 @@ async function main() {
       subject: 'Request for bulk discount on electronics',
       status: 'resolved',
       priority: 'low',
-      category: 'Sales Inquiry',
       resolvedAt: new Date('2026-04-20T15:00:00Z'),
     },
   })
   console.log('Service Cases: 3 seeded')
 
-  // Case note on case-001
-  // Use deleteMany+create pattern since CaseNote has no natural unique key besides id
-  const existingNote = await prisma.caseNote.findFirst({
-    where: { caseId: case001.id, authorId: emp001.id },
-  })
-  if (!existingNote) {
-    await prisma.caseNote.create({
-      data: {
-        caseId: case001.id,
-        authorId: emp001.id,
-        content: 'Customer brought item in for inspection. Confirmed hardware fault. Replacement ordered.',
-        isPublic: false,
-      },
-    })
-  }
-  console.log('Case note seeded')
+  // Case activity skipped — CaseActivity model not in schema
+  void case001
 
   // ─── Campaigns ───────────────────────────────────────────────────────────────
   await prisma.campaign.upsert({
@@ -802,98 +785,113 @@ async function main() {
   }
   console.log('✅ Payroll seed complete')
 
-  // ─── Fixed Asset Groups ──────────────────────────────────────────────────────
-  const faGroups = await Promise.all([
+  // ─── Fixed Asset Groups (BC model) ─────────────────────────────────────────
+  const faClasses = await Promise.all([
     prisma.fixedAssetGroup.upsert({
       where: { code: 'EQUIP' },
       update: {},
-      create: {
-        code: 'EQUIP',
-        name: 'Equipment',
-        depreciationMethod: 'straight_line',
-        usefulLifeYears: 5,
-        salvageValuePct: 0.1,
-      },
+      create: { code: 'EQUIP', name: 'Equipment' },
     }),
     prisma.fixedAssetGroup.upsert({
       where: { code: 'TECH' },
       update: {},
-      create: {
-        code: 'TECH',
-        name: 'Technology & Computers',
-        depreciationMethod: 'declining_balance',
-        usefulLifeYears: 3,
-        salvageValuePct: 0.05,
-      },
+      create: { code: 'TECH', name: 'Technology' },
     }),
     prisma.fixedAssetGroup.upsert({
       where: { code: 'FURN' },
       update: {},
-      create: {
-        code: 'FURN',
-        name: 'Furniture & Fixtures',
-        depreciationMethod: 'straight_line',
-        usefulLifeYears: 7,
-        salvageValuePct: 0.1,
-      },
+      create: { code: 'FURN', name: 'Furniture & Fixtures' },
     }),
   ])
 
-  // ─── Fixed Assets ────────────────────────────────────────────────────────────
-  await prisma.fixedAsset.upsert({
-    where: { assetNumber: 'FA-001' },
+  // ─── Fixed Assets (BC model) ─────────────────────────────────────────────────
+  const fa1 = await prisma.fixedAsset.upsert({
+    where: { assetNumber: 'FA-000001' },
     update: {},
     create: {
-      assetNumber: 'FA-001',
+      assetNumber: 'FA-000001',
       name: 'POS Terminal System',
-      groupId: faGroups[1].id,
+      description: 'POS Terminal System',
+      groupId: faClasses[1].id,
       acquisitionDate: new Date('2025-01-15'),
       acquisitionCost: 8500,
       salvageValue: 425,
       usefulLifeYears: 3,
-      depreciationMethod: 'declining_balance',
       currentBookValue: 6800,
-      accumulatedDeprec: 1700,
       status: 'active',
       location: 'Store Floor',
     },
   })
-
-  await prisma.fixedAsset.upsert({
-    where: { assetNumber: 'FA-002' },
+  await prisma.assetDepreciation.upsert({
+    where: { assetId_fiscalYear_periodNumber: { assetId: fa1.id, fiscalYear: 'FY2025', periodNumber: 1 } },
     update: {},
     create: {
-      assetNumber: 'FA-002',
+      assetId: fa1.id,
+      fiscalYear: 'FY2025',
+      periodNumber: 1,
+      depreciationAmount: 1700,
+      accumulatedDepreciation: 1700,
+      bookValueAfter: 6800,
+    },
+  })
+
+  const fa2 = await prisma.fixedAsset.upsert({
+    where: { assetNumber: 'FA-000002' },
+    update: {},
+    create: {
+      assetNumber: 'FA-000002',
       name: 'Display Shelving Units',
-      groupId: faGroups[2].id,
+      description: 'Display Shelving Units',
+      groupId: faClasses[2].id,
       acquisitionDate: new Date('2024-06-01'),
       acquisitionCost: 12000,
       salvageValue: 1200,
       usefulLifeYears: 7,
-      depreciationMethod: 'straight_line',
       currentBookValue: 9771.43,
-      accumulatedDeprec: 2228.57,
       status: 'active',
       location: 'Sales Floor',
     },
   })
-
-  await prisma.fixedAsset.upsert({
-    where: { assetNumber: 'FA-003' },
+  await prisma.assetDepreciation.upsert({
+    where: { assetId_fiscalYear_periodNumber: { assetId: fa2.id, fiscalYear: 'FY2025', periodNumber: 1 } },
     update: {},
     create: {
-      assetNumber: 'FA-003',
+      assetId: fa2.id,
+      fiscalYear: 'FY2025',
+      periodNumber: 1,
+      depreciationAmount: 2228.57,
+      accumulatedDepreciation: 2228.57,
+      bookValueAfter: 9771.43,
+    },
+  })
+
+  const fa3 = await prisma.fixedAsset.upsert({
+    where: { assetNumber: 'FA-000003' },
+    update: {},
+    create: {
+      assetNumber: 'FA-000003',
       name: 'Warehouse Forklift',
-      groupId: faGroups[0].id,
+      description: 'Warehouse Forklift',
+      groupId: faClasses[0].id,
       acquisitionDate: new Date('2023-03-10'),
       acquisitionCost: 45000,
       salvageValue: 4500,
       usefulLifeYears: 5,
-      depreciationMethod: 'straight_line',
       currentBookValue: 27000,
-      accumulatedDeprec: 18000,
       status: 'active',
       location: 'Warehouse',
+    },
+  })
+  await prisma.assetDepreciation.upsert({
+    where: { assetId_fiscalYear_periodNumber: { assetId: fa3.id, fiscalYear: 'FY2025', periodNumber: 1 } },
+    update: {},
+    create: {
+      assetId: fa3.id,
+      fiscalYear: 'FY2025',
+      periodNumber: 1,
+      depreciationAmount: 18000,
+      accumulatedDepreciation: 18000,
+      bookValueAfter: 27000,
     },
   })
   console.log('✅ Fixed Assets seed complete')

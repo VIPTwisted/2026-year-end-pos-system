@@ -4,6 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { Badge } from '@/components/ui/badge'
 import { Plus } from 'lucide-react'
 
+const STATUS_VARIANT: Record<string, 'warning' | 'success' | 'destructive' | 'secondary'> = {
+  pending: 'warning', approved: 'success', denied: 'destructive', cancelled: 'secondary',
+}
+
 export default async function LeaveRequestsPage({
   searchParams,
 }: {
@@ -16,21 +20,19 @@ export default async function LeaveRequestsPage({
 
   const requests = await prisma.leaveRequest.findMany({
     where,
-    include: { leaveType: true },
     orderBy: { createdAt: 'desc' },
   })
 
-  const empIds = [...new Set(requests.map(r => r.employeeId))]
-  const employees = await prisma.employee.findMany({
-    where: { id: { in: empIds } },
-    select: { id: true, firstName: true, lastName: true },
-  })
+  const empIds = [...new Set(requests.map(r => r.employeeId).filter(Boolean) as string[])]
+  const employees = empIds.length > 0
+    ? await prisma.employee.findMany({
+        where: { id: { in: empIds } },
+        select: { id: true, firstName: true, lastName: true },
+      })
+    : []
   const empMap = Object.fromEntries(employees.map(e => [e.id, `${e.lastName}, ${e.firstName}`]))
 
   const STATUSES = ['pending', 'approved', 'denied', 'cancelled']
-  const STATUS_VARIANT: Record<string, 'warning' | 'success' | 'destructive' | 'secondary'> = {
-    pending: 'warning', approved: 'success', denied: 'destructive', cancelled: 'secondary',
-  }
 
   return (
     <>
@@ -83,6 +85,7 @@ export default async function LeaveRequestsPage({
                     <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Leave Type</th>
                     <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Start</th>
                     <th className="text-left px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">End</th>
+                    <th className="text-right px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Days</th>
                     <th className="text-right px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Hours</th>
                     <th className="text-center px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">FMLA</th>
                     <th className="text-center px-3 pb-3 pt-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Status</th>
@@ -93,12 +96,17 @@ export default async function LeaveRequestsPage({
                   {requests.map(r => (
                     <tr key={r.id} className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/20 transition-colors">
                       <td className="px-5 py-2">
-                        <Link href={`/hr/leave/requests/${r.id}`} className="font-mono text-blue-400 hover:underline text-[12px]">{r.requestNo}</Link>
+                        <Link href={`/hr/leave/requests/${r.id}`} className="font-mono text-blue-400 hover:underline text-[12px]">
+                          {r.requestNo.slice(0, 8).toUpperCase()}
+                        </Link>
                       </td>
-                      <td className="px-3 py-2 font-semibold text-zinc-100">{empMap[r.employeeId] ?? r.employeeId}</td>
-                      <td className="px-3 py-2 text-zinc-400">{r.leaveType.name}</td>
+                      <td className="px-3 py-2 font-semibold text-zinc-100">
+                        {empMap[r.employeeId ?? ''] ?? r.employeeName}
+                      </td>
+                      <td className="px-3 py-2 text-zinc-400">{r.leaveTypeName}</td>
                       <td className="px-3 py-2 text-zinc-500">{new Date(r.startDate).toLocaleDateString()}</td>
                       <td className="px-3 py-2 text-zinc-500">{new Date(r.endDate).toLocaleDateString()}</td>
+                      <td className="px-3 py-2 text-right text-zinc-300">{r.days}d</td>
                       <td className="px-3 py-2 text-right text-zinc-300">{r.hours}h</td>
                       <td className="px-3 py-2 text-center">
                         {r.isFmla && (
