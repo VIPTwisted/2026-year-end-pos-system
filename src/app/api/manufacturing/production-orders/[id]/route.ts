@@ -22,6 +22,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
         include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
         orderBy: { lineNo: 'asc' },
       },
+      capacityNeeds: { orderBy: { operationNo: 'asc' } },
     },
   })
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -31,9 +32,10 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json()
+
   const current = await prisma.productionOrder.findUnique({
     where: { id },
-    select: { status: true },
+    select: { status: true, quantity: true },
   })
   if (!current) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -50,7 +52,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (body.status === 'finished') {
       const qf = Number(body.quantityFinished ?? 0)
       if (qf <= 0) {
-        return NextResponse.json({ error: 'quantityFinished must be > 0 to finish order' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'quantityFinished must be > 0 to finish order' },
+          { status: 400 },
+        )
       }
       data.quantityFinished = qf
     }
@@ -61,8 +66,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data.quantityFinished = Number(body.quantityFinished)
   }
 
-  if ('notes' in body) data.notes = body.notes
+  if ('notes' in body) data.notes = body.notes?.trim() || null
+  if ('dueDate' in body) data.dueDate = body.dueDate ? new Date(body.dueDate) : null
+  if ('startingDate' in body) data.startingDate = body.startingDate ? new Date(body.startingDate) : null
+  if ('endingDate' in body) data.endingDate = body.endingDate ? new Date(body.endingDate) : null
 
   const order = await prisma.productionOrder.update({ where: { id }, data })
   return NextResponse.json(order)
+}
+
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const order = await prisma.productionOrder.findUnique({ where: { id }, select: { status: true } })
+  if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (order.status === 'released' || order.status === 'finished') {
+    return NextResponse.json(
+      { error: 'Cannot delete a released or finished production order' },
+      { status: 400 },
+    )
+  }
+  await prisma.productionOrder.delete({ where: { id } })
+  return NextResponse.json({ ok: true })
 }

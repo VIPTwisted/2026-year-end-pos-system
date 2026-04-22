@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { TopBar } from '@/components/layout/TopBar'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'

@@ -1,4 +1,4 @@
-// Incoming Documents — backed by VendorInvoice model
+// Incoming Documents — GET/PATCH backed by VendorInvoice; POST supports both IncomingDocument and VendorInvoice
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
@@ -34,6 +34,39 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const body = await req.json()
+
+  // If the body contains IncomingDocument-specific fields, create an IncomingDocument
+  if ('sourceType' in body || 'documentType' in body) {
+    // Auto-generate a document number
+    const count = await prisma.incomingDocument.count()
+    const documentNumber = `IDOC-${String(count + 1).padStart(6, '0')}`
+    const doc = await prisma.incomingDocument.create({
+      data: {
+        documentNumber,
+        fileName: body.fileName ?? null,
+        fileUrl: body.fileUrl ?? null,
+        sourceType: body.sourceType ?? 'upload',
+        status: body.status ?? 'pending',
+        documentType: body.documentType ?? null,
+        vendorId: body.vendorId ?? null,
+        vendorName: body.vendorName ?? null,
+        vendorVatNo: body.vendorVatNo ?? null,
+        invoiceNumber: body.invoiceNumber ?? null,
+        invoiceDate: body.invoiceDate ? new Date(body.invoiceDate) : null,
+        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        amount: body.amount != null ? parseFloat(body.amount) : null,
+        currency: body.currency ?? 'USD',
+        taxAmount: body.taxAmount != null ? parseFloat(body.taxAmount) : null,
+        lineItemsJson: body.lineItemsJson ?? null,
+        ocrConfidence: body.ocrConfidence ?? null,
+        notes: body.notes ?? null,
+        matchedPOId: body.matchedPOId ?? null,
+      },
+    })
+    return NextResponse.json(doc, { status: 201 })
+  }
+
+  // Legacy: create VendorInvoice
   const invoice = await prisma.vendorInvoice.create({
     data: {
       invoiceNumber: body.invoiceNumber,

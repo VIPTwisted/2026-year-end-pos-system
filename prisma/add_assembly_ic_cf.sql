@@ -1,0 +1,83 @@
+-- Add Assembly BOM, Assembly Order, IC, CashFlow tables (safe: IF NOT EXISTS / column checks)
+
+CREATE TABLE IF NOT EXISTS "AssemblyBOM" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "bomNo" TEXT NOT NULL UNIQUE,
+  "description" TEXT,
+  "itemNo" TEXT,
+  "unitOfMeasure" TEXT NOT NULL DEFAULT 'EACH',
+  "versionCode" TEXT NOT NULL DEFAULT '1',
+  "status" TEXT NOT NULL DEFAULT 'Certified',
+  "isActive" BOOLEAN NOT NULL DEFAULT 1,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "AssemblyBOMLine" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "bomId" TEXT NOT NULL,
+  "lineNo" INTEGER NOT NULL DEFAULT 1,
+  "type" TEXT NOT NULL DEFAULT 'Item',
+  "componentNo" TEXT,
+  "description" TEXT,
+  "qtyPer" REAL NOT NULL DEFAULT 1,
+  "unitOfMeasure" TEXT NOT NULL DEFAULT 'EACH',
+  "leadTimeDays" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("bomId") REFERENCES "AssemblyBOM" ("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "AssemblyOrder" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "orderNo" TEXT NOT NULL UNIQUE,
+  "itemNo" TEXT,
+  "description" TEXT,
+  "qtyToAssemble" REAL NOT NULL DEFAULT 1,
+  "qtyAssembled" REAL NOT NULL DEFAULT 0,
+  "unitOfMeasure" TEXT NOT NULL DEFAULT 'EACH',
+  "dueDate" DATETIME,
+  "startingDate" DATETIME,
+  "endingDate" DATETIME,
+  "locationCode" TEXT,
+  "binCode" TEXT,
+  "bomId" TEXT,
+  "bomVersionCode" TEXT NOT NULL DEFAULT '1',
+  "status" TEXT NOT NULL DEFAULT 'Open',
+  "isPosted" BOOLEAN NOT NULL DEFAULT 0,
+  "notes" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("bomId") REFERENCES "AssemblyBOM" ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "AssemblyOrderLine" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "orderId" TEXT NOT NULL,
+  "lineNo" INTEGER NOT NULL DEFAULT 1,
+  "type" TEXT NOT NULL DEFAULT 'Item',
+  "componentNo" TEXT,
+  "description" TEXT,
+  "qtyPer" REAL NOT NULL DEFAULT 1,
+  "quantity" REAL NOT NULL DEFAULT 1,
+  "qtyConsumed" REAL NOT NULL DEFAULT 0,
+  "availableQty" REAL NOT NULL DEFAULT 0,
+  "unitOfMeasure" TEXT NOT NULL DEFAULT 'EACH',
+  "unitCost" REAL NOT NULL DEFAULT 0,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("orderId") REFERENCES "AssemblyOrder" ("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "CashFlowAccount" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "accountNo" TEXT NOT NULL UNIQUE,
+  "name" TEXT NOT NULL,
+  "sourceType" TEXT NOT NULL DEFAULT 'Liquid Funds',
+  "glIntegration" BOOLEAN NOT NULL DEFAULT 0,
+  "glAccountNo" TEXT,
+  "description" TEXT,
+  "isActive" BOOLEAN NOT NULL DEFAULT 1,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

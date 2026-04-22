@@ -1,65 +1,50 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { initCrmTables, cuid } from '@/lib/crm-db'
 
 export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status')
+  await initCrmTables()
+  const { searchParams } = new URL(req.url)
+  const salesperson = searchParams.get('salesperson') ?? ''
+  const contactId = searchParams.get('contactId') ?? ''
+  const status = searchParams.get('status') ?? ''
+  const campaignId = searchParams.get('campaignId') ?? ''
+  const dateFrom = searchParams.get('dateFrom') ?? ''
+  const dateTo = searchParams.get('dateTo') ?? ''
 
-    const where: Record<string, unknown> = {}
-    if (status) where.status = status
-
-    const opportunities = await prisma.opportunity.findMany({
-      where,
-      include: {
-        contact: { select: { id: true, firstName: true, lastName: true, email: true } },
-        customer: { select: { id: true, firstName: true, lastName: true } },
-        salesCycle: { select: { id: true, name: true, stages: { orderBy: { stageOrder: 'asc' } } } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-    return NextResponse.json(opportunities)
-  } catch (err) {
-    console.error(err)
-    return NextResponse.json({ error: 'Failed to fetch opportunities' }, { status: 500 })
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = await prisma.$queryRaw`
+    SELECT o.*, c.name AS contactName
+    FROM BCOpportunity o
+    LEFT JOIN BCContact c ON c.id = o.contactId
+    WHERE (${salesperson} = '' OR o.salesperson = ${salesperson})
+      AND (${contactId} = '' OR o.contactId = ${contactId})
+      AND (${status} = '' OR o.status = ${status})
+      AND (${campaignId} = '' OR o.campaignId = ${campaignId})
+      AND (${dateFrom} = '' OR o.closeDate >= ${dateFrom})
+      AND (${dateTo} = '' OR o.closeDate <= ${dateTo})
+    ORDER BY o.createdAt DESC
+  `
+  return NextResponse.json(rows)
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const {
-      title, contactId, customerId, salesCycleId, currentStageId,
-      estimatedValue, probability, expectedCloseDate, status, assignedTo, notes,
-    } = body
+  await initCrmTables()
+  const body = await req.json()
+  const { description, contactId, salesperson, status, stage, probability, estimatedValue, closeDate, campaignId } = body
+  if (!description) return NextResponse.json({ error: 'description required' }, { status: 400 })
 
-    if (!title) {
-      return NextResponse.json({ error: 'title is required' }, { status: 400 })
-    }
-
-    const opportunity = await prisma.opportunity.create({
-      data: {
-        title,
-        contactId: contactId ?? null,
-        customerId: customerId ?? null,
-        salesCycleId: salesCycleId ?? null,
-        currentStageId: currentStageId ?? null,
-        estimatedValue: estimatedValue ?? 0,
-        probability: probability ?? 0,
-        expectedCloseDate: expectedCloseDate ? new Date(expectedCloseDate) : null,
-        status: status ?? 'open',
-        assignedTo: assignedTo ?? null,
-        notes: notes ?? null,
-      },
-      include: {
-        contact: true,
-        customer: { select: { id: true, firstName: true, lastName: true } },
-        salesCycle: { select: { id: true, name: true } },
-      },
-    })
-    return NextResponse.json(opportunity, { status: 201 })
-  } catch (err) {
-    console.error(err)
-    return NextResponse.json({ error: 'Failed to create opportunity' }, { status: 500 })
-  }
+  const id = cuid()
+  const opportunityNo = 'OP' + Date.now().toString().slice(-6)
+  await prisma.$executeRaw`
+    INSERT INTO BCOpportunity (id, opportunityNo, description, contactId, salesperson, status, stage, probability, estimatedValue, closeDate, campaignId)
+    VALUES (${id}, ${opportunityNo}, ${description}, ${contactId ?? null}, ${salesperson ?? null},
+            ${status ?? 'Open'}, ${stage ?? null}, ${probability ?? 0}, ${estimatedValue ?? 0},
+            ${closeDate ?? null}, ${campaignId ?? null})
+  `
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = await prisma.$queryRaw`SELECT * FROM BCOpportunity WHERE id = ${id}`
+  return NextResponse.json(rows[0], { status: 201 })
 }

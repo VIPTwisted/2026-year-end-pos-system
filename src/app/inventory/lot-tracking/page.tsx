@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 /**
  * Lot / Serial Number Tracking — List
  * Route: /inventory/lot-tracking/

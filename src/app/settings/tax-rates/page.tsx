@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
 import { TopBar } from '@/components/layout/TopBar'
 import Link from 'next/link'

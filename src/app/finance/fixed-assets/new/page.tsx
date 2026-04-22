@@ -1,11 +1,9 @@
 'use client'
 
 import { TopBar } from '@/components/layout/TopBar'
-import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Calculator } from 'lucide-react'
-import Link from 'next/link'
+import { Save, X, ChevronDown, Calculator } from 'lucide-react'
 
 type AssetGroup = {
   id: string
@@ -16,33 +14,34 @@ type AssetGroup = {
   salvageValuePct: number
 }
 
-function calcAnnualDeprec(
-  method: string,
-  cost: number,
-  salvage: number,
-  lifeYears: number,
-  bookValue?: number
-): number {
-  if (lifeYears <= 0 || cost <= 0) return 0
-  if (method === 'straight_line') {
-    return (cost - salvage) / lifeYears
-  }
-  if (method === 'declining_balance') {
-    const bv = bookValue ?? cost
-    return bv * (2 / lifeYears)
-  }
+function calcAnnualDeprec(method: string, cost: number, salvage: number, life: number): number {
+  if (life <= 0 || cost <= 0) return 0
+  if (method === 'straight_line') return (cost - salvage) / life
+  if (method === 'declining_balance') return cost * (2 / life)
   if (method === 'sum_of_years') {
-    const sumYears = (lifeYears * (lifeYears + 1)) / 2
-    return ((cost - salvage) * lifeYears) / sumYears
+    const s = (life * (life + 1)) / 2
+    return ((cost - salvage) * life) / s
   }
   return 0
+}
+
+const inp = 'w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-[13px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-colors'
+const labelCls = 'block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5'
+
+function FF({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className={labelCls}>{label}</label>
+      {children}
+    </div>
+  )
 }
 
 export default function NewFixedAssetPage() {
   const router = useRouter()
   const [groups, setGroups] = useState<AssetGroup[]>([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null)
 
   const [form, setForm] = useState({
     assetNumber: `FA-${Date.now().toString(36).toUpperCase()}`,
@@ -66,13 +65,9 @@ export default function NewFixedAssetPage() {
       .catch(() => setGroups([]))
   }, [])
 
-  // When group changes, auto-fill method + life + salvage
   const handleGroupChange = useCallback((groupId: string) => {
     const g = groups.find(g => g.id === groupId)
-    if (!g) {
-      setForm(f => ({ ...f, groupId }))
-      return
-    }
+    if (!g) { setForm(f => ({ ...f, groupId })); return }
     setForm(f => ({
       ...f,
       groupId,
@@ -84,24 +79,27 @@ export default function NewFixedAssetPage() {
     }))
   }, [groups])
 
+  function set(field: string, value: string) {
+    setForm(f => ({ ...f, [field]: value }))
+  }
+
+  function notify(msg: string, type: 'ok' | 'err' = 'ok') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
   const cost = parseFloat(form.acquisitionCost) || 0
   const salvage = parseFloat(form.salvageValue) || 0
   const life = parseFloat(form.usefulLifeYears) || 0
   const annualDeprec = calcAnnualDeprec(form.depreciationMethod, cost, salvage, life)
   const monthlyDeprec = annualDeprec / 12
 
-  function set(field: string, value: string) {
-    setForm(f => ({ ...f, [field]: value }))
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    if (!form.name.trim()) { setError('Name is required'); return }
-    if (!form.groupId) { setError('Asset group is required'); return }
-    if (!form.acquisitionDate) { setError('Acquisition date is required'); return }
-    if (cost <= 0) { setError('Acquisition cost must be greater than zero'); return }
-    if (life <= 0) { setError('Useful life must be greater than zero'); return }
+  async function handleSave() {
+    if (!form.name.trim()) { notify('Description is required', 'err'); return }
+    if (!form.groupId) { notify('Asset group (FA Class) is required', 'err'); return }
+    if (!form.acquisitionDate) { notify('Acquisition date is required', 'err'); return }
+    if (cost <= 0) { notify('Acquisition cost must be greater than zero', 'err'); return }
+    if (life <= 0) { notify('Useful life must be greater than zero', 'err'); return }
 
     setSaving(true)
     try {
@@ -124,239 +122,186 @@ export default function NewFixedAssetPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Failed to create asset'); return }
+      if (!res.ok) { notify(data.error ?? 'Save failed', 'err'); return }
+      notify('Fixed asset created')
       router.push(`/finance/fixed-assets/${data.id}`)
     } catch {
-      setError('Network error — please try again')
+      notify('Network error — please try again', 'err')
     } finally {
       setSaving(false)
     }
   }
 
-  const inputCls = 'w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-colors'
-  const labelCls = 'block text-xs font-medium text-zinc-400 mb-1.5'
-
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-zinc-950">
-      <TopBar title="New Fixed Asset" />
-
-      <main className="flex-1 p-6 overflow-auto">
-        <div className="max-w-3xl mx-auto">
-
-          {/* Back */}
-          <Link href="/finance/fixed-assets" className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 mb-6 transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Fixed Assets
-          </Link>
-
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold text-zinc-100">Register New Asset</h2>
-            <p className="text-sm text-zinc-500 mt-1">Add a capital asset to the depreciation ledger</p>
+    <>
+      <TopBar
+        title="Fixed Asset Card"
+        breadcrumb={[
+          { label: 'Finance', href: '/finance' },
+          { label: 'Fixed Assets', href: '/finance/fixed-assets' },
+        ]}
+        actions={
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-[12px] font-medium rounded transition-colors"
+            >
+              <Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={() => router.push('/finance/fixed-assets')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> Cancel
+            </button>
           </div>
+        }
+      />
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mb-6">
-              <p className="text-sm text-red-400">{error}</p>
+      <div className="min-h-[100dvh] bg-[#0f0f1a] p-6">
+        {toast && (
+          <div className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded shadow-lg text-[13px] font-medium ${
+            toast.type === 'ok' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+          }`}>
+            {toast.msg}
+          </div>
+        )}
+
+        <div className="max-w-3xl space-y-3">
+
+          {/* General FastTab */}
+          <details open className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">General</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-5 grid grid-cols-2 gap-x-8 gap-y-5">
+              <FF label="No.">
+                <input value={form.assetNumber} onChange={e => set('assetNumber', e.target.value)} className={inp} placeholder="FA-XXXXXX" />
+              </FF>
+              <FF label="FA Class *">
+                <select value={form.groupId} onChange={e => handleGroupChange(e.target.value)} className={inp}>
+                  <option value="">Select FA class…</option>
+                  {groups.map(g => (
+                    <option key={g.id} value={g.id}>{g.code} · {g.name}</option>
+                  ))}
+                </select>
+              </FF>
+              <div className="col-span-2">
+                <FF label="Description *">
+                  <input value={form.name} onChange={e => set('name', e.target.value)} className={inp} placeholder="e.g. POS Terminal System" />
+                </FF>
+              </div>
+              <FF label="Description 2">
+                <input value={form.description} onChange={e => set('description', e.target.value)} className={inp} placeholder="Optional" />
+              </FF>
+              <FF label="Location Code">
+                <input value={form.location} onChange={e => set('location', e.target.value)} className={inp} placeholder="e.g. MAIN, STORE-1" />
+              </FF>
+              <FF label="Serial No.">
+                <input value={form.serialNumber} onChange={e => set('serialNumber', e.target.value)} className={inp} placeholder="Optional serial #" />
+              </FF>
             </div>
-          )}
+          </details>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Depreciation Book FastTab */}
+          <details open className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Depreciation Book</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-5 grid grid-cols-2 gap-x-8 gap-y-5">
+              <FF label="Depreciation Book Code">
+                <input value="DEFAULT" readOnly className={inp + ' opacity-60 cursor-not-allowed'} />
+              </FF>
+              <FF label="Depreciation Method *">
+                <select value={form.depreciationMethod} onChange={e => set('depreciationMethod', e.target.value)} className={inp}>
+                  <option value="straight_line">Straight-Line</option>
+                  <option value="declining_balance">Declining Balance (200%)</option>
+                  <option value="sum_of_years">Sum-of-Years&apos; Digits</option>
+                </select>
+              </FF>
+              <FF label="FA Posting Date (Acquisition) *">
+                <input type="date" value={form.acquisitionDate} onChange={e => set('acquisitionDate', e.target.value)} className={inp} />
+              </FF>
+              <FF label="Acquisition Cost *">
+                <input type="number" min="0" step="0.01" value={form.acquisitionCost} onChange={e => set('acquisitionCost', e.target.value)} className={inp} placeholder="0.00" />
+              </FF>
+              <FF label="Salvage Value">
+                <input type="number" min="0" step="0.01" value={form.salvageValue} onChange={e => set('salvageValue', e.target.value)} className={inp} placeholder="0.00" />
+              </FF>
+              <FF label="Depreciation Starting Date">
+                <input type="date" value={form.acquisitionDate} readOnly className={inp + ' opacity-60 cursor-not-allowed'} />
+              </FF>
+              <FF label="No. of Depreciation Years *">
+                <input type="number" min="1" step="1" value={form.usefulLifeYears} onChange={e => set('usefulLifeYears', e.target.value)} className={inp} placeholder="5" />
+              </FF>
 
-            {/* Identification */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h3 className="text-sm font-semibold text-zinc-300 mb-5">Identification</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Asset Number</label>
-                  <input
-                    className={inputCls}
-                    value={form.assetNumber}
-                    onChange={e => set('assetNumber', e.target.value)}
-                    placeholder="FA-XXXXXX"
-                  />
+              {/* Depreciation Preview */}
+              {cost > 0 && life > 0 && (
+                <div className="col-span-2 bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Calculator className="w-4 h-4 text-indigo-400" />
+                    <span className="text-[12px] font-medium text-indigo-300">Depreciation Preview</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-[10px] text-zinc-500 mb-1">Depreciable Amount</div>
+                      <div className="text-[15px] font-bold text-zinc-100 tabular-nums">
+                        ${(cost - salvage).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-zinc-500 mb-1">Annual Depreciation (Yr 1)</div>
+                      <div className="text-[15px] font-bold text-amber-400 tabular-nums">
+                        ${annualDeprec.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-zinc-500 mb-1">Monthly Depreciation</div>
+                      <div className="text-[15px] font-bold text-emerald-400 tabular-nums">
+                        ${monthlyDeprec.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>Asset Group <span className="text-red-400">*</span></label>
-                  <select
-                    className={inputCls}
-                    value={form.groupId}
-                    onChange={e => handleGroupChange(e.target.value)}
-                    required
-                  >
-                    <option value="">Select group…</option>
-                    {groups.map(g => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className={labelCls}>Asset Name <span className="text-red-400">*</span></label>
-                  <input
-                    className={inputCls}
-                    value={form.name}
-                    onChange={e => set('name', e.target.value)}
-                    placeholder="e.g. POS Terminal System"
-                    required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className={labelCls}>Description</label>
+              )}
+            </div>
+          </details>
+
+          {/* Maintenance FastTab */}
+          <details className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Maintenance</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-5 grid grid-cols-2 gap-x-8 gap-y-5">
+              <FF label="Maintenance Vendor No.">
+                <input value="" readOnly className={inp + ' opacity-60 cursor-not-allowed'} placeholder="—" />
+              </FF>
+              <FF label="Under Maintenance">
+                <select className={inp}>
+                  <option value="0">No</option>
+                  <option value="1">Yes</option>
+                </select>
+              </FF>
+              <div className="col-span-2">
+                <FF label="Notes">
                   <textarea
-                    className={inputCls + ' resize-none'}
-                    rows={2}
-                    value={form.description}
-                    onChange={e => set('description', e.target.value)}
-                    placeholder="Optional description"
+                    value={form.notes}
+                    onChange={e => set('notes', e.target.value)}
+                    rows={3}
+                    className={inp + ' resize-none'}
+                    placeholder="Internal notes, warranty info, etc."
                   />
-                </div>
-                <div>
-                  <label className={labelCls}>Location</label>
-                  <input
-                    className={inputCls}
-                    value={form.location}
-                    onChange={e => set('location', e.target.value)}
-                    placeholder="e.g. Store Floor, Warehouse"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Serial Number</label>
-                  <input
-                    className={inputCls}
-                    value={form.serialNumber}
-                    onChange={e => set('serialNumber', e.target.value)}
-                    placeholder="Optional serial #"
-                  />
-                </div>
+                </FF>
               </div>
             </div>
+          </details>
 
-            {/* Acquisition */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h3 className="text-sm font-semibold text-zinc-300 mb-5">Acquisition & Valuation</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Acquisition Date <span className="text-red-400">*</span></label>
-                  <input
-                    type="date"
-                    className={inputCls}
-                    value={form.acquisitionDate}
-                    onChange={e => set('acquisitionDate', e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Acquisition Cost ($) <span className="text-red-400">*</span></label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className={inputCls}
-                    value={form.acquisitionCost}
-                    onChange={e => set('acquisitionCost', e.target.value)}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Salvage Value ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className={inputCls}
-                    value={form.salvageValue}
-                    onChange={e => set('salvageValue', e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Useful Life (years) <span className="text-red-400">*</span></label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    className={inputCls}
-                    value={form.usefulLifeYears}
-                    onChange={e => set('usefulLifeYears', e.target.value)}
-                    placeholder="e.g. 5"
-                    required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className={labelCls}>Depreciation Method <span className="text-red-400">*</span></label>
-                  <select
-                    className={inputCls}
-                    value={form.depreciationMethod}
-                    onChange={e => set('depreciationMethod', e.target.value)}
-                  >
-                    <option value="straight_line">Straight-Line</option>
-                    <option value="declining_balance">Declining Balance (200%)</option>
-                    <option value="sum_of_years">Sum of Years&apos; Digits</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Depreciation Preview */}
-            {cost > 0 && life > 0 && (
-              <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <Calculator className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm font-medium text-blue-300">Depreciation Preview</span>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-xs text-zinc-500 mb-1">Depreciable Amount</p>
-                    <p className="text-lg font-bold text-zinc-100">
-                      ${(cost - salvage).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-500 mb-1">Annual Depreciation (Yr 1)</p>
-                    <p className="text-lg font-bold text-amber-400">
-                      ${annualDeprec.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-500 mb-1">Monthly Depreciation</p>
-                    <p className="text-lg font-bold text-emerald-400">
-                      ${monthlyDeprec.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h3 className="text-sm font-semibold text-zinc-300 mb-5">Notes</h3>
-              <textarea
-                className={inputCls + ' resize-none'}
-                rows={3}
-                value={form.notes}
-                onChange={e => set('notes', e.target.value)}
-                placeholder="Internal notes, warranty info, etc."
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pb-4">
-              <Link href="/finance/fixed-assets">
-                <Button type="button" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-                  Cancel
-                </Button>
-              </Link>
-              <Button
-                type="submit"
-                disabled={saving}
-                className="bg-blue-600 hover:bg-blue-500 text-white gap-2"
-              >
-                {saving ? 'Saving…' : 'Register Asset'}
-              </Button>
-            </div>
-          </form>
         </div>
-      </main>
-    </div>
+      </div>
+    </>
   )
 }

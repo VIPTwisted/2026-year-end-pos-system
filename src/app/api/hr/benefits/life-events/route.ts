@@ -17,14 +17,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
+  if (!body.employeeId || !body.eventType || !body.eventDate) {
+    return NextResponse.json({ error: 'employeeId, eventType, and eventDate are required' }, { status: 400 })
+  }
   const event = await prisma.lifeEvent.create({
     data: {
       employeeId: body.employeeId,
       eventType: body.eventType,
       eventDate: new Date(body.eventDate),
-      description: body.description ?? null,
+      documentation: body.documentation ?? null,
+      changesJson: body.changesJson ?? null,
       status: 'pending',
-      notes: body.notes ?? null,
     },
   })
   return NextResponse.json(event, { status: 201 })

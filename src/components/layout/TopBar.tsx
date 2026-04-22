@@ -18,7 +18,7 @@ interface TopBarProps {
 
 export function TopBar({ title, breadcrumb, actions }: TopBarProps) {
   return (
-    <header className="border-b border-zinc-800 bg-zinc-950 sticky top-0 z-10">
+    <header className="sticky top-0 z-10" style={{ background: '#0d0e24', borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
       {breadcrumb && breadcrumb.length > 0 && (
         <div className="px-6 pt-2 flex items-center gap-1.5">
           {breadcrumb.map((item, i) => (

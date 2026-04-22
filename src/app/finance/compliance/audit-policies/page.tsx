@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { Shield, Plus, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'

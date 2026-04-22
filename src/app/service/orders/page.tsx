@@ -1,192 +1,256 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { formatDate } from '@/lib/utils'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Wrench, Plus, AlertTriangle, ChevronRight } from 'lucide-react'
-
-const PRIORITY_VARIANT: Record<string, 'destructive' | 'warning' | 'default' | 'secondary'> = {
-  urgent: 'destructive',
-  high: 'warning',
-  normal: 'default',
-  low: 'secondary',
-}
+import {
+  Plus, Edit2, Trash2, ChevronRight, SendHorizonal, CheckCircle,
+  Receipt, MapPin, Users2, RefreshCw,
+} from 'lucide-react'
 
 const STATUS_VARIANT: Record<string, 'warning' | 'default' | 'success' | 'secondary' | 'destructive'> = {
-  open: 'warning',
-  'in-progress': 'default',
-  'on-hold': 'secondary',
-  completed: 'success',
-  cancelled: 'destructive',
+  Pending:    'warning',
+  'In Process': 'default',
+  Finished:   'success',
+  'On Hold':  'secondary',
+}
+const PRIORITY_VARIANT: Record<string, 'destructive' | 'warning' | 'default' | 'secondary'> = {
+  Urgent: 'destructive',
+  High:   'warning',
+  Normal: 'default',
+  Low:    'secondary',
 }
 
-export default async function ServiceOrdersPage({
+function fmtDate(d: string | Date | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+export default async function ServiceOrdersListPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string>>
 }) {
   const sp = await searchParams
-  const statusFilter = sp.status ?? ''
-  const techFilter = sp.tech ?? ''
+  const search     = (sp.search ?? '').toLowerCase()
+  const cust       = sp.customer ?? ''
+  const status     = sp.status ?? ''
+  const priority   = sp.priority ?? ''
+  const dateFrom   = sp.dateFrom ?? ''
+  const dateTo     = sp.dateTo ?? ''
 
   const orders = await prisma.serviceOrder.findMany({
     where: {
-      ...(statusFilter ? { status: statusFilter } : {}),
-      ...(techFilter ? { assignedTech: techFilter } : {}),
+      ...(status   ? { status }   : {}),
+      ...(priority ? { priority } : {}),
+      ...(cust     ? { customerId: cust } : {}),
+      ...(dateFrom ? { createdAt: { gte: new Date(dateFrom) } } : {}),
+      ...(dateTo   ? { createdAt: { ...(dateFrom ? { gte: new Date(dateFrom) } : {}), lte: new Date(dateTo) } } : {}),
     },
-    include: { customer: true, serviceItem: true },
+    include: { customer: true },
     orderBy: { createdAt: 'desc' },
   })
 
-  const now = new Date()
-  const open = orders.filter(o => o.status === 'open').length
-  const inProgress = orders.filter(o => o.status === 'in-progress').length
-  const overdue = orders.filter(o =>
-    o.dueDate && o.dueDate < now && !['completed', 'cancelled'].includes(o.status)
-  ).length
-  const completedToday = orders.filter(o => {
-    if (!o.completedAt) return false
-    const d = o.completedAt
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
-  }).length
+  const filtered = search
+    ? orders.filter(o =>
+        o.orderNumber.toLowerCase().includes(search) ||
+        o.description.toLowerCase().includes(search) ||
+        `${o.customer?.firstName ?? ''} ${o.customer?.lastName ?? ''}`.toLowerCase().includes(search)
+      )
+    : orders
+
+  const customers = await prisma.customer.findMany({
+    select: { id: true, firstName: true, lastName: true },
+    orderBy: { firstName: 'asc' },
+    take: 200,
+  })
+
+  const buildUrl = (overrides: Record<string, string>) => {
+    const p = new URLSearchParams()
+    const merged = { search, customer: cust, status, priority, dateFrom, dateTo, ...overrides }
+    Object.entries(merged).forEach(([k, v]) => { if (v) p.set(k, v) })
+    const qs = p.toString()
+    return `/service/orders${qs ? `?${qs}` : ''}`
+  }
 
   return (
     <>
       <TopBar title="Service Orders" />
-      <main className="flex-1 p-6 overflow-auto space-y-6">
+      <main className="flex-1 overflow-auto">
 
-        {/* KPIs */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card><CardContent className="pt-5 pb-5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Open</p>
-            <p className={`text-2xl font-bold ${open > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>{open}</p>
-          </CardContent></Card>
-          <Card><CardContent className="pt-5 pb-5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">In Progress</p>
-            <p className="text-2xl font-bold text-blue-400">{inProgress}</p>
-          </CardContent></Card>
-          <Card><CardContent className="pt-5 pb-5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Overdue</p>
-            <p className={`text-2xl font-bold ${overdue > 0 ? 'text-red-400' : 'text-zinc-400'}`}>{overdue}</p>
-          </CardContent></Card>
-          <Card><CardContent className="pt-5 pb-5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Completed Today</p>
-            <p className="text-2xl font-bold text-emerald-400">{completedToday}</p>
-          </CardContent></Card>
-        </div>
-
-        {/* Filters + header */}
-        <section>
-          <div className="mb-4 flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-semibold text-zinc-100">Orders</h2>
-              <div className="flex gap-1">
-                {['', 'open', 'in-progress', 'on-hold', 'completed', 'cancelled'].map(s => (
-                  <Link
-                    key={s}
-                    href={s ? `/service/orders?status=${s}` : '/service/orders'}
-                    className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
-                      statusFilter === s
-                        ? 'bg-blue-600 text-white border-blue-500'
-                        : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:border-zinc-500'
-                    }`}
-                  >
-                    {s || 'All'}
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <Button asChild>
-              <Link href="/service/orders/new">
-                <Plus className="w-4 h-4 mr-1" />
-                New Order
-              </Link>
+        {/* Ribbon */}
+        <div className="border-b border-zinc-800 bg-zinc-950 px-4 py-2 flex items-center gap-1 flex-wrap">
+          <div className="flex items-center gap-1 pr-3 border-r border-zinc-800">
+            <Button asChild size="sm" className="h-7 px-2.5 text-xs gap-1">
+              <Link href="/service/orders/new"><Plus className="w-3.5 h-3.5" />New</Link>
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" disabled>
+              <Edit2 className="w-3.5 h-3.5" />Edit
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1 text-red-400 border-red-900 hover:bg-red-950" disabled>
+              <Trash2 className="w-3.5 h-3.5" />Delete
             </Button>
           </div>
+          <div className="flex items-center gap-1 px-3 border-r border-zinc-800">
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" disabled>
+              <RefreshCw className="w-3.5 h-3.5" />Release
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" disabled>
+              <CheckCircle className="w-3.5 h-3.5" />Finish
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" disabled>
+              <Receipt className="w-3.5 h-3.5" />Create Invoice
+            </Button>
+          </div>
+          <div className="flex items-center gap-1 px-3">
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" disabled>
+              <SendHorizonal className="w-3.5 h-3.5" />Dispatch
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" disabled>
+              <MapPin className="w-3.5 h-3.5" />Allocations
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" disabled>
+              <Users2 className="w-3.5 h-3.5" />Assign
+            </Button>
+          </div>
+        </div>
 
-          {orders.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-20 text-zinc-500">
-                <Wrench className="w-12 h-12 mb-4 opacity-30" />
-                <p className="text-base font-medium text-zinc-300 mb-2">No service orders</p>
-                <Button asChild variant="outline">
-                  <Link href="/service/orders/new">Create First Order</Link>
+        <div className="flex min-h-0 flex-1">
+          {/* Filter Pane */}
+          <form method="GET" action="/service/orders"
+            className="w-56 shrink-0 border-r border-zinc-800 bg-zinc-950 p-4 space-y-4 sticky top-0 overflow-y-auto"
+            style={{ maxHeight: 'calc(100vh - 112px)' }}>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">Filters</p>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Search</label>
+              <input
+                name="search"
+                defaultValue={search}
+                placeholder="No. / Description…"
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Customer</label>
+              <select name="customer" defaultValue={cust}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100">
+                <option value="">All Customers</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Status</label>
+              <select name="status" defaultValue={status}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100">
+                <option value="">All</option>
+                {['Pending','In Process','Finished','On Hold'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Priority</label>
+              <select name="priority" defaultValue={priority}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100">
+                <option value="">All</option>
+                {['Low','Normal','High','Urgent'].map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Date From</label>
+              <input type="date" name="dateFrom" defaultValue={dateFrom}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Date To</label>
+              <input type="date" name="dateTo" defaultValue={dateTo}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100" />
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <button type="submit"
+                className="w-full h-7 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors">
+                Apply
+              </button>
+              <Link href="/service/orders"
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs font-medium transition-colors flex items-center justify-center">
+                Clear
+              </Link>
+            </div>
+          </form>
+
+          {/* Table */}
+          <div className="flex-1 p-5 overflow-x-auto">
+            <div className="mb-3 flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-zinc-100">Service Orders</h2>
+              <span className="text-xs text-zinc-500">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
+                <p className="text-sm">No service orders match the current filters.</p>
+                <Button asChild variant="outline" className="mt-4">
+                  <Link href="/service/orders/new"><Plus className="w-4 h-4 mr-1" />New Service Order</Link>
                 </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              </div>
+            ) : (
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                    <th className="text-left pb-3 font-medium">Order #</th>
-                    <th className="text-left pb-3 font-medium">Customer</th>
-                    <th className="text-left pb-3 font-medium">Item</th>
-                    <th className="text-left pb-3 font-medium max-w-[180px]">Description</th>
-                    <th className="text-left pb-3 font-medium">Tech</th>
-                    <th className="text-center pb-3 font-medium">Priority</th>
-                    <th className="text-center pb-3 font-medium">Status</th>
-                    <th className="text-left pb-3 font-medium">Due</th>
-                    <th className="text-right pb-3 font-medium"></th>
+                  <tr className="border-b border-zinc-800 text-zinc-500 uppercase tracking-wide">
+                    <th className="text-left pb-2.5 font-medium pr-4">No.</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Customer Name</th>
+                    <th className="text-left pb-2.5 font-medium pr-4 max-w-[160px]">Description</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Status</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Priority</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Response Date</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Repair Status</th>
+                    <th className="text-right pb-2.5 font-medium pr-4">Allocated Hrs</th>
+                    <th className="pb-2.5 w-6"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {orders.map(o => {
-                    const isOverdue = o.dueDate && o.dueDate < now && !['completed', 'cancelled'].includes(o.status)
-                    return (
-                      <tr key={o.id} className="hover:bg-zinc-900/50 transition-colors group">
-                        <td className="py-3 pr-4 font-mono text-xs">
-                          <Link href={`/service/orders/${o.id}`} className="font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
-                            {o.orderNumber}
-                          </Link>
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-300 text-xs">
-                          {o.customer ? `${o.customer.firstName} ${o.customer.lastName}` : '—'}
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-500 text-xs max-w-[120px] truncate">
-                          {o.serviceItem?.description ?? '—'}
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-400 text-xs max-w-[180px] truncate">
-                          {o.description}
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-400 text-xs">
-                          {o.assignedTech ?? <span className="text-zinc-700">Unassigned</span>}
-                        </td>
-                        <td className="py-3 pr-4 text-center">
-                          <Badge variant={PRIORITY_VARIANT[o.priority] ?? 'secondary'} className="capitalize text-xs">
-                            {o.priority}
-                          </Badge>
-                        </td>
-                        <td className="py-3 pr-4 text-center">
-                          <Badge variant={STATUS_VARIANT[o.status] ?? 'secondary'} className="capitalize text-xs">
-                            {o.status.replace('-', ' ')}
-                          </Badge>
-                        </td>
-                        <td className="py-3 pr-4 text-xs">
-                          {o.dueDate ? (
-                            <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-400' : 'text-zinc-400'}`}>
-                              {isOverdue && <AlertTriangle className="w-3 h-3" />}
-                              {formatDate(o.dueDate)}
-                            </span>
-                          ) : (
-                            <span className="text-zinc-700">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 text-right">
-                          <Link href={`/service/orders/${o.id}`}>
-                            <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                <tbody className="divide-y divide-zinc-800/60">
+                  {filtered.map(o => (
+                    <tr key={o.id} className="hover:bg-zinc-900/40 transition-colors group">
+                      <td className="py-2.5 pr-4">
+                        <Link href={`/service/orders/${o.id}`}
+                          className="font-mono text-indigo-400 hover:text-indigo-300 font-medium">
+                          {o.orderNumber}
+                        </Link>
+                      </td>
+                      <td className="py-2.5 pr-4 text-zinc-300">
+                        {o.customer ? `${o.customer.firstName} ${o.customer.lastName}` : <span className="text-zinc-600">—</span>}
+                      </td>
+                      <td className="py-2.5 pr-4 text-zinc-400 max-w-[160px] truncate">{o.description}</td>
+                      <td className="py-2.5 pr-4">
+                        <Badge variant={STATUS_VARIANT[o.status] ?? 'secondary'} className="text-[10px]">{o.status}</Badge>
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <Badge variant={PRIORITY_VARIANT[o.priority] ?? 'secondary'} className="capitalize text-[10px]">{o.priority}</Badge>
+                      </td>
+                      <td className="py-2.5 pr-4 text-zinc-400">{fmtDate(o.dueDate)}</td>
+                      <td className="py-2.5 pr-4 text-zinc-500">{(o as { repairStatus?: string | null }).repairStatus ?? '—'}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-zinc-300">
+                        {o.estimatedHours?.toFixed(1) ?? '0.0'}
+                      </td>
+                      <td className="py-2.5">
+                        <Link href={`/service/orders/${o.id}`}>
+                          <ChevronRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-400" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-            </div>
-          )}
-        </section>
+            )}
+          </div>
+        </div>
       </main>
     </>
   )

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, ShoppingCart, Package, Users, Warehouse,
+  LayoutDashboard, LayoutGrid, ShoppingCart, Package, Users, Warehouse,
   Building2, HeadphonesIcon, DollarSign, Megaphone, Wrench,
   Settings, ChevronRight, Store, Map,
   CreditCard, CalendarDays, CheckSquare, GraduationCap,
@@ -33,6 +33,10 @@ import {
   Moon, ShieldAlert,
   Database, Brain, MapPin, ThumbsUp, Sparkles, Bot, Handshake,
   Server, Key, Activity, Download, Gauge,
+  Heart, Barcode, UserX, PackageSearch, ArrowDownToLine, Briefcase,
+  Hash, Landmark, Car, CalendarCheck,
+  Factory,
+  Award, Tag as TagIcon,
 } from 'lucide-react'
 
 type NavItem =
@@ -40,8 +44,12 @@ type NavItem =
   | { type: 'section'; label: string }
 
 const NAV: NavItem[] = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'POS Terminal', href: '/pos', icon: ShoppingCart },
+
+  { type: 'section', label: 'Dashboards' },
+  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart2 },
+  { label: 'CRM Dashboard', href: '/dashboard/crm', icon: LayoutDashboard },
 
   { type: 'section', label: 'Retail & Commerce' },
   { label: 'Products', href: '/products', icon: Package },
@@ -59,6 +67,7 @@ const NAV: NavItem[] = [
   { label: 'Price Rules', href: '/pricing/rules', icon: Sliders },
   { label: 'Customer Groups', href: '/pricing/customer-groups', icon: Users },
   { label: 'Price Simulator', href: '/pricing/simulate', icon: Play },
+  { label: 'Price Attributes', href: '/pricing/price-attributes', icon: SlidersHorizontal },
 
   { type: 'section', label: 'Merchandising' },
   { label: 'Catalogs', href: '/ecom/catalogs', icon: BookOpen },
@@ -80,20 +89,88 @@ const NAV: NavItem[] = [
   { label: 'Non-Conformances', href: '/quality/nc', icon: AlertTriangle },
   { label: 'Test Groups', href: '/quality/test-groups', icon: FlaskConical },
   { label: 'Inspection Plans', href: '/quality/plans', icon: FileSearch },
+  { label: 'Item Categories', href: '/inventory/item-categories', icon: Tag },
+  { label: 'Item Ledger Entries', href: '/inventory/item-ledger', icon: List },
+  { label: 'Value Entries', href: '/inventory/value-entries', icon: FileBarChart },
+  { label: 'Physical Inventory', href: '/inventory/physical-inventory', icon: ClipboardList },
+  { label: 'Item Tracking', href: '/inventory/item-tracking', icon: Barcode },
+  { label: 'Item Variants', href: '/inventory/item-variants', icon: Layers },
+  { label: 'Item Attributes', href: '/inventory/item-attributes', icon: SlidersHorizontal },
+  { label: 'SKUs', href: '/inventory/skus', icon: Barcode },
+  { label: 'Adjustments', href: '/inventory/adjustments', icon: Calculator },
   { label: 'Physical Count', href: '/inventory/physical-count', icon: ListChecks },
   { label: 'Lot Tracking', href: '/inventory/lot-tracking', icon: Tag },
   { label: 'Serial Numbers', href: '/inventory/serial-numbers', icon: Key },
+  { label: 'Visibility Dashboard', href: '/inventory/visibility', icon: Eye },
   { label: 'Landed Costs', href: '/purchasing/landed-costs', icon: Truck },
+  { label: 'Item Charges', href: '/inventory/item-charges', icon: Percent },
+  { label: 'Warehouse Planning', href: '/warehouse/planning', icon: Layers },
+
+  { type: 'section', label: 'Warehouse Management' },
+  { label: 'Overview', href: '/warehouse', icon: Warehouse },
+  { label: 'Receipts', href: '/warehouse/receipts', icon: PackageCheck },
+  { label: 'Shipments', href: '/warehouse/shipments', icon: Truck },
+  { label: 'Picks', href: '/warehouse/picks', icon: PackageSearch },
+  { label: 'Put-Aways', href: '/warehouse/put-aways', icon: ArrowDownToLine },
+  { label: 'Movements', href: '/warehouse/movements', icon: ArrowLeftRight },
+  { label: 'Bin Contents', href: '/warehouse/bin-contents', icon: Layers },
+  { label: 'Locations', href: '/warehouse/locations', icon: MapPin },
+  { label: 'Transfer Orders', href: '/warehouse/transfers', icon: Repeat },
+
+  { type: 'section', label: 'Assembly' },
+  { label: 'Assembly Orders', href: '/assembly/orders', icon: Package },
+  { label: 'Assembly BOMs', href: '/assembly/boms', icon: Layers },
 
   { type: 'section', label: 'Manufacturing' },
   { label: 'Overview', href: '/manufacturing', icon: Cpu },
+  { label: 'Production Floor', href: '/manufacturing/production-floor', icon: Factory },
   { label: 'Production Orders', href: '/manufacturing/production-orders', icon: ClipboardList },
   { label: 'BOMs', href: '/manufacturing/boms', icon: Layers },
+  { label: 'Bill of Materials', href: '/manufacturing/bom', icon: BookOpen },
   { label: 'BOM Routing', href: '/manufacturing/bom-routing', icon: GitBranch },
+  { label: 'Routes', href: '/manufacturing/routes', icon: GitBranch },
   { label: 'Routings', href: '/manufacturing/routings', icon: Network },
   { label: 'Work Centers', href: '/manufacturing/work-centers', icon: Settings2 },
+  { label: 'Machine Centers', href: '/manufacturing/machine-centers', icon: Cpu },
+  { label: 'Capacity Ledger', href: '/manufacturing/capacity-ledger', icon: Activity },
+  { label: 'Capacity', href: '/manufacturing/capacity', icon: Activity },
   { label: 'Subcontracting', href: '/manufacturing/subcontracting', icon: Handshake },
+  { label: 'Quality Management', href: '/manufacturing/quality', icon: CheckSquare },
   { label: 'Mfg Quality', href: '/manufacturing/quality', icon: CheckCircle },
+  { label: 'Engineering Changes', href: '/engineering-change', icon: Settings2 },
+  { label: 'Production Performance', href: '/manufacturing/production-performance', icon: BarChart2 },
+
+  { type: 'section', label: 'Purchase' },
+  { label: 'Vendors', href: '/purchase/vendors', icon: Building2 },
+  { label: 'Orders', href: '/purchase/orders', icon: Building2 },
+  { label: 'Invoices', href: '/purchase/invoices', icon: Receipt },
+  { label: 'Price Lists', href: '/purchase/price-lists', icon: Tag },
+  { label: 'Credit Memos', href: '/purchase/credit-memos', icon: RotateCcw },
+  { label: 'Receipts', href: '/purchase/receipts', icon: PackageCheck },
+
+  { type: 'section', label: 'Supply Chain Extended' },
+  { label: 'Trade Agreements',        href: '/supply-chain/trade-agreements',                    icon: Handshake },
+  { label: 'New Trade Agreement',     href: '/supply-chain/trade-agreements/new',                icon: Send },
+  { label: 'Costing Sheets',          href: '/supply-chain/costing/costing-sheets',              icon: Layers },
+  { label: 'Std. Cost Updates',       href: '/supply-chain/costing/standard-cost-updates',       icon: RefreshCw },
+  { label: 'Cost Accounting Ledger',  href: '/supply-chain/costing/cost-accounting',             icon: Calculator },
+  { label: 'Net Requirements',        href: '/supply-chain/master-planning/net-requirements',    icon: ListChecks },
+  { label: 'Planned Orders',          href: '/supply-chain/master-planning/planned-orders',      icon: ClipboardList },
+  { label: 'Firmed Orders',           href: '/supply-chain/master-planning/firmed-orders',       icon: CheckCircle },
+
+  { type: 'section', label: 'Procurement' },
+  { label: 'Purchase Orders', href: '/procurement/purchase-orders', icon: ShoppingCart },
+  { label: 'Vendors', href: '/procurement/vendors', icon: Building2 },
+  { label: 'Receiving', href: '/procurement/receiving', icon: PackageCheck },
+
+  { type: 'section', label: 'Inventory' },
+  { label: 'Items', href: '/inventory/items', icon: Package },
+  { label: 'Product Variants', href: '/inventory/product-variants', icon: Layers },
+  { label: 'Inventory Management', href: '/inventory/management', icon: Package },
+  { label: 'Warehouse Management', href: '/inventory/warehouse-management', icon: Warehouse },
+  { label: 'Transfer Orders', href: '/inventory/transfers', icon: ArrowLeftRight },
+  { label: 'Cycle Count', href: '/inventory/cycle-count', icon: RefreshCw },
+  { label: 'Adjustments', href: '/inventory/adjustments', icon: Calculator },
 
   { type: 'section', label: 'Procurement & Sourcing' },
   { label: 'Purchase Orders', href: '/purchasing', icon: Building2 },
@@ -102,12 +179,23 @@ const NAV: NavItem[] = [
   { label: 'Documents', href: '/vp-documents', icon: FolderOpen },
   { label: 'Vendors / AP', href: '/vendors', icon: Building2 },
 
+  { type: 'section', label: 'Commerce' },
+  { label: 'Channels', href: '/commerce/channels', icon: Globe },
+  { label: 'Stores', href: '/commerce/stores', icon: Store },
+  { label: 'Terminals', href: '/commerce/terminals', icon: Monitor },
+  { label: 'CDX Jobs', href: '/commerce/cdx', icon: Database },
+  { label: 'Pricing', href: '/commerce/pricing', icon: Tag },
+  { label: 'Discounts', href: '/commerce/discounts', icon: Percent },
+  { label: 'Hierarchy', href: '/commerce/hierarchy', icon: Layers },
+  { label: 'Tasks', href: '/commerce/tasks', icon: CheckSquare },
+
   { type: 'section', label: 'Commerce HQ' },
-  { label: 'Channels', href: '/channels', icon: Globe },
+  { label: 'Shopify', href: '/shopify', icon: ShoppingBag },
   { label: 'CSU Management', href: '/channels/csu', icon: Server },
   { label: 'BOPIS / Pickup', href: '/channels/bopis', icon: PackageCheck },
   { label: 'Hardware Profiles', href: '/channels/hardware-profiles', icon: Cpu },
   { label: 'Registers', href: '/channels/registers', icon: Monitor },
+  { label: 'Store Commerce Devices', href: '/channels/store-commerce', icon: Monitor },
   { label: 'Receipt Profiles', href: '/channels/receipt-profiles', icon: Printer },
   { label: 'Payment Connectors', href: '/channels/payment-connectors', icon: CreditCard },
   { label: 'Fulfillment Groups', href: '/channels/fulfillment-groups', icon: Truck },
@@ -116,50 +204,155 @@ const NAV: NavItem[] = [
 
   { type: 'section', label: 'Finance' },
   { label: 'Overview', href: '/finance', icon: DollarSign },
+  { label: 'Finance Analytics', href: '/finance/analytics', icon: BarChart2 },
+  { label: 'Cash Overview', href: '/finance/cash-overview', icon: Landmark },
+  { label: 'Financial Insights', href: '/finance/financial-insights', icon: TrendingUp },
+  { label: 'Ledger Budgets', href: '/finance/ledger-budgets', icon: PieChart },
+  { label: 'Consolidations', href: '/finance/consolidations', icon: Building },
+  { label: 'Period Close', href: '/finance/period-close', icon: CalendarCheck },
+  { label: 'Chart of Accounts', href: '/finance/chart-of-accounts', icon: BookOpen },
+  { label: 'G/L Entries', href: '/finance/gl-entries', icon: List },
+  { label: 'G/L Registers', href: '/finance/gl-registers', icon: Database },
   { label: 'GL Journal', href: '/finance/gl', icon: FileText },
+  { label: 'General Journal', href: '/finance/general-journal', icon: BookOpen },
   { label: 'Posting Profiles', href: '/finance/posting-profiles', icon: Sliders },
   { label: 'AR / Receivables', href: '/ar', icon: ArrowDownCircle },
-  { label: 'Bank Accounts', href: '/bank', icon: CreditCard },
+  { label: 'Vendor Payments', href: '/finance/vendor-payments', icon: Banknote },
+  { label: 'Cash Management', href: '/finance/cash-management', icon: Landmark },
+  { label: 'Bank Management', href: '/finance/bank-management', icon: CreditCard },
+  { label: 'Bank Accounts', href: '/finance/bank-accounts', icon: CreditCard },
+  { label: 'Bank Reconciliation', href: '/finance/bank-reconciliation', icon: CheckSquare },
   { label: 'Fixed Assets', href: '/finance/fixed-assets', icon: Boxes },
+  { label: 'Lease Management', href: '/finance/lease-management', icon: Building2 },
+  { label: 'Dimensions', href: '/finance/dimensions', icon: Layers },
   { label: 'Cost Accounting', href: '/finance/cost-accounting', icon: Calculator },
-  { label: 'Budget', href: '/budget', icon: PieChart },
+  { label: 'Cost Types', href: '/finance/cost-types', icon: BarChart3 },
+  { label: 'Budgets', href: '/finance/budgets', icon: PieChart },
+  { label: 'Budget Management', href: '/finance/budgets/management', icon: Target },
   { label: 'Budget Plans', href: '/budget/plans', icon: Target },
+  { label: 'Expense Management', href: '/finance/expense-management', icon: FileCheck },
   { label: 'Statements', href: '/statements', icon: Receipt },
   { label: 'Fiscal Calendar', href: '/fiscal', icon: CalendarDays },
+  { label: 'Incoming Documents', href: '/finance/incoming-documents', icon: FileSearch },
   { label: 'Year-End Close', href: '/year-end', icon: CheckSquare },
-  { label: 'Tax Management', href: '/finance/tax', icon: Percent },
+  { label: 'Tax Management', href: '/finance/tax-management', icon: Percent },
+  { label: 'Tax Management (Legacy)', href: '/finance/tax', icon: Percent },
   { label: 'Credit Management', href: '/finance/credit-management', icon: Shield },
+  { label: 'Credit & Collections', href: '/finance/credit-collections', icon: AlertTriangle },
+  { label: 'Customer Invoicing', href: '/finance/customer-invoicing', icon: Receipt },
   { label: 'Collections', href: '/finance/collections', icon: TrendingDown },
   { label: 'Interest', href: '/finance/interest', icon: Percent },
   { label: 'Cash Discounts', href: '/finance/cash-discounts', icon: Tag },
   { label: 'Prepayments', href: '/finance/prepayments', icon: CreditCard },
+  { label: 'Intercompany', href: '/finance/intercompany', icon: ArrowLeftRight },
+  { label: 'IC Partners', href: '/finance/intercompany/partners', icon: Building2 },
+  { label: 'IC Inbox', href: '/finance/intercompany/inbox', icon: ArrowDownCircle },
+  { label: 'IC Outbox', href: '/finance/intercompany/outbox', icon: Send },
+  { label: 'Revenue Recognition', href: '/finance/revenue-recognition', icon: TrendingUp },
+  { label: 'VAT Returns', href: '/finance/vat-returns', icon: Percent },
+  { label: 'Consolidation', href: '/finance/consolidation', icon: Building },
+  { label: 'Elimination Journals', href: '/finance/consolidation/elimination', icon: ArrowLeftRight },
+  { label: 'Depreciation Books', href: '/finance/fixed-assets/depreciation-books', icon: Calculator },
+  { label: 'Depreciation Tables', href: '/finance/fixed-assets/depreciation-tables', icon: Layers },
+  { label: 'FA Journal', href: '/finance/fixed-assets/fa-journal', icon: FileText },
+  { label: 'Dimension Sets', href: '/finance/dimension-sets', icon: Layers },
+  { label: 'Reminders', href: '/finance/reminders', icon: Bell },
+  { label: 'Finance Charges', href: '/finance/finance-charges', icon: AlertTriangle },
+
+  { type: 'section', label: 'Journals' },
+  { label: 'Journal Templates', href: '/finance/journals/templates', icon: FileText },
+  { label: 'General Journal', href: '/finance/journals/general', icon: BookOpen },
+  { label: 'Payment Journal', href: '/finance/journals/payment', icon: CreditCard },
+  { label: 'Cash Receipt Journal', href: '/finance/journals/cash-receipts', icon: ArrowDownCircle },
+
+  { type: 'section', label: 'Finance Reports' },
+  { label: 'Trial Balance', href: '/finance/reports/trial-balance', icon: BarChart3 },
+  { label: 'Income Statement', href: '/finance/reports/income-statement', icon: TrendingUp },
+  { label: 'Balance Sheet', href: '/finance/reports/balance-sheet', icon: BarChart2 },
+  { label: 'Cash Flow Statement', href: '/finance/reports/cash-flow', icon: Activity },
+  { label: 'Account Schedules', href: '/finance/account-schedules', icon: FileBarChart },
+  { label: 'Report Builder', href: '/finance/reports/builder', icon: FileSearch },
+
+  { type: 'section', label: 'Finance Setup' },
+  { label: 'Accounting Periods', href: '/finance/accounting-periods', icon: CalendarDays },
+  { label: 'Gen. Bus. Posting Groups', href: '/finance/setup/posting-groups/gen-business', icon: Layers },
+  { label: 'Gen. Prod. Posting Groups', href: '/finance/setup/posting-groups/gen-product', icon: Layers },
+  { label: 'Customer Posting Groups', href: '/finance/setup/posting-groups/customer', icon: Users },
+  { label: 'Vendor Posting Groups', href: '/finance/setup/posting-groups/vendor', icon: Building2 },
+  { label: 'Inventory Posting Groups', href: '/finance/setup/posting-groups/inventory', icon: Boxes },
+  { label: 'VAT Posting Setup', href: '/finance/setup/vat-posting', icon: Percent },
+  { label: 'Payment Terms', href: '/finance/setup/payment-terms', icon: CalendarDays },
+  { label: 'Payment Methods', href: '/finance/setup/payment-methods', icon: CreditCard },
+  { label: 'Finance Currencies', href: '/finance/setup/currencies', icon: DollarSign },
+  { label: 'Countries/Regions', href: '/finance/setup/countries', icon: Map },
 
   { type: 'section', label: 'Human Resources' },
+  { label: 'HR Workspace', href: '/hr/workspace', icon: LayoutDashboard },
   { label: 'Employees', href: '/hr/employees', icon: Users },
-  { label: 'Payroll', href: '/hr/payroll', icon: Banknote },
+  { label: 'Positions', href: '/hr/positions', icon: Briefcase },
+  { label: 'Workers', href: '/hr/workers', icon: Users2 },
+  { label: 'Benefits Management', href: '/hr/benefits', icon: Heart },
+  { label: 'Leave & Absence', href: '/hr/leave-absence', icon: Umbrella },
+  { label: 'Payroll Integration', href: '/hr/payroll', icon: Banknote },
+  { label: 'Resource Lifecycle', href: '/hr/resource-lifecycle', icon: RefreshCw },
+  { label: 'Performance', href: '/hr/performance', icon: Target },
+  { label: 'Recruiting', href: '/hr/recruiting', icon: UserPlus },
+  { label: 'Training', href: '/hr/training', icon: GraduationCap },
+  { label: 'Absences', href: '/hr/absences', icon: UserX },
+  { label: 'Qualifications', href: '/hr/qualifications', icon: GraduationCap },
   { label: 'Scheduling', href: '/hr/scheduling', icon: CalendarDays },
   { label: 'Time & Attendance', href: '/hr/time-attendance', icon: Clock },
   { label: 'Leave Management', href: '/hr/leave', icon: Umbrella },
   { label: 'Leave Balances', href: '/hr/leave-balances', icon: PiggyBank },
-  { label: 'Training', href: '/hr/training', icon: GraduationCap },
+  { label: 'New Training Course', href: '/hr/training/new', icon: Send },
+  { label: 'Employee Skills', href: '/hr/skills', icon: Target },
+  { label: 'Comp. Structures', href: '/hr/compensation/structures', icon: Layers },
+  { label: 'Comp. Review', href: '/hr/compensation/review', icon: CheckCircle },
+  { label: 'Self Service', href: '/hr/self-service', icon: User },
+  { label: 'Personnel Workspace', href: '/hr/personnel-workspace', icon: Users },
+  { label: 'Leave Accruals', href: '/hr/leave-absence/accruals', icon: Calendar },
+  { label: 'Questionnaires', href: '/hr/questionnaires', icon: ClipboardList },
+  { label: 'Benefits Workspace', href: '/hr/benefits/workspace', icon: Heart },
+  { label: 'Life Events', href: '/hr/benefits/life-events', icon: Calendar },
+  { label: 'FMLA', href: '/hr/leave-absence/fmla', icon: FileCheck },
+  { label: 'I-9 Compliance', href: '/hr/compliance/i9', icon: Shield },
+  { label: 'Garnishments', href: '/hr/payroll/garnishments', icon: Banknote },
+  { label: 'Performance Goals', href: '/hr/performance/goals', icon: Target },
+
+  { type: 'section', label: 'HR Setup' },
+  { label: 'HR Parameters', href: '/hr/setup/parameters', icon: Settings },
+  { label: 'Causes of Absence', href: '/hr/setup/causes-of-absence', icon: ClipboardList },
+  { label: 'Misc. Articles', href: '/hr/setup/misc-articles', icon: Package },
 
   { type: 'section', label: 'Sales' },
   { label: 'Sales Pipeline', href: '/sales', icon: TrendingUp },
+  { label: 'Customers', href: '/sales/customers', icon: Users },
   { label: 'Leads', href: '/sales/leads', icon: UserPlus },
   { label: 'Opportunities', href: '/sales/opportunities', icon: Target },
-  { label: 'Quotes', href: '/sales/quotes', icon: FileText },
-  { label: 'Sales Orders', href: '/sales/orders', icon: ShoppingBag },
+  { label: 'Quotations', href: '/sales/quotes', icon: FileText },
+  { label: 'Sales Orders', href: '/sales/processing-inquiry', icon: ShoppingBag },
   { label: 'Invoices', href: '/sales/invoices', icon: Receipt },
+  { label: 'Returns', href: '/sales/returns', icon: RotateCcw },
+  { label: 'Deliveries', href: '/sales/deliveries', icon: Truck },
+  { label: 'Price Lists', href: '/sales/price-lists', icon: Tag },
+  { label: 'Pricing & Discounts', href: '/sales/pricing', icon: SlidersHorizontal },
+  { label: 'Credit Memos', href: '/sales/credit-memos', icon: FileText },
+  { label: 'Return Orders', href: '/sales/return-orders', icon: RotateCcw },
+  { label: 'Posted Invoices', href: '/sales/posted-invoices', icon: FileCheck },
+  { label: 'Posted Shipments', href: '/sales/posted-shipments', icon: Truck },
   { label: 'Forecasting', href: '/sales/forecasting', icon: BarChart2 },
   { label: 'Sequences', href: '/sales/sequences', icon: GitBranch },
   { label: 'Competitors', href: '/sales/competitors', icon: Layers },
 
   { type: 'section', label: 'Customer Service' },
+  { label: 'CS Dashboard', href: '/dashboard/customer-service', icon: LayoutDashboard },
   { label: 'Overview', href: '/service', icon: HeadphonesIcon },
+  { label: 'Cases', href: '/crm/cases', icon: HeadphonesIcon },
   { label: 'Case Queue', href: '/service/cases', icon: ClipboardList },
   { label: 'Service Orders', href: '/service/orders', icon: ShoppingBag },
   { label: 'Service Items', href: '/service/items', icon: Package },
-  { label: 'Contracts', href: '/service/contracts', icon: FileText },
+  { label: 'Service Contracts', href: '/service/contracts', icon: FileText },
+  { label: 'Loaners', href: '/service/loaners', icon: Wrench },
   { label: 'Warranties', href: '/service/warranties', icon: Shield },
   { label: 'Entitlements', href: '/service/entitlements', icon: FileCheck },
   { label: 'Dispatch Board', href: '/service/dispatch', icon: MapPin },
@@ -169,6 +362,14 @@ const NAV: NavItem[] = [
   { label: 'Knowledge Base', href: '/service/knowledge', icon: BookOpen },
   { label: 'SLA Policies', href: '/service/sla', icon: Clock },
   { label: 'Analytics', href: '/service/analytics', icon: BarChart2 },
+  { label: 'AI Agents', href: '/service/ai-agents', icon: Bot },
+  { label: 'Omnichannel Analytics', href: '/service/omnichannel-analytics', icon: BarChart2 },
+  { label: 'Workstreams', href: '/service/routing/workstreams', icon: GitBranch },
+  { label: 'Copilot Config', href: '/service/copilot', icon: Sparkles },
+
+  { type: 'section', label: 'Service Setup' },
+  { label: 'Fault Codes', href: '/service/setup/fault-codes', icon: AlertTriangle },
+  { label: 'Resolution Codes', href: '/service/setup/resolution-codes', icon: CheckCircle },
 
   { type: 'section', label: 'Customer Insights' },
   { label: 'Overview', href: '/customer-insights', icon: Brain },
@@ -182,9 +383,21 @@ const NAV: NavItem[] = [
   { label: 'Governance', href: '/customer-insights/governance', icon: Shield },
   { label: 'Copilot', href: '/customer-insights/copilot', icon: Bot },
 
+  { type: 'section', label: 'CRM' },
+  { label: 'Leads', href: '/crm/leads', icon: UserPlus },
+  { label: 'Contacts', href: '/crm/contacts', icon: Users2 },
+  { label: 'Opportunities', href: '/crm/opportunities', icon: TrendingUp },
+
+  { type: 'section', label: 'Relationship Management' },
+  { label: 'Contacts', href: '/crm/contacts', icon: User },
+  { label: 'Interactions', href: '/crm/interactions', icon: MessageCircle },
+  { label: 'Opportunities', href: '/crm/opportunities', icon: Target },
+  { label: 'Campaigns', href: '/crm/campaigns', icon: Send },
+  { label: 'Segments', href: '/crm/segments', icon: Users2 },
+  { label: 'Tasks', href: '/crm/tasks', icon: CheckSquare },
+
   { type: 'section', label: 'Customer Engagement' },
   { label: 'Accounts', href: '/crm/accounts', icon: Building },
-  { label: 'Contacts', href: '/crm/contacts', icon: User },
   { label: 'Activities', href: '/crm/activities', icon: Activity },
   { label: 'Entitlements', href: '/crm/entitlements', icon: FileCheck },
   { label: 'Service Contracts', href: '/crm/contracts', icon: FileText },
@@ -193,6 +406,13 @@ const NAV: NavItem[] = [
   { label: 'Customer 360', href: '/clienteling/customers', icon: User },
   { label: 'Associate Tasks', href: '/clienteling/tasks', icon: CheckSquare },
   { label: 'Outreach Templates', href: '/clienteling/templates', icon: Mail },
+  { label: 'CRM Segments', href: '/contacts/segments', icon: Users2 },
+
+  { type: 'section', label: 'Loyalty & Promotions' },
+  { label: 'Loyalty Program', href: '/loyalty/program', icon: Award },
+  { label: 'Members', href: '/loyalty/members', icon: Users },
+  { label: 'Promotions Engine', href: '/promotions/engine', icon: Tag },
+  { label: 'Coupons', href: '/promotions/coupons', icon: Tag },
 
   { type: 'section', label: 'Call Center' },
   { label: 'Orders', href: '/call-center/orders/new', icon: ShoppingCart },
@@ -201,6 +421,33 @@ const NAV: NavItem[] = [
   { label: 'Fraud Rules', href: '/call-center/fraud-rules', icon: Shield },
   { label: 'Scripts', href: '/call-center/scripts', icon: FileText },
 
+  { type: 'section', label: 'Contact Center' },
+  { label: 'Supervisor', href: '/contact-center', icon: HeadphonesIcon },
+  { label: 'Conversations', href: '/contact-center/conversations', icon: MessageCircle },
+  { label: 'Agents', href: '/contact-center/agents', icon: Users2 },
+  { label: 'Routing', href: '/contact-center/routing', icon: GitBranch },
+  { label: 'Channels', href: '/contact-center/channels', icon: Globe },
+  { label: 'IVR Flows', href: '/contact-center/ivr', icon: Phone },
+  { label: 'Voice Channels', href: '/contact-center/voice', icon: Radio },
+  { label: 'Agent Scripts', href: '/contact-center/scripts', icon: FileText },
+  { label: 'Analytics', href: '/contact-center/analytics', icon: BarChart2 },
+  { label: 'Sentiment', href: '/contact-center/sentiment', icon: Activity },
+  { label: 'Connectors', href: '/contact-center/connectors', icon: Network },
+
+  { type: 'section', label: 'Retail Management' },
+  { label: 'Store Management', href: '/retail/store-management', icon: Store },
+  { label: 'Channel Management', href: '/retail/channel-management', icon: Globe },
+  { label: 'Store Financials', href: '/retail/store-financials', icon: BarChart2 },
+  { label: 'Retail IT', href: '/retail/retail-it', icon: Cpu },
+  { label: 'Replenishment', href: '/retail/replenishment', icon: RefreshCw },
+
+  { type: 'section', label: 'POS' },
+  { label: 'Terminal', href: '/pos/transaction', icon: ShoppingCart },
+  { label: 'Register Management', href: '/pos/register-management', icon: Monitor },
+  { label: 'Gift Cards', href: '/pos/gift-cards', icon: Gift },
+  { label: 'Returns', href: '/pos/returns', icon: RotateCcw },
+  { label: 'Reports', href: '/pos/reports', icon: BarChart3 },
+
   { type: 'section', label: 'Store Operations' },
   { label: 'Store Journal', href: '/store-ops/journal', icon: BookOpen },
   { label: 'Day-End Close', href: '/store-ops/day-end', icon: Moon },
@@ -208,12 +455,19 @@ const NAV: NavItem[] = [
   { label: 'Manager Overrides', href: '/store-ops/overrides', icon: ShieldAlert },
   { label: 'Alerts', href: '/store-ops/alerts', icon: Bell },
   { label: 'Store Locator', href: '/store-locator', icon: MapPin },
+  { label: 'Device Activation', href: '/pos/device-activation', icon: Cpu },
 
   { type: 'section', label: 'Order Management (DOM)' },
   { label: 'DOM Hub', href: '/dom', icon: GitBranch },
   { label: 'DOM Profiles', href: '/dom/profiles', icon: Settings2 },
   { label: 'Run History', href: '/dom/runs', icon: Play },
   { label: 'Exclusions', href: '/dom/exclusions', icon: Ban },
+  { label: 'Flow Designer', href: '/iom/flow-designer', icon: GitBranch },
+  { label: 'Fulfillment Rules', href: '/iom/fulfillment-optimization', icon: SlidersHorizontal },
+
+  { type: 'section', label: 'eCommerce' },
+  { label: 'Orders', href: '/ecommerce/orders', icon: ShoppingCart },
+  { label: 'Channel Sync', href: '/ecommerce/sync', icon: LinkIcon },
 
   { type: 'section', label: 'Planning & Forecasting' },
   { label: 'Master Plans', href: '/planning/master-plans', icon: Calendar },
@@ -222,6 +476,9 @@ const NAV: NavItem[] = [
   { label: 'Safety Stock', href: '/planning/safety-stock', icon: Shield },
   { label: 'Reorder Triggers', href: '/forecasting/triggers', icon: AlertTriangle },
   { label: 'Replenishment Runs', href: '/forecasting/suggestions', icon: RefreshCw },
+  { label: 'MRP Worksheet', href: '/planning/mrp', icon: Calculator },
+  { label: 'MPS Worksheet', href: '/planning/mps', icon: BarChart3 },
+  { label: 'Demand Forecast', href: '/planning/demand-forecast', icon: TrendingUp },
 
   { type: 'section', label: 'Fraud Protection' },
   { label: 'Overview', href: '/fraud', icon: ShieldAlert },
@@ -299,6 +556,44 @@ const NAV: NavItem[] = [
   { label: 'Recurring Orders', href: '/subscriptions/recurring-orders', icon: Repeat },
   { label: 'Churn Analysis', href: '/subscriptions/churn', icon: TrendingDown },
 
+  { type: 'section', label: 'Billing Contracts' },
+  { label: 'Subscriptions', href: '/billing/subscriptions', icon: Receipt },
+  { label: 'Billing Groups', href: '/billing/billing-groups', icon: Users2 },
+
+  { type: 'section', label: 'Projects' },
+  { label: 'Projects', href: '/projects/list', icon: FolderOpen },
+  { label: 'Timesheets', href: '/projects/timesheets', icon: Clock },
+  { label: 'Invoicing', href: '/projects/invoicing', icon: Receipt },
+  { label: 'Planning', href: '/projects/planning', icon: CalendarDays },
+  { label: 'Resources', href: '/projects/resources/management', icon: Users2 },
+
+  { type: 'section', label: 'Project Management' },
+  { label: 'Projects', href: '/projects', icon: FolderOpen },
+  { label: 'Jobs', href: '/projects/jobs', icon: Briefcase },
+  { label: 'Resources', href: '/projects/bc-resources', icon: Users },
+  { label: 'Resource Management', href: '/projects/resources/management', icon: Users2 },
+  { label: 'Resource Groups', href: '/projects/resource-groups', icon: Layers },
+  { label: 'Time Sheets', href: '/projects/bc-timesheets', icon: Clock },
+  { label: 'Job Ledger Entries', href: '/projects/job-ledger', icon: BookOpen },
+  { label: 'WBS', href: '/projects/wbs', icon: Network },
+  { label: 'Forecasts', href: '/projects/forecasts', icon: BarChart2 },
+  { label: 'Proforma Invoices', href: '/projects/invoicing/proforma', icon: FileText },
+  { label: 'Invoice Proposals', href: '/projects/invoicing/proposals', icon: Receipt },
+  { label: 'Subcontracts', href: '/projects/subcontracts', icon: Handshake },
+  { label: 'Retention', href: '/projects/retention', icon: PiggyBank },
+  { label: 'Funding Sources', href: '/projects/funding-sources', icon: DollarSign },
+
+  { type: 'section', label: 'Operations' },
+  { label: 'Reservations', href: '/operations/reservations', icon: CalendarCheck },
+  { label: 'Fleet', href: '/operations/fleet', icon: Car },
+  { label: 'Fleet Management', href: '/operations/fleet', icon: Car },
+  { label: 'Maintenance', href: '/operations/maintenance', icon: Wrench },
+
+  { type: 'section', label: 'Approval Workflows' },
+  { label: 'Approvals Hub', href: '/approvals', icon: CheckCircle },
+  { label: 'Approval Requests', href: '/approval/requests', icon: ClipboardList },
+  { label: 'Approval User Setup', href: '/approval/setup', icon: Settings2 },
+
   { type: 'section', label: 'Analytics & Reporting' },
   { label: 'Reports', href: '/reports', icon: BarChart3 },
   { label: 'Analytics', href: '/analytics', icon: TrendingUp },
@@ -309,34 +604,78 @@ const NAV: NavItem[] = [
   { label: 'Tasks', href: '/tasks', icon: ListChecks },
   { label: 'Field Service', href: '/field-service', icon: Wrench },
 
+  { type: 'section', label: 'Enterprise Asset Mgmt.' },
+  { label: 'Assets', href: '/assets', icon: Boxes },
+  { label: 'New Asset', href: '/assets/new', icon: Send },
+  { label: 'Work Orders', href: '/assets/work-orders', icon: Wrench },
+  { label: 'New Work Order', href: '/assets/work-orders/new', icon: ClipboardList },
+  { label: 'Maintenance Schedules', href: '/assets/maintenance-schedules', icon: Calendar },
+
+  { type: 'section', label: 'Administration' },
+  { label: 'Implementation Plan', href: '/admin/methodology', icon: ClipboardList },
+  { label: 'Methodology', href: '/admin/methodology', icon: ClipboardList },
+  { label: 'Company Information', href: '/admin/company-information', icon: Building2 },
+  { label: 'Company Information (Legacy)', href: '/admin/company', icon: Building2 },
+  { label: 'Users', href: '/admin/users', icon: User },
+  { label: 'Security Roles', href: '/admin/security-roles', icon: Shield },
+  { label: 'Permission Sets', href: '/admin/permission-sets', icon: Shield },
+  { label: 'Workflow', href: '/admin/workflow', icon: GitBranch },
+  { label: 'Workflows', href: '/admin/workflows', icon: GitBranch },
+  { label: 'System Parameters', href: '/admin/system-parameters', icon: Settings2 },
+  { label: 'Currencies', href: '/admin/currencies', icon: DollarSign },
+  { label: 'Number Sequences', href: '/admin/number-sequences', icon: Hash },
+  { label: 'Number Series', href: '/admin/no-series', icon: Hash },
+  { label: 'Global Address Book', href: '/admin/global-address-book', icon: BookOpen },
+  { label: 'Data Management', href: '/admin/data-management', icon: Database },
+  { label: 'Job Queue', href: '/admin/job-queue', icon: Clock },
+  { label: 'Change Log', href: '/admin/change-log', icon: History },
+  { label: 'Electronic Reporting', href: '/admin/electronic-reporting', icon: FileBarChart },
+  { label: 'Audit Workbench', href: '/admin/audit-workbench', icon: Eye },
+  { label: 'Compliance', href: '/admin/compliance', icon: ShieldAlert },
+  { label: 'Compliance Management', href: '/admin/compliance', icon: ShieldAlert },
+
   { type: 'section', label: 'Settings & Admin' },
   { label: 'Settings', href: '/settings', icon: Settings },
-  { label: 'Users & Roles', href: '/admin/users', icon: Key },
+  { label: 'Barcode Settings', href: '/settings/barcode', icon: Barcode },
+  { label: 'Job Queues', href: '/admin/job-queues', icon: Cpu },
+  { label: 'Data Management', href: '/admin/data-management', icon: Database },
+  { label: 'Org Hierarchy', href: '/admin/org-hierarchy', icon: Network },
   { label: 'Integrations', href: '/integrations', icon: Handshake },
   { label: 'Stores / HQ', href: '/stores', icon: Store },
   { label: 'Training', href: '/training', icon: GraduationCap },
   { label: 'Module Map', href: '/d365-map', icon: Map },
+  { label: 'Modules', href: '/modules', icon: LayoutGrid },
+  { label: 'Global Address Book', href: '/admin/global-address-book', icon: BookOpen },
+  { label: 'Electronic Reporting', href: '/admin/electronic-reporting', icon: FileBarChart },
+  { label: 'Release Management', href: '/admin/release-management', icon: Zap },
+  { label: 'Network Printers', href: '/admin/network-printers', icon: Printer },
+  { label: 'Dual-Write', href: '/admin/dual-write', icon: Repeat },
+  { label: 'Data Lake', href: '/admin/data-lake', icon: Database },
 ]
 
 export function Sidebar() {
   const path = usePathname()
   return (
-    <aside className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col h-screen sticky top-0">
-      <div className="p-5 border-b border-zinc-800">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">N</div>
+    <aside className="w-64 flex flex-col h-screen sticky top-0" style={{ background: 'linear-gradient(180deg, #0d0e24 0%, #0f1230 50%, #0d0e24 100%)', borderRight: '1px solid rgba(99,102,241,0.15)' }}>
+      {/* Logo */}
+      <div className="p-5" style={{ borderBottom: '1px solid rgba(99,102,241,0.12)' }}>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
+            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
+            N
+          </div>
           <div>
-            <div className="text-sm font-bold text-zinc-100">NovaPOS</div>
-            <div className="text-xs text-zinc-500">Enterprise Platform</div>
+            <div className="text-sm font-bold text-white">NovaPOS</div>
+            <div className="text-[11px]" style={{ color: 'rgba(165,180,252,0.6)' }}>Enterprise Platform</div>
           </div>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
+      <nav className="flex-1 overflow-y-auto py-3 px-2.5">
         {NAV.map((item, i) => {
           if (item.type === 'section') {
             return (
-              <div key={`section-${i}`} className="px-3 pt-4 pb-1">
-                <p className="text-xs font-semibold text-zinc-600 uppercase tracking-wider">{item.label}</p>
+              <div key={`section-${i}`} className="px-2 pt-4 pb-1">
+                <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(165,180,252,0.4)' }}>{item.label}</p>
               </div>
             )
           }
@@ -346,23 +685,25 @@ export function Sidebar() {
             <Link
               key={`${href}-${i}`}
               href={href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm mb-1 transition-colors group',
-                active
-                  ? 'bg-blue-600/20 text-blue-400 font-medium'
-                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
-              )}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm mb-0.5 transition-all group"
+              style={active ? {
+                background: 'linear-gradient(135deg, rgba(79,70,229,0.25), rgba(124,58,237,0.15))',
+                color: '#a5b4fc',
+                fontWeight: 500,
+                boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.2)',
+              } : {
+                color: 'rgba(148,163,184,0.7)',
+              }}
             >
               <Icon className="w-4 h-4 shrink-0" />
               <span className="flex-1">{label}</span>
-              {active && <ChevronRight className="w-3 h-3" />}
+              {active && <ChevronRight className="w-3 h-3 opacity-60" />}
             </Link>
           )
         })}
       </nav>
-      <div className="p-4 border-t border-zinc-800">
-        <div className="text-xs text-zinc-600">NovaPOS Platform v1.0</div>
-        <div className="text-xs text-zinc-700">Powered by NovaPOS</div>
+      <div className="p-4" style={{ borderTop: '1px solid rgba(99,102,241,0.12)' }}>
+        <div className="text-[11px]" style={{ color: 'rgba(165,180,252,0.35)' }}>NovaPOS Platform v1.0</div>
       </div>
     </aside>
   )

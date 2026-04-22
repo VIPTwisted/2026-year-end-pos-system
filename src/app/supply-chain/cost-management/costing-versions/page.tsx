@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 // TODO: Add schema models: AssetItem, MaintenanceRequest, CostingVersion
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'

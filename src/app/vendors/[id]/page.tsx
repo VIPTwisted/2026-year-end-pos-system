@@ -1,377 +1,351 @@
-import Link from 'next/link'
+export const dynamic = 'force-dynamic'
+
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { formatCurrency, formatDate, isOverdue, getDaysOverdue, getStatusColor } from '@/lib/utils'
-import { Card, CardContent } from '@/components/ui/card'
+import { formatCurrency } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  ArrowLeft, Building2, Mail, Phone, MapPin, CreditCard,
-  Clock, FileText, DollarSign, AlertTriangle, Plus, Receipt,
-} from 'lucide-react'
+import { ArrowLeft, Building2, Edit, Trash2, Plus, BookOpen } from 'lucide-react'
 
-export default async function VendorDetailPage({ params }: { params: { id: string } }) {
+export default async function VendorCardPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
   const vendor = await prisma.vendor.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       vendorGroup: true,
       invoices: {
-        include: { lines: true, settlements: true },
         orderBy: { invoiceDate: 'desc' },
+        take: 5,
       },
-      payments: {
-        include: { settlements: true },
-        orderBy: { paymentDate: 'desc' },
+      purchaseOrders: {
+        orderBy: { createdAt: 'desc' },
+        take: 3,
       },
     },
   })
 
   if (!vendor) notFound()
 
-  const now = new Date()
-
-  // AP Summary calculations
-  const totalInvoiced = vendor.invoices.reduce((sum, inv) => sum + inv.totalAmount, 0)
-  const totalPaid = vendor.invoices.reduce((sum, inv) => sum + inv.paidAmount, 0)
-  const openBalance = totalInvoiced - totalPaid
-  const overdueAmount = vendor.invoices
-    .filter(inv => isOverdue(inv.dueDate, inv.status))
-    .reduce((sum, inv) => sum + (inv.totalAmount - inv.paidAmount), 0)
+  const balance = vendor.invoices.reduce(
+    (s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)),
+    0
+  )
+  const outstandingPOs = vendor.purchaseOrders.filter(
+    po => !['received', 'cancelled', 'closed'].includes(po.status)
+  ).length
+  const receivedNotInvoiced = vendor.purchaseOrders
+    .filter(po => po.status === 'received')
+    .reduce((s, po) => s + Number(po.totalAmt ?? 0), 0)
 
   return (
     <>
       <TopBar title={vendor.name} />
-      <main className="flex-1 p-6 overflow-auto space-y-8">
+      <main className="flex-1 overflow-auto bg-[#0f0f1a] min-h-[100dvh]">
 
-        {/* Back link */}
-        <div>
-          <Link href="/vendors" className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Vendors
+        {/* Breadcrumb */}
+        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-2 text-xs text-zinc-500 flex items-center gap-1.5">
+          <Link href="/vendors" className="hover:text-zinc-300 transition-colors">Vendors</Link>
+          <span>/</span>
+          <span className="text-zinc-300">{vendor.name}</span>
+        </div>
+
+        {/* Action Ribbon */}
+        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-2 flex items-center gap-2">
+          <Link href={`/vendors/${id}/edit`}>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              <Edit className="w-3 h-3" /> Edit
+            </button>
+          </Link>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+          <Link href="/vendors/new">
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              <Plus className="w-3 h-3" /> New
+            </button>
+          </Link>
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <Link href={`/vendors/${id}/ledger-entries`}>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              <BookOpen className="w-3 h-3" /> Ledger Entries
+            </button>
+          </Link>
+          <Link href="/vendors/apply-entries">
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              Apply Entries
+            </button>
+          </Link>
+          <Link href={`/vendors/invoices/new?vendorId=${vendor.id}`}>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              <Plus className="w-3 h-3" /> New Invoice
+            </button>
           </Link>
         </div>
 
-        {/* Vendor Header Card */}
-        <Card>
-          <CardContent className="pt-6 pb-6">
-            <div className="flex items-start justify-between gap-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center shrink-0">
-                  <Building2 className="w-6 h-6 text-zinc-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="secondary" className="font-mono text-xs">{vendor.vendorCode}</Badge>
-                    <Badge variant={vendor.isActive ? 'success' : 'destructive'}>
-                      {vendor.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                    {vendor.vendorGroup && (
-                      <Badge variant="outline">{vendor.vendorGroup.name}</Badge>
-                    )}
-                  </div>
-                  <h1 className="text-2xl font-bold text-zinc-100">{vendor.name}</h1>
-                  {vendor.vendorGroup && (
-                    <p className="text-sm text-zinc-500 mt-0.5">Group: {vendor.vendorGroup.name}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-2 shrink-0">
-                <Link href={`/vendors/invoices/new?vendorId=${vendor.id}`}>
-                  <Button size="sm">
-                    <Plus className="w-4 h-4 mr-1" />
-                    New Invoice
-                  </Button>
-                </Link>
-                <Link href={`/vendors/${vendor.id}/payments/new`}>
-                  <Button size="sm" variant="outline">
-                    <Receipt className="w-4 h-4 mr-1" />
-                    Record Payment
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
-            {/* Contact + Terms Grid */}
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-zinc-800">
-              {vendor.email && (
-                <div className="flex items-start gap-2">
-                  <Mail className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Email</p>
-                    <p className="text-sm text-zinc-300 break-all">{vendor.email}</p>
-                  </div>
-                </div>
-              )}
-              {vendor.phone && (
-                <div className="flex items-start gap-2">
-                  <Phone className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Phone</p>
-                    <p className="text-sm text-zinc-300">{vendor.phone}</p>
-                  </div>
-                </div>
-              )}
-              {(vendor.address || vendor.city) && (
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Address</p>
-                    <p className="text-sm text-zinc-300">
-                      {vendor.address && <span>{vendor.address}, </span>}
-                      {vendor.city}{vendor.state ? `, ${vendor.state}` : ''}{vendor.zip ? ` ${vendor.zip}` : ''}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {vendor.paymentTerms && (
-                <div className="flex items-start gap-2">
-                  <Clock className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Payment Terms</p>
-                    <p className="text-sm text-zinc-300">{vendor.paymentTerms}</p>
-                  </div>
-                </div>
-              )}
-              {vendor.paymentMethod && (
-                <div className="flex items-start gap-2">
-                  <CreditCard className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Payment Method</p>
-                    <p className="text-sm text-zinc-300">{vendor.paymentMethod}</p>
-                  </div>
-                </div>
-              )}
-              {vendor.creditLimit !== null && (
-                <div className="flex items-start gap-2">
-                  <DollarSign className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Credit Limit</p>
-                    <p className="text-sm text-zinc-300">{formatCurrency(vendor.creditLimit)}</p>
-                  </div>
-                </div>
-              )}
-              {vendor.currency && vendor.currency !== 'USD' && (
-                <div className="flex items-start gap-2">
-                  <DollarSign className="w-3.5 h-3.5 text-zinc-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Currency</p>
-                    <p className="text-sm text-zinc-300">{vendor.currency}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {vendor.notes && (
-              <div className="mt-4 pt-4 border-t border-zinc-800">
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Notes</p>
-                <p className="text-sm text-zinc-400">{vendor.notes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* AP Summary Cards */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="w-4 h-4 text-blue-400" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">Total Invoiced</p>
-              </div>
-              <p className="text-2xl font-bold text-blue-400">{formatCurrency(totalInvoiced)}</p>
-              <p className="text-xs text-zinc-600 mt-1">{vendor.invoices.length} invoice{vendor.invoices.length !== 1 ? 's' : ''}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-emerald-400" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">Total Paid</p>
-              </div>
-              <p className="text-2xl font-bold text-emerald-400">{formatCurrency(totalPaid)}</p>
-              <p className="text-xs text-zinc-600 mt-1">{vendor.payments.length} payment{vendor.payments.length !== 1 ? 's' : ''}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <CreditCard className="w-4 h-4 text-amber-400" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">Open Balance</p>
-              </div>
-              <p className={`text-2xl font-bold ${openBalance > 0 ? 'text-amber-400' : 'text-zinc-500'}`}>
-                {formatCurrency(openBalance)}
-              </p>
-              <p className="text-xs text-zinc-600 mt-1">outstanding</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">Overdue</p>
-              </div>
-              <p className={`text-2xl font-bold ${overdueAmount > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-                {formatCurrency(overdueAmount)}
-              </p>
-              <p className="text-xs text-zinc-600 mt-1">past due date</p>
-            </CardContent>
-          </Card>
+        {/* Page Title */}
+        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-3 flex items-center gap-3">
+          <Link href="/vendors" className="text-zinc-500 hover:text-zinc-300 transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <Building2 className="w-5 h-5 text-zinc-400" />
+          <h1 className="text-lg font-bold text-zinc-100">{vendor.name}</h1>
+          <span className="font-mono text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">{vendor.vendorCode}</span>
+          {!vendor.isActive && <Badge variant="destructive">Blocked</Badge>}
         </div>
 
-        {/* Invoices Table */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">Invoices</h2>
-            <Link href={`/vendors/invoices/new?vendorId=${vendor.id}`}>
-              <Button size="sm" variant="outline">
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                New Invoice
-              </Button>
-            </Link>
+        <div className="px-6 py-4 flex gap-4">
+
+          {/* Left: FastTabs */}
+          <div className="flex-1 space-y-2">
+
+            {/* General */}
+            <details open className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className="px-4 py-3 text-sm font-semibold text-zinc-200 cursor-pointer hover:bg-zinc-900/30 select-none list-none flex items-center gap-2">
+                <span className="text-zinc-500 text-xs">▶</span> General
+              </summary>
+              <div className="px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-3 pt-2 md:grid-cols-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">No.</label>
+                  <p className="text-sm text-zinc-100 font-mono">{vendor.vendorCode}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Name</label>
+                  <p className="text-sm text-zinc-100">{vendor.name}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Balance (LCY)</label>
+                  <p className={`text-sm font-semibold ${balance > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>{formatCurrency(balance)}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Balance Due (LCY)</label>
+                  <p className="text-sm text-zinc-400">{formatCurrency(balance)}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Blocked</label>
+                  <p className="text-sm text-zinc-100">{vendor.isActive ? 'None' : 'All'}</p>
+                </div>
+                {vendor.vendorGroup && (
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest text-zinc-500">Vendor Posting Group</label>
+                    <p className="text-sm text-zinc-100">{vendor.vendorGroup.name}</p>
+                  </div>
+                )}
+              </div>
+            </details>
+
+            {/* Address & Contact */}
+            <details open className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className="px-4 py-3 text-sm font-semibold text-zinc-200 cursor-pointer hover:bg-zinc-900/30 select-none list-none flex items-center gap-2">
+                <span className="text-zinc-500 text-xs">▶</span> Address &amp; Contact
+              </summary>
+              <div className="px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-3 pt-2 md:grid-cols-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Address</label>
+                  <p className="text-sm text-zinc-100">{vendor.address || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">City</label>
+                  <p className="text-sm text-zinc-100">{vendor.city || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">State</label>
+                  <p className="text-sm text-zinc-100">{vendor.state || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">ZIP / Post Code</label>
+                  <p className="text-sm text-zinc-100">{vendor.zip || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Phone</label>
+                  <p className="text-sm text-zinc-100">{vendor.phone || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Email</label>
+                  <p className="text-sm text-zinc-100">{vendor.email || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Contact</label>
+                  <p className="text-sm text-zinc-100">—</p>
+                </div>
+              </div>
+            </details>
+
+            {/* Invoicing */}
+            <details className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className="px-4 py-3 text-sm font-semibold text-zinc-200 cursor-pointer hover:bg-zinc-900/30 select-none list-none flex items-center gap-2">
+                <span className="text-zinc-500 text-xs">▶</span> Invoicing
+              </summary>
+              <div className="px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-3 pt-2 md:grid-cols-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Vendor Invoice No.</label>
+                  <p className="text-sm text-zinc-100 font-mono">{vendor.vendorCode}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Currency Code</label>
+                  <p className="text-sm text-zinc-100">{vendor.currency || 'USD'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Payment Terms Code</label>
+                  <p className="text-sm text-zinc-100">{vendor.paymentTerms || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Payment Method Code</label>
+                  <p className="text-sm text-zinc-100">{vendor.paymentMethod || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">VAT Registration No.</label>
+                  <p className="text-sm text-zinc-100">{vendor.taxId || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Gen. Bus. Posting Group</label>
+                  <p className="text-sm text-zinc-100">DOMESTIC</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Vendor Posting Group</label>
+                  <p className="text-sm text-zinc-100">{vendor.vendorGroup?.code || 'DOMESTIC'}</p>
+                </div>
+              </div>
+            </details>
+
+            {/* Payments */}
+            <details className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className="px-4 py-3 text-sm font-semibold text-zinc-200 cursor-pointer hover:bg-zinc-900/30 select-none list-none flex items-center gap-2">
+                <span className="text-zinc-500 text-xs">▶</span> Payments
+              </summary>
+              <div className="px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-3 pt-2 md:grid-cols-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Application Method</label>
+                  <p className="text-sm text-zinc-100">Manual</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Payment Terms</label>
+                  <p className="text-sm text-zinc-100">{vendor.paymentTerms || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Bank Account</label>
+                  <p className="text-sm text-zinc-100">—</p>
+                </div>
+              </div>
+            </details>
+
+            {/* Receiving */}
+            <details className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className="px-4 py-3 text-sm font-semibold text-zinc-200 cursor-pointer hover:bg-zinc-900/30 select-none list-none flex items-center gap-2">
+                <span className="text-zinc-500 text-xs">▶</span> Receiving
+              </summary>
+              <div className="px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-3 pt-2 md:grid-cols-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Location Code</label>
+                  <p className="text-sm text-zinc-100">—</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Shipment Method Code</label>
+                  <p className="text-sm text-zinc-100">—</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Lead Time Calculation</label>
+                  <p className="text-sm text-zinc-100">—</p>
+                </div>
+              </div>
+            </details>
+
+            {/* Foreign Trade */}
+            <details className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className="px-4 py-3 text-sm font-semibold text-zinc-200 cursor-pointer hover:bg-zinc-900/30 select-none list-none flex items-center gap-2">
+                <span className="text-zinc-500 text-xs">▶</span> Foreign Trade
+              </summary>
+              <div className="px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-3 pt-2 md:grid-cols-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Currency Code</label>
+                  <p className="text-sm text-zinc-100">{vendor.currency || 'USD'}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-500">Transaction Type Code</label>
+                  <p className="text-sm text-zinc-100">—</p>
+                </div>
+              </div>
+            </details>
+
           </div>
 
-          {vendor.invoices.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-10 text-zinc-500">
-                <FileText className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm">No invoices found for this vendor.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                    <th className="text-left pb-3 font-medium">Invoice #</th>
-                    <th className="text-left pb-3 font-medium">Invoice Date</th>
-                    <th className="text-left pb-3 font-medium">Due Date</th>
-                    <th className="text-right pb-3 font-medium">Total</th>
-                    <th className="text-right pb-3 font-medium">Paid</th>
-                    <th className="text-right pb-3 font-medium">Balance</th>
-                    <th className="text-center pb-3 font-medium">Status</th>
-                    <th className="text-center pb-3 font-medium">Matching</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {vendor.invoices.map(inv => {
-                    const balance = inv.totalAmount - inv.paidAmount
-                    const overdue = isOverdue(inv.dueDate, inv.status)
-                    const daysOver = overdue ? getDaysOverdue(inv.dueDate) : 0
+          {/* Right: FactBox Sidebar */}
+          <div className="w-72 shrink-0 space-y-3">
 
-                    return (
-                      <tr key={inv.id} className="hover:bg-zinc-900/50">
-                        <td className="py-3 pr-4 font-mono text-xs text-zinc-300">{inv.invoiceNumber}</td>
-                        <td className="py-3 pr-4 text-zinc-400 text-xs">
-                          {new Date(inv.invoiceDate).toLocaleDateString('en-US', { dateStyle: 'medium' })}
+            {/* Vendor Statistics FactBox */}
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-3 py-2 bg-zinc-900/40 border-b border-zinc-800/50">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Vendor Statistics</span>
+              </div>
+              <div className="px-3 py-2 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] text-zinc-500">Balance (LCY)</span>
+                  <span className={`text-[12px] font-semibold tabular-nums ${balance > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>
+                    {formatCurrency(balance)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] text-zinc-500">Outstanding POs</span>
+                  <span className="text-[12px] font-semibold text-zinc-200 tabular-nums">{outstandingPOs}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] text-zinc-500">Received Not Invoiced</span>
+                  <span className="text-[12px] font-semibold text-zinc-400 tabular-nums">
+                    {formatCurrency(receivedNotInvoiced)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] text-zinc-500">Total Invoices</span>
+                  <span className="text-[12px] font-semibold text-zinc-200 tabular-nums">{vendor.invoices.length}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Invoices FactBox */}
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-3 py-2 bg-zinc-900/40 border-b border-zinc-800/50">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Recent Invoices</span>
+              </div>
+              {vendor.invoices.length === 0 ? (
+                <p className="px-3 py-3 text-[11px] text-zinc-600">No invoices.</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-zinc-800/50">
+                      <th className="px-3 py-1.5 text-left text-[9px] uppercase tracking-widest text-zinc-600 font-medium">Date</th>
+                      <th className="px-3 py-1.5 text-left text-[9px] uppercase tracking-widest text-zinc-600 font-medium">Invoice</th>
+                      <th className="px-3 py-1.5 text-right text-[9px] uppercase tracking-widest text-zinc-600 font-medium">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vendor.invoices.slice(0, 5).map(inv => (
+                      <tr key={inv.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20">
+                        <td className="px-3 py-1.5 text-[10px] text-zinc-500">
+                          {new Date(inv.invoiceDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
                         </td>
-                        <td className="py-3 pr-4 text-xs">
-                          <span className={overdue ? 'text-red-400 font-medium' : 'text-zinc-400'}>
-                            {new Date(inv.dueDate).toLocaleDateString('en-US', { dateStyle: 'medium' })}
-                          </span>
-                          {overdue && (
-                            <div className="text-red-500 text-xs">{daysOver}d overdue</div>
-                          )}
-                        </td>
-                        <td className="py-3 pr-4 text-right text-zinc-300 font-medium">
-                          {formatCurrency(inv.totalAmount)}
-                        </td>
-                        <td className="py-3 pr-4 text-right text-emerald-400">
-                          {formatCurrency(inv.paidAmount)}
-                        </td>
-                        <td className="py-3 pr-4 text-right font-semibold">
-                          <span className={balance > 0 ? (overdue ? 'text-red-400' : 'text-amber-400') : 'text-zinc-500'}>
-                            {formatCurrency(balance)}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-4 text-center">
-                          <span className={`text-xs font-medium ${getStatusColor(inv.status)}`}>
-                            {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="py-3 text-center">
-                          <span className="text-xs text-zinc-500 capitalize">
-                            {inv.matchingStatus.replace('_', ' ')}
-                          </span>
+                        <td className="px-3 py-1.5 font-mono text-[10px] text-zinc-300">{inv.invoiceNumber.slice(-8)}</td>
+                        <td className="px-3 py-1.5 text-right text-[10px] font-semibold text-emerald-400 tabular-nums">
+                          {formatCurrency(Number(inv.totalAmount))}
                         </td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <div className="px-3 py-2 border-t border-zinc-800/50">
+                <Link href={`/vendors/${id}/ledger-entries`} className="text-[11px] text-blue-400 hover:underline">
+                  View all ledger entries →
+                </Link>
+              </div>
             </div>
-          )}
-        </section>
 
-        {/* Payments Table */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">Payments</h2>
-            <Link href={`/vendors/${vendor.id}/payments/new`}>
-              <Button size="sm" variant="outline">
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Record Payment
-              </Button>
-            </Link>
           </div>
-
-          {vendor.payments.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-10 text-zinc-500">
-                <Receipt className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm">No payments recorded for this vendor.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                    <th className="text-left pb-3 font-medium">Payment #</th>
-                    <th className="text-left pb-3 font-medium">Date</th>
-                    <th className="text-left pb-3 font-medium">Method</th>
-                    <th className="text-left pb-3 font-medium">Check #</th>
-                    <th className="text-right pb-3 font-medium">Amount</th>
-                    <th className="text-center pb-3 font-medium">Status</th>
-                    <th className="text-right pb-3 font-medium">Applied To</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {vendor.payments.map(pmt => (
-                    <tr key={pmt.id} className="hover:bg-zinc-900/50">
-                      <td className="py-3 pr-4 font-mono text-xs text-zinc-300">{pmt.paymentNumber}</td>
-                      <td className="py-3 pr-4 text-zinc-400 text-xs">
-                        {new Date(pmt.paymentDate).toLocaleDateString('en-US', { dateStyle: 'medium' })}
-                      </td>
-                      <td className="py-3 pr-4 text-zinc-400 capitalize">{pmt.paymentMethod.replace('_', ' ')}</td>
-                      <td className="py-3 pr-4 text-zinc-500 font-mono text-xs">
-                        {pmt.checkNumber ?? <span className="text-zinc-700">—</span>}
-                      </td>
-                      <td className="py-3 pr-4 text-right font-semibold text-emerald-400">
-                        {formatCurrency(pmt.amount)}
-                      </td>
-                      <td className="py-3 pr-4 text-center">
-                        <span className={`text-xs font-medium ${getStatusColor(pmt.status)}`}>
-                          {pmt.status.charAt(0).toUpperCase() + pmt.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right text-xs text-zinc-500">
-                        {pmt.settlements.length > 0
-                          ? `${pmt.settlements.length} invoice${pmt.settlements.length !== 1 ? 's' : ''}`
-                          : <span className="text-zinc-700">Unapplied</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
+        </div>
       </main>
     </>
   )

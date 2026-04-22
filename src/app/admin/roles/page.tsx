@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { Lock, Shield } from 'lucide-react'
 
 const SYSTEM_ROLES = [

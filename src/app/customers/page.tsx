@@ -1,213 +1,328 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Users, Plus, Star, TrendingUp, UserCheck, ChevronRight } from 'lucide-react'
+import {
+  Plus, Edit, Trash2, Navigation, Ban, ChevronRight,
+  BookOpen, BarChart2, ChevronUp, ChevronDown,
+} from 'lucide-react'
 
-export default async function CustomersPage() {
-  const customers = await prisma.customer.findMany({
-    orderBy: { totalSpent: 'desc' },
+export default async function CustomersListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    search?: string
+    balance?: string
+    postingGroup?: string
+    paymentTerms?: string
+    page?: string
+  }>
+}) {
+  const sp           = await searchParams
+  const search        = sp.search       ?? ''
+  const balanceFilter = sp.balance      ?? 'all'
+  const postingGroup  = sp.postingGroup ?? ''
+  const payTerms      = sp.paymentTerms ?? ''
+  const page          = Math.max(1, parseInt(sp.page ?? '1'))
+  const pageSize      = 25
+
+  const where: Record<string, unknown> = {}
+  if (search) {
+    where.OR = [
+      { firstName: { contains: search, mode: 'insensitive' } },
+      { lastName:  { contains: search, mode: 'insensitive' } },
+      { email:     { contains: search, mode: 'insensitive' } },
+    ]
+  }
+
+  const [customers, total] = await Promise.all([
+    prisma.customer.findMany({
+      where,
+      include: {
+        arInvoices: {
+          where: { status: { notIn: ['paid', 'cancelled'] } },
+          select: { totalAmount: true, paidAmount: true, dueDate: true, status: true },
+        },
+      },
+      orderBy: { lastName: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.customer.count({ where }),
+  ])
+
+  const totalPages = Math.ceil(total / pageSize)
+
+  const filtered = customers.filter(c => {
+    const bal = c.arInvoices.reduce(
+      (s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0
+    )
+    const balDue = c.arInvoices
+      .filter(i => new Date(i.dueDate) < new Date())
+      .reduce((s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0)
+    if (balanceFilter === 'with-balance') return bal > 0
+    if (balanceFilter === 'overdue')      return balDue > 0
+    return true
   })
 
-  // Tier classification
-  const vipCustomers    = customers.filter(c => c.loyaltyPoints > 500)
-  const regularCustomers = customers.filter(c => c.loyaltyPoints >= 100 && c.loyaltyPoints <= 500)
-  const newCustomers    = customers.filter(c => c.loyaltyPoints < 100)
-
-  // Key accounts: top 3 by totalSpent (already sorted desc)
-  const keyAccounts = customers.slice(0, 3)
-
-  // Average visit count
-  const avgVisits =
-    customers.length > 0
-      ? (customers.reduce((sum, c) => sum + c.visitCount, 0) / customers.length).toFixed(1)
-      : '0.0'
-
-  function getTierVariant(points: number): 'success' | 'default' | 'secondary' {
-    if (points > 500) return 'success'
-    if (points >= 100) return 'default'
-    return 'secondary'
+  function blockedValue(c: { isActive: boolean; creditStatus: string }) {
+    if (!c.isActive)               return 'All'
+    if (c.creditStatus === 'hold') return 'Invoice'
+    return ''
   }
 
-  function getTierLabel(points: number): string {
-    if (points > 500) return 'VIP'
-    if (points >= 100) return 'Active'
-    return 'New'
+  function qs(extra: Record<string, string>) {
+    const base: Record<string, string> = {}
+    if (search)                   base.search       = search
+    if (balanceFilter !== 'all')  base.balance       = balanceFilter
+    if (postingGroup)             base.postingGroup  = postingGroup
+    if (payTerms)                 base.paymentTerms  = payTerms
+    const merged = { ...base, ...extra }
+    const q = new URLSearchParams(merged).toString()
+    return q ? `?${q}` : ''
   }
+
+  const hasFilters = !!(search || balanceFilter !== 'all' || postingGroup || payTerms)
 
   return (
     <>
       <TopBar title="Customers" />
-      <main className="flex-1 p-6 overflow-auto space-y-8">
+      <main className="flex-1 overflow-auto bg-[#0f0f1a] min-h-[100dvh]">
 
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-100">Customer Database</h2>
-            <p className="text-sm text-zinc-500">{customers.length} customers</p>
-          </div>
+        {/* Action Ribbon */}
+        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-2 flex items-center gap-1.5 flex-wrap">
           <Link href="/customers/new">
-            <Button><Plus className="w-4 h-4 mr-1" />Add Customer</Button>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-700 hover:bg-blue-600 border border-blue-600 rounded transition-colors">
+              <Plus className="w-3 h-3" /> New
+            </button>
           </Link>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Edit className="w-3 h-3" /> Edit
+          </button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <Link href="/customers/apply-entries">
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              <Navigation className="w-3 h-3" /> Apply Entries
+            </button>
+          </Link>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <BookOpen className="w-3 h-3" /> Ledger Entries
+          </button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <BarChart2 className="w-3 h-3" /> Statistics
+          </button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Navigation className="w-3 h-3" /> Navigate
+          </button>
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Ban className="w-3 h-3" /> Block
+          </button>
         </div>
 
-        {/* ── Customer Table ── */}
-        {customers.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-zinc-500">
-              <Users className="w-12 h-12 mb-4 opacity-30" />
-              <p className="text-sm">No customers yet</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                  <th className="text-left pb-3 font-medium">Customer</th>
-                  <th className="text-left pb-3 font-medium">Email</th>
-                  <th className="text-left pb-3 font-medium">Phone</th>
-                  <th className="text-right pb-3 font-medium">Lifetime Value</th>
-                  <th className="text-right pb-3 font-medium">Visits</th>
-                  <th className="text-right pb-3 font-medium">Points</th>
-                  <th className="text-center pb-3 font-medium">Tier</th>
-                  <th className="pb-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {customers.map(c => (
-                  <tr key={c.id} className="hover:bg-zinc-900/50 transition-colors group">
-                    <td className="py-3 pr-4">
-                      <Link href={`/customers/${c.id}`} className="font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
-                        {c.firstName} {c.lastName}
-                      </Link>
-                    </td>
-                    <td className="py-3 pr-4 text-zinc-400">{c.email || '-'}</td>
-                    <td className="py-3 pr-4 text-zinc-400">{c.phone || '-'}</td>
-                    <td className="py-3 pr-4 text-right font-semibold text-emerald-400">
-                      {formatCurrency(c.totalSpent)}
-                    </td>
-                    <td className="py-3 pr-4 text-right text-zinc-400">{c.visitCount}</td>
-                    <td className="py-3 pr-4 text-right">
-                      <Badge variant="secondary">{c.loyaltyPoints} pts</Badge>
-                    </td>
-                    <td className="py-3 text-center">
-                      <Badge variant={getTierVariant(c.loyaltyPoints)}>
-                        {getTierLabel(c.loyaltyPoints)}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link href={`/customers/${c.id}`}>
-                        <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="flex">
 
-        {/* ── Sales Pipeline Overview ── */}
-        <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-zinc-100">Sales Pipeline Overview</h2>
-            <p className="text-sm text-zinc-500">NovaPOS-style CRM summary derived from loyalty & spend data</p>
-          </div>
+          {/* Left Filter Pane */}
+          <aside className="w-56 shrink-0 bg-[#16213e] border-r border-zinc-800/50 min-h-[calc(100dvh-88px)] p-4 space-y-5">
+            <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Filter</p>
 
-          {/* Tier breakdown + avg visits */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-5 pb-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <Star className="w-4 h-4 text-emerald-400" />
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">VIP Customers</p>
-                </div>
-                <p className="text-2xl font-bold text-emerald-400">{vipCustomers.length}</p>
-                <p className="text-xs text-zinc-600 mt-1">loyaltyPoints &gt; 500</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-5 pb-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <UserCheck className="w-4 h-4 text-blue-400" />
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Regular</p>
-                </div>
-                <p className="text-2xl font-bold text-blue-400">{regularCustomers.length}</p>
-                <p className="text-xs text-zinc-600 mt-1">100 – 500 pts</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-5 pb-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-4 h-4 text-zinc-400" />
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">New</p>
-                </div>
-                <p className="text-2xl font-bold text-zinc-300">{newCustomers.length}</p>
-                <p className="text-xs text-zinc-600 mt-1">&lt; 100 pts</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-5 pb-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-4 h-4 text-amber-400" />
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Avg Visits</p>
-                </div>
-                <p className="text-2xl font-bold text-amber-400">{avgVisits}</p>
-                <p className="text-xs text-zinc-600 mt-1">per customer</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Key Accounts */}
-          {keyAccounts.length > 0 && (
-            <Card>
-              <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800 bg-zinc-900/60 rounded-t-lg">
-                <h3 className="text-sm font-semibold text-zinc-200 uppercase tracking-wide">Key Accounts</h3>
-                <span className="text-xs text-zinc-500">Top 3 by Lifetime Value</span>
+            <form method="GET" className="space-y-4">
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Search</label>
+                <input
+                  name="search"
+                  defaultValue={search}
+                  placeholder="No. or Name..."
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600"
+                />
               </div>
-              <CardContent className="p-0">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-800/60 text-zinc-500 text-xs uppercase tracking-wide">
-                      <th className="text-left px-5 py-2 font-medium">Rank</th>
-                      <th className="text-left py-2 font-medium">Customer</th>
-                      <th className="text-left py-2 font-medium">Tier</th>
-                      <th className="text-right py-2 font-medium">Visits</th>
-                      <th className="text-right px-5 py-2 font-medium">Lifetime Value</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/40">
-                    {keyAccounts.map((c, i) => (
-                      <tr key={c.id} className="hover:bg-zinc-900/40 transition-colors group">
-                        <td className="px-5 py-3 text-zinc-500 font-mono text-xs">#{i + 1}</td>
-                        <td className="py-3 pr-4 font-medium text-zinc-100">
-                          <Link href={`/customers/${c.id}`} className="group-hover:text-blue-300 transition-colors">
+
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Customer Posting Group</label>
+                <select
+                  name="postingGroup"
+                  defaultValue={postingGroup}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
+                >
+                  <option value="">All</option>
+                  <option value="DOMESTIC">DOMESTIC</option>
+                  <option value="FOREIGN">FOREIGN</option>
+                  <option value="INTERCOMPANY">INTERCOMPANY</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Payment Terms Code</label>
+                <select
+                  name="paymentTerms"
+                  defaultValue={payTerms}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
+                >
+                  <option value="">All</option>
+                  <option value="NET15">NET15</option>
+                  <option value="NET30">NET30</option>
+                  <option value="NET60">NET60</option>
+                  <option value="COD">COD</option>
+                  <option value="IMMEDIATE">Immediate</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Balance Filter</label>
+                <select
+                  name="balance"
+                  defaultValue={balanceFilter}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
+                >
+                  <option value="all">All</option>
+                  <option value="with-balance">With Balance</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="submit"
+                  className="flex-1 px-2.5 py-1.5 text-xs font-medium text-white bg-blue-700 hover:bg-blue-600 border border-blue-600 rounded transition-colors"
+                >
+                  Apply
+                </button>
+                {hasFilters && (
+                  <Link
+                    href="/customers"
+                    className="flex-1 text-center px-2.5 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors"
+                  >
+                    Clear
+                  </Link>
+                )}
+              </div>
+            </form>
+          </aside>
+
+          {/* Main Table */}
+          <div className="flex-1 overflow-x-auto">
+            <div className="px-6 py-2.5 flex items-center justify-between border-b border-zinc-800/50 bg-zinc-900/20">
+              <p className="text-xs text-zinc-500">
+                {total} customer{total !== 1 ? 's' : ''}
+                {search ? ` matching "${search}"` : ''}
+              </p>
+              <div className="flex items-center gap-3 text-xs text-zinc-500">
+                <span>Page {page} of {totalPages || 1}</span>
+                {page > 1 && (
+                  <Link href={`/customers${qs({ page: String(page - 1) })}`} className="text-blue-400 hover:underline">
+                    &larr; Prev
+                  </Link>
+                )}
+                {page < totalPages && (
+                  <Link href={`/customers${qs({ page: String(page + 1) })}`} className="text-blue-400 hover:underline">
+                    Next &rarr;
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
+                <p className="text-sm">No customers found.</p>
+                <Link href="/customers/new" className="mt-2 text-xs text-blue-400 hover:underline">
+                  Create a new customer
+                </Link>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-zinc-800/60 bg-zinc-900/30">
+                    {[
+                      { label: 'No.',                right: false },
+                      { label: 'Name',               right: false },
+                      { label: 'Phone No.',          right: false },
+                      { label: 'Contact',            right: false },
+                      { label: 'Balance (LCY)',      right: true  },
+                      { label: 'Balance Due (LCY)',  right: true  },
+                      { label: 'Credit Limit (LCY)', right: true  },
+                      { label: 'Blocked',            right: false },
+                      { label: '',                   right: false },
+                    ].map((col, i) => (
+                      <th
+                        key={i}
+                        className={`px-3 py-2 text-[10px] uppercase tracking-widest text-zinc-500 font-medium whitespace-nowrap ${col.right ? 'text-right' : 'text-left'}`}
+                      >
+                        {col.label ? (
+                          <span className="inline-flex items-center gap-0.5">
+                            {col.label}
+                            <span className="flex flex-col ml-0.5">
+                              <ChevronUp   className="w-2.5 h-2.5 text-zinc-700" />
+                              <ChevronDown className="w-2.5 h-2.5 text-zinc-700 -mt-1" />
+                            </span>
+                          </span>
+                        ) : null}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(c => {
+                    const bal = c.arInvoices.reduce(
+                      (s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0
+                    )
+                    const balDue = c.arInvoices
+                      .filter(i => new Date(i.dueDate) < new Date())
+                      .reduce((s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0)
+                    const blocked = blockedValue(c)
+
+                    return (
+                      <tr key={c.id} className="border-b border-zinc-800/30 hover:bg-[#16213e]/60 transition-colors group">
+                        <td className="px-3 py-2">
+                          <Link href={`/customers/${c.id}`} className="font-mono text-[11px] text-blue-400 hover:underline">
+                            {c.id.slice(-8).toUpperCase()}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Link href={`/customers/${c.id}`} className="text-sm font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
                             {c.firstName} {c.lastName}
                           </Link>
-                          {c.email && <span className="block text-xs text-zinc-500 font-normal">{c.email}</span>}
                         </td>
-                        <td className="py-3 pr-4">
-                          <Badge variant={getTierVariant(c.loyaltyPoints)}>
-                            {getTierLabel(c.loyaltyPoints)}
-                          </Badge>
+                        <td className="px-3 py-2 text-sm text-zinc-400 whitespace-nowrap">{c.phone || '—'}</td>
+                        <td className="px-3 py-2 text-sm text-zinc-400">{c.firstName} {c.lastName}</td>
+                        <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums">
+                          <span className={bal < 0 ? 'text-red-400' : bal > 0 ? 'text-amber-400' : 'text-zinc-500'}>
+                            {formatCurrency(bal)}
+                          </span>
                         </td>
-                        <td className="py-3 pr-4 text-right text-zinc-400">{c.visitCount}</td>
-                        <td className="px-5 py-3 text-right font-bold text-emerald-400 tabular-nums text-base">
-                          {formatCurrency(c.totalSpent)}
+                        <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums">
+                          <span className={balDue > 0 ? 'text-red-400' : 'text-zinc-500'}>
+                            {formatCurrency(balDue)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right text-sm tabular-nums text-zinc-300">
+                          {formatCurrency(Number(c.creditLimit))}
+                        </td>
+                        <td className="px-3 py-2">
+                          {blocked ? (
+                            <Badge variant="destructive" className="text-[10px]">{blocked}</Badge>
+                          ) : (
+                            <span className="text-zinc-600 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <Link href={`/customers/${c.id}`}>
+                            <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-blue-400 transition-colors" />
+                          </Link>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
-        </section>
-
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       </main>
     </>
   )

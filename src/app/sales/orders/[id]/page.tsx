@@ -1,160 +1,296 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { ArrowLeft, FileText } from 'lucide-react'
+import { TopBar } from '@/components/layout/TopBar'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import {
+  ChevronDown, CheckCircle2, Truck, X,
+  User, BarChart2,
+} from 'lucide-react'
 
-type OrderItem = { id: string; productName: string; quantity: number; pricePerUnit: number; lineTotal: number }
-type Invoice = { id: string; invoiceNumber: string; status: string; totalAmount: number }
-type Order = {
-  id: string
-  orderNumber: string
-  accountName: string | null
-  status: string
-  totalAmount: number
-  dueDate: string | null
-  notes: string | null
-  items: OrderItem[]
-  invoices: Invoice[]
-  quote: { quoteNumber: string } | null
+export const dynamic = 'force-dynamic'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface OrderLine {
+  lineNo: number
+  itemNo: string
+  description: string
+  qtyOrdered: string | number
+  qtyShipped: number
+  qtyInvoiced: number
+  unitPrice: number
+  discountPct: number
+  lineAmount: number
 }
 
-const statusColor: Record<string, string> = {
-  new: 'bg-blue-500/20 text-blue-400',
-  processing: 'bg-amber-500/20 text-amber-400',
-  fulfilled: 'bg-emerald-500/20 text-emerald-400',
-  cancelled: 'bg-red-500/20 text-red-400',
+// ─── Static data ──────────────────────────────────────────────────────────────
+
+const ORDER_LINES: OrderLine[] = [
+  { lineNo: 1, itemNo: '1000', description: 'Widget Assembly A100', qtyOrdered: 50, qtyShipped: 0, qtyInvoiced: 0, unitPrice: 34.99, discountPct: 5, lineAmount: 1662.03 },
+  { lineNo: 2, itemNo: '1002', description: 'Control Panel C300', qtyOrdered: 10, qtyShipped: 0, qtyInvoiced: 0, unitPrice: 229.99, discountPct: 0, lineAmount: 2299.90 },
+  { lineNo: 3, itemNo: 'SRV-001', description: 'Installation Service', qtyOrdered: '5 hrs', qtyShipped: 0, qtyInvoiced: 0, unitPrice: 125.00, discountPct: 0, lineAmount: 625.00 },
+  { lineNo: 4, itemNo: '2010', description: 'Mounting Hardware Kit', qtyOrdered: 10, qtyShipped: 0, qtyInvoiced: 0, unitPrice: 18.95, discountPct: 0, lineAmount: 189.50 },
+  { lineNo: 5, itemNo: 'PKG-001', description: 'Freight & Handling', qtyOrdered: 1, qtyShipped: 0, qtyInvoiced: 0, unitPrice: 236.00, discountPct: 0, lineAmount: 236.00 },
+]
+
+const SUBTOTAL = 5012.43
+const DISCOUNT = -87.93
+const TAX = 405.39
+const TOTAL = 5417.82
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmt(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
 }
 
-function fmt(n: number) { return `$${n.toFixed(2)}` }
+// ─── FactBox Card ─────────────────────────────────────────────────────────────
 
-export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function FactBoxCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: '#16213e', border: '1px solid rgba(99,102,241,0.15)' }}>
+      <div className="flex items-center gap-2">
+        <span style={{ color: '#a5b4fc' }}>{icon}</span>
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#94a3b8' }}>{title}</span>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function FactRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs" style={{ color: '#94a3b8' }}>{label}</span>
+      <span className="text-xs font-medium" style={{ color: accent ? '#a5b4fc' : '#e2e8f0' }}>{value}</span>
+    </div>
+  )
+}
+
+// ─── FastTab ──────────────────────────────────────────────────────────────────
+
+function FastTab({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  return (
+    <details open={defaultOpen} className="group rounded-xl overflow-hidden" style={{ border: '1px solid rgba(99,102,241,0.15)' }}>
+      <summary
+        className="flex items-center justify-between px-5 py-3.5 cursor-pointer select-none list-none"
+        style={{ background: '#16213e', borderBottom: '1px solid rgba(99,102,241,0.1)' }}
+      >
+        <span className="text-sm font-semibold" style={{ color: '#e2e8f0' }}>{title}</span>
+        <ChevronDown className="w-4 h-4 group-open:rotate-180 transition-transform" style={{ color: '#94a3b8' }} />
+      </summary>
+      <div className="px-5 py-5" style={{ background: '#16213e' }}>
+        {children}
+      </div>
+    </details>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function SalesOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [order, setOrder] = useState<Order | null>(null)
-  const [creating, setCreating] = useState(false)
 
-  async function load() {
-    const res = await fetch(`/api/sales/orders/${id}`)
-    setOrder(await res.json())
-  }
-
-  useEffect(() => { load() }, [id])
-
-  async function createInvoice() {
-    setCreating(true)
-    await fetch(`/api/sales/orders/${id}/create-invoice`, { method: 'POST' })
-    await load()
-    setCreating(false)
-  }
-
-  if (!order) return <div className="p-6 text-zinc-400">Loading...</div>
-
-  const subtotal = order.items.reduce((s, i) => s + i.lineTotal, 0)
+  const actions = (
+    <div className="flex items-center gap-2">
+      <button className="px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors" style={{ background: 'rgba(99,102,241,0.85)', color: '#fff' }}>
+        Edit
+      </button>
+      {['Confirm', 'Post Invoice', 'Ship', 'Cancel'].map(label => (
+        <button key={label} className="px-3.5 py-1.5 text-sm rounded-lg transition-colors hover:bg-white/5" style={{ border: '1px solid rgba(99,102,241,0.3)', color: '#e2e8f0' }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/sales/orders" className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-semibold text-zinc-100 font-mono">Order #{order.orderNumber.slice(-10)}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={cn('px-2 py-0.5 rounded text-xs capitalize', statusColor[order.status] || 'bg-zinc-700 text-zinc-300')}>{order.status}</span>
-              {order.accountName && <span className="text-sm text-zinc-400">{order.accountName}</span>}
-            </div>
-          </div>
-        </div>
-        <button onClick={createInvoice} disabled={creating} className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50">
-          <FileText className="w-4 h-4" /> Create Invoice
-        </button>
+    <div className="min-h-[100dvh] flex flex-col" style={{ background: '#0d0e24', color: '#e2e8f0' }}>
+      <TopBar
+        title={`Sales Order ${id}`}
+        breadcrumb={[
+          { label: 'Sales', href: '/sales' },
+          { label: 'Orders', href: '/sales/orders' },
+          { label: id, href: `/sales/orders/${id}` },
+        ]}
+        actions={actions}
+      />
+
+      {/* Status Bar */}
+      <div
+        className="flex flex-wrap items-center gap-4 px-6 py-2.5 text-xs"
+        style={{ background: 'rgba(99,102,241,0.06)', borderBottom: '1px solid rgba(99,102,241,0.12)' }}
+      >
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+          <CheckCircle2 className="w-3 h-3" /> Released
+        </span>
+        <span style={{ color: '#94a3b8' }}>Released Apr 18, 2026 by <span style={{ color: '#e2e8f0' }}>Alice Chen</span></span>
+        <span className="w-px h-3.5 bg-zinc-700" />
+        <span style={{ color: '#94a3b8' }}>Order Date: <span style={{ color: '#e2e8f0' }}>Apr 18</span></span>
+        <span className="w-px h-3.5 bg-zinc-700" />
+        <span style={{ color: '#94a3b8' }}>Requested Delivery: <span style={{ color: '#e2e8f0' }}>Apr 25</span></span>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-            <div className="px-4 py-3 border-b border-zinc-800">
-              <h2 className="text-sm font-medium text-zinc-300">Line Items</h2>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800">
-                  <th className="text-left px-4 py-3 text-zinc-500 font-medium">Product</th>
-                  <th className="text-right px-4 py-3 text-zinc-500 font-medium">Qty</th>
-                  <th className="text-right px-4 py-3 text-zinc-500 font-medium">Unit Price</th>
-                  <th className="text-right px-4 py-3 text-zinc-500 font-medium">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.items.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-zinc-600">No items</td></tr>}
-                {order.items.map((item) => (
-                  <tr key={item.id} className="border-b border-zinc-800/50">
-                    <td className="px-4 py-3 text-zinc-200">{item.productName}</td>
-                    <td className="px-4 py-3 text-right text-zinc-400">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right text-zinc-400">{fmt(item.pricePerUnit)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-400 font-mono">{fmt(item.lineTotal)}</td>
-                  </tr>
+      <main className="flex-1 px-6 py-5">
+        {/* Two-column layout: main + factbox sidebar */}
+        <div className="flex gap-5" style={{ alignItems: 'flex-start' }}>
+          {/* Main content */}
+          <div className="flex-1 min-w-0 flex flex-col gap-4">
+            {/* Order Header FastTab */}
+            <FastTab title="Order Header" defaultOpen>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                {[
+                  ['Order No.', id || 'SO-2026-4812'],
+                  ['Customer PO No.', 'CANNON-2026-0441'],
+                  ['Order Date', 'Apr 18, 2026'],
+                  ['Requested Delivery', 'Apr 25, 2026'],
+                  ['Payment Terms', 'Net 30'],
+                  ['Currency', 'USD'],
+                  ['Sales Rep', 'Alice Chen'],
+                  ['Quote No.', 'QT-2026-0901'],
+                  ['Ship-To', '192 Fisher Road, Detroit MI 48201'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex flex-col gap-0.5">
+                    <span className="text-[11px]" style={{ color: '#94a3b8' }}>{label}</span>
+                    <span className="text-sm" style={{ color: '#e2e8f0' }}>{value}</span>
+                  </div>
                 ))}
-              </tbody>
-              {order.items.length > 0 && (
-                <tfoot>
-                  <tr className="border-t border-zinc-700">
-                    <td colSpan={3} className="px-4 py-3 text-right text-zinc-400 font-medium">Total</td>
-                    <td className="px-4 py-3 text-right text-emerald-400 font-mono font-semibold">{fmt(subtotal)}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-
-          {order.invoices.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-zinc-400 mb-3">Linked Invoices</h3>
-              <div className="space-y-2">
-                {order.invoices.map((inv) => (
-                  <Link key={inv.id} href={`/sales/invoices/${inv.id}`} className="flex items-center justify-between p-2 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors">
-                    <span className="text-sm text-blue-400 font-mono">Invoice #{inv.invoiceNumber.slice(-8)}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-emerald-400 font-mono">{fmt(inv.totalAmount)}</span>
-                      <span className="text-xs text-zinc-400 capitalize">{inv.status}</span>
-                    </div>
+                {/* Customer with link */}
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[11px]" style={{ color: '#94a3b8' }}>Customer</span>
+                  <Link href="/sales/customers/C10000" className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
+                    The Cannon Group PLC
                   </Link>
+                </div>
+              </div>
+            </FastTab>
+
+            {/* Shipping FastTab — collapsed */}
+            <FastTab title="Shipping">
+              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                {[
+                  ['Carrier', 'UPS Ground'],
+                  ['Ship Method', 'Standard Ground'],
+                  ['Tracking #', '—'],
+                  ['Ship-From', 'Warehouse A, Detroit MI'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex flex-col gap-0.5">
+                    <span className="text-[11px]" style={{ color: '#94a3b8' }}>{label}</span>
+                    <span className="text-sm" style={{ color: '#e2e8f0' }}>{value}</span>
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
+            </FastTab>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3 h-fit">
-          <h3 className="text-sm font-medium text-zinc-400">Details</h3>
-          <div>
-            <label className="block text-xs text-zinc-500">Account</label>
-            <p className="text-sm text-zinc-200">{order.accountName || '—'}</p>
+            {/* Order Lines */}
+            <details open className="group rounded-xl overflow-hidden" style={{ border: '1px solid rgba(99,102,241,0.15)' }}>
+              <summary
+                className="flex items-center justify-between px-5 py-3.5 cursor-pointer select-none list-none"
+                style={{ background: '#16213e', borderBottom: '1px solid rgba(99,102,241,0.1)' }}
+              >
+                <span className="text-sm font-semibold" style={{ color: '#e2e8f0' }}>Order Lines</span>
+                <ChevronDown className="w-4 h-4 group-open:rotate-180 transition-transform" style={{ color: '#94a3b8' }} />
+              </summary>
+              <div style={{ background: '#16213e' }}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr style={{ background: 'rgba(99,102,241,0.08)', borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
+                        {['Line #', 'Item No.', 'Description', 'Qty Ordered', 'Qty Shipped', 'Qty Invoiced', 'Unit Price', 'Discount%', 'Line Amount'].map(h => (
+                          <th key={h} className="px-3 py-2.5 text-left font-medium whitespace-nowrap" style={{ color: '#94a3b8' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ORDER_LINES.map((line, idx) => (
+                        <tr
+                          key={line.lineNo}
+                          style={{
+                            background: idx % 2 === 1 ? 'rgba(255,255,255,0.015)' : 'transparent',
+                            borderBottom: '1px solid rgba(99,102,241,0.08)',
+                          }}
+                          className="hover:bg-white/5 transition-colors"
+                        >
+                          <td className="px-3 py-2.5 text-center" style={{ color: '#94a3b8' }}>{line.lineNo}</td>
+                          <td className="px-3 py-2.5 font-mono" style={{ color: '#a5b4fc' }}>{line.itemNo}</td>
+                          <td className="px-3 py-2.5" style={{ color: '#e2e8f0' }}>{line.description}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: '#e2e8f0' }}>{line.qtyOrdered}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: '#94a3b8' }}>{line.qtyShipped}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: '#94a3b8' }}>{line.qtyInvoiced}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: '#e2e8f0' }}>{fmt(line.unitPrice)}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: line.discountPct > 0 ? '#f59e0b' : '#94a3b8' }}>
+                            {line.discountPct > 0 ? `${line.discountPct}%` : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums font-medium" style={{ color: '#e2e8f0' }}>{fmt(line.lineAmount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Line totals */}
+                <div className="px-5 py-4 flex justify-end" style={{ borderTop: '1px solid rgba(99,102,241,0.1)' }}>
+                  <div className="flex flex-col gap-1.5 min-w-[220px]">
+                    {[
+                      { label: 'Subtotal', value: fmt(SUBTOTAL) },
+                      { label: 'Discount', value: fmt(DISCOUNT), accent: 'amber' },
+                      { label: 'Tax (8.25%)', value: fmt(TAX) },
+                    ].map(({ label, value, accent }) => (
+                      <div key={label} className="flex items-center justify-between">
+                        <span className="text-xs" style={{ color: '#94a3b8' }}>{label}</span>
+                        <span className="text-xs tabular-nums" style={{ color: accent === 'amber' ? '#f59e0b' : '#e2e8f0' }}>{value}</span>
+                      </div>
+                    ))}
+                    <div
+                      className="flex items-center justify-between pt-2 mt-1"
+                      style={{ borderTop: '1px solid rgba(99,102,241,0.2)' }}
+                    >
+                      <span className="text-sm font-semibold" style={{ color: '#e2e8f0' }}>Total</span>
+                      <span className="text-sm font-bold tabular-nums" style={{ color: '#a5b4fc' }}>{fmt(TOTAL)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
-          {order.quote && (
-            <div>
-              <label className="block text-xs text-zinc-500">From Quote</label>
-              <p className="text-sm text-zinc-200 font-mono">{order.quote.quoteNumber.slice(-8)}</p>
-            </div>
-          )}
-          <div>
-            <label className="block text-xs text-zinc-500">Due Date</label>
-            <p className="text-sm text-zinc-200">{order.dueDate ? new Date(order.dueDate).toLocaleDateString() : '—'}</p>
+
+          {/* FactBox Sidebar */}
+          <div className="flex flex-col gap-4" style={{ width: 280, flexShrink: 0 }}>
+            <FactBoxCard title="Order Statistics" icon={<BarChart2 className="w-3.5 h-3.5" />}>
+              <FactRow label="Subtotal" value={fmt(SUBTOTAL)} />
+              <FactRow label="Tax" value={fmt(TAX)} />
+              <FactRow label="Total" value={fmt(TOTAL)} accent />
+              <FactRow label="Paid" value={fmt(0)} />
+              <div className="flex items-center justify-between pt-1" style={{ borderTop: '1px solid rgba(99,102,241,0.1)' }}>
+                <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>Outstanding</span>
+                <span className="text-xs font-bold" style={{ color: '#f87171' }}>{fmt(TOTAL)}</span>
+              </div>
+            </FactBoxCard>
+
+            <FactBoxCard title="Customer Info" icon={<User className="w-3.5 h-3.5" />}>
+              <FactRow label="Credit Status" value="Good" />
+              <FactRow label="Balance" value="$12,450.00" />
+              <FactRow label="Credit Limit" value="$50,000.00" />
+              <div className="mt-1">
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <div className="h-full rounded-full" style={{ width: '24.9%', background: '#34d399' }} />
+                </div>
+                <div className="text-[10px] mt-1" style={{ color: '#94a3b8' }}>24.9% of credit limit used</div>
+              </div>
+            </FactBoxCard>
+
+            <FactBoxCard title="Shipping Status" icon={<Truck className="w-3.5 h-3.5" />}>
+              <FactRow label="Items Ordered" value="5 lines" />
+              <FactRow label="Items Shipped" value="0" />
+              <FactRow label="Items Invoiced" value="0" />
+              <div className="mt-2 text-[11px] px-2 py-1.5 rounded" style={{ background: 'rgba(99,102,241,0.1)', color: '#94a3b8' }}>
+                Ready to ship — no shipments posted
+              </div>
+            </FactBoxCard>
           </div>
-          <div>
-            <label className="block text-xs text-zinc-500">Total</label>
-            <p className="text-lg font-semibold text-emerald-400 font-mono">{fmt(order.totalAmount)}</p>
-          </div>
-          {order.notes && (
-            <div className="pt-2 border-t border-zinc-800">
-              <label className="block text-xs text-zinc-500 mb-1">Notes</label>
-              <p className="text-sm text-zinc-300">{order.notes}</p>
-            </div>
-          )}
         </div>
-      </div>
+      </main>
     </div>
   )
 }

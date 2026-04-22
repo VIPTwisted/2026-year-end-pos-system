@@ -1,74 +1,39 @@
+export const dynamic = 'force-dynamic'
+
+import { notFound } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { formatCurrency } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
-import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, MapPin, Hash, FileText } from 'lucide-react'
-import DisposeAssetForm from './DisposeAssetForm'
+import { Edit2, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 
-function statusBadge(status: string) {
-  if (status === 'active') return <Badge variant="success">Active</Badge>
-  if (status === 'disposed') return <Badge variant="secondary">Disposed</Badge>
-  if (status === 'fully_depreciated') return <Badge variant="warning">Fully Depreciated</Badge>
-  return <Badge variant="outline">{status}</Badge>
+function formatCurrency(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
 }
 
-function methodLabel(method: string) {
-  if (method === 'straight_line') return 'Straight-Line'
-  if (method === 'declining_balance') return 'Declining Balance (200%)'
-  if (method === 'sum_of_years') return 'Sum of Years\' Digits'
-  return method
+function formatDate(d: Date | string) {
+  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })
 }
 
-/** Build a projected depreciation schedule (monthly) without saving */
-function buildProjectedSchedule(
-  method: string,
-  acquisitionCost: number,
-  salvageValue: number,
-  usefulLifeYears: number,
-  startYear = new Date().getFullYear()
-): Array<{
-  fiscalYear: number
-  periodNumber: number
-  depreciationAmount: number
-  accumulatedDepreciation: number
-  bookValueAfter: number
-}> {
-  const totalMonths = usefulLifeYears * 12
-  const rows = []
-  let bookValue = acquisitionCost
-  let accumulated = 0
+function methodLabel(m: string) {
+  if (m === 'straight_line') return 'Straight-Line'
+  if (m === 'declining_balance') return 'Declining Balance (200%)'
+  if (m === 'sum_of_years') return "Sum-of-Years' Digits"
+  return m
+}
 
-  for (let m = 1; m <= totalMonths; m++) {
-    if (bookValue <= salvageValue) break
-    let depreciationAmount = 0
+const STATUS_BADGE: Record<string, string> = {
+  active:            'bg-emerald-500/10 text-emerald-400',
+  disposed:          'bg-zinc-700 text-zinc-400',
+  fully_depreciated: 'bg-amber-500/10 text-amber-400',
+}
 
-    if (method === 'straight_line') {
-      depreciationAmount = (acquisitionCost - salvageValue) / totalMonths
-    } else if (method === 'declining_balance') {
-      depreciationAmount = bookValue * (2 / totalMonths)
-    } else if (method === 'sum_of_years') {
-      const remainingMonths = totalMonths - m + 1
-      const sumMonths = (totalMonths * (totalMonths + 1)) / 2
-      depreciationAmount = ((acquisitionCost - salvageValue) * remainingMonths) / sumMonths
-    }
-
-    depreciationAmount = Math.min(depreciationAmount, bookValue - salvageValue)
-    bookValue -= depreciationAmount
-    accumulated += depreciationAmount
-
-    const yearOffset = Math.floor((m - 1) / 12)
-    const periodInYear = ((m - 1) % 12) + 1
-    rows.push({
-      fiscalYear: startYear + yearOffset,
-      periodNumber: periodInYear,
-      depreciationAmount,
-      accumulatedDepreciation: accumulated,
-      bookValueAfter: bookValue,
-    })
-  }
-  return rows
+function Field({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">{label}</div>
+      <div className="text-[13px] text-zinc-200">{children ?? value ?? '—'}</div>
+    </div>
+  )
 }
 
 export default async function FixedAssetDetailPage({
@@ -77,228 +42,232 @@ export default async function FixedAssetDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+
   const asset = await prisma.fixedAsset.findUnique({
     where: { id },
     include: {
       group: true,
       depreciationLines: {
-        orderBy: [{ fiscalYear: 'asc' }, { periodNumber: 'asc' }],
+        orderBy: [{ fiscalYear: 'desc' }, { periodNumber: 'desc' }],
+        take: 24,
       },
     },
   })
 
   if (!asset) notFound()
 
-  const hasLines = asset.depreciationLines.length > 0
-  const projected = hasLines ? [] : buildProjectedSchedule(
-    asset.depreciationMethod,
-    asset.acquisitionCost,
-    asset.salvageValue,
-    asset.usefulLifeYears,
-    new Date(asset.acquisitionDate).getFullYear()
+  const depreciationPct = asset.acquisitionCost > 0
+    ? (asset.accumulatedDeprec / asset.acquisitionCost * 100).toFixed(1)
+    : '0'
+
+  const actions = (
+    <div className="flex items-center gap-1.5">
+      <Link
+        href={`/finance/fixed-assets/${id}/edit`}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-medium rounded transition-colors"
+      >
+        <Edit2 className="w-3.5 h-3.5" /> Edit
+      </Link>
+      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+        <Trash2 className="w-3.5 h-3.5" /> Delete
+      </button>
+      <div className="w-px h-5 bg-zinc-700 mx-1" />
+      {/* Navigate */}
+      <div className="relative group">
+        <button className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+          Navigate <ChevronDown className="w-3 h-3" />
+        </button>
+        <div className="absolute left-0 top-full mt-1 w-52 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-20 hidden group-hover:block">
+          <Link href="/finance/gl-entries" className="block px-3 py-2 text-[12px] text-zinc-300 hover:bg-zinc-800 rounded-t-lg transition-colors">
+            FA Ledger Entries
+          </Link>
+          <Link href="/finance/fixed-assets" className="block px-3 py-2 text-[12px] text-zinc-300 hover:bg-zinc-800 transition-colors">
+            Maintenance
+          </Link>
+          <Link href="/finance/fixed-assets" className="block px-3 py-2 text-[12px] text-zinc-300 hover:bg-zinc-800 rounded-b-lg transition-colors">
+            Depreciation Books
+          </Link>
+        </div>
+      </div>
+    </div>
   )
 
-  const depreciationPct = asset.acquisitionCost > 0
-    ? (asset.accumulatedDeprec / asset.acquisitionCost) * 100
-    : 0
-
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-zinc-950">
-      <TopBar title={`Asset: ${asset.assetNumber}`} />
+    <>
+      <TopBar
+        title={`${asset.assetNumber} · ${asset.name}`}
+        breadcrumb={[
+          { label: 'Finance', href: '/finance' },
+          { label: 'Fixed Assets', href: '/finance/fixed-assets' },
+        ]}
+        actions={actions}
+      />
 
-      <main className="flex-1 p-6 overflow-auto space-y-8">
-        <div className="max-w-5xl mx-auto space-y-8">
+      <div className="flex min-h-[100dvh] bg-[#0f0f1a]">
+        <main className="flex-1 p-6 overflow-auto space-y-3">
 
-          {/* Back */}
-          <Link href="/finance/fixed-assets" className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Fixed Assets
-          </Link>
+          {/* General FastTab */}
+          <details open className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">General</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="No." value={asset.assetNumber} />
+              <Field label="Description" value={asset.name} />
+              <Field label="Description 2" value={asset.description ?? '—'} />
+              <Field label="FA Class Code" value={asset.group.code} />
+              <Field label="FA Subclass Code" value={asset.group.name} />
+              <Field label="Location Code" value={asset.location ?? '—'} />
+              <Field label="Serial No." value={asset.serialNumber ?? '—'} />
+              <Field label="Status">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${STATUS_BADGE[asset.status] ?? 'bg-zinc-700 text-zinc-400'}`}>
+                  {asset.status.replace('_', ' ')}
+                </span>
+              </Field>
+              <Field label="Blocked" value={asset.status === 'disposed' ? 'Yes' : 'No'} />
+            </div>
+          </details>
 
-          {/* Asset Header */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                  <span className="font-mono text-sm font-bold text-blue-400 bg-blue-400/10 px-2.5 py-1 rounded-lg border border-blue-400/20">
-                    {asset.assetNumber}
-                  </span>
-                  {statusBadge(asset.status)}
-                  <Badge variant="outline">{methodLabel(asset.depreciationMethod)}</Badge>
+          {/* Depreciation Book FastTab */}
+          <details open className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Depreciation Book</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="Depreciation Book Code" value="DEFAULT" />
+              <Field label="Depreciation Method" value={methodLabel(asset.depreciationMethod)} />
+              <Field label="FA Posting Date" value={formatDate(asset.acquisitionDate)} />
+              <Field label="Acquisition Cost" value={formatCurrency(asset.acquisitionCost)} />
+              <Field label="Salvage Value" value={formatCurrency(asset.salvageValue)} />
+              <Field label="No. of Depreciation Years" value={String(asset.usefulLifeYears)} />
+              <Field label="Accumulated Depreciation" value={formatCurrency(asset.accumulatedDeprec)} />
+              <Field label="Book Value" value={formatCurrency(asset.currentBookValue)} />
+              <Field label="% Depreciated" value={`${depreciationPct}%`} />
+            </div>
+          </details>
+
+          {/* Maintenance FastTab */}
+          <details className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Maintenance</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="Maintenance Vendor No." value="—" />
+              <Field label="Under Maintenance" value="No" />
+              {asset.notes && (
+                <div className="col-span-3">
+                  <Field label="Notes" value={asset.notes} />
                 </div>
-                <h1 className="text-xl font-bold text-zinc-100 mb-1">{asset.name}</h1>
-                <p className="text-sm text-zinc-500">{asset.group.name}</p>
-                {asset.description && (
-                  <p className="text-sm text-zinc-400 mt-2">{asset.description}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-4 text-xs text-zinc-500 flex-wrap">
-                {asset.location && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {asset.location}
-                  </span>
-                )}
-                {asset.serialNumber && (
-                  <span className="flex items-center gap-1">
-                    <Hash className="w-3.5 h-3.5" />
-                    {asset.serialNumber}
-                  </span>
-                )}
-                {asset.notes && (
-                  <span className="flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5" />
-                    {asset.notes}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Key Figures */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-zinc-800">
-              <div>
-                <p className="text-xs text-zinc-500 mb-1">Acquisition Cost</p>
-                <p className="text-2xl font-bold text-zinc-100">{formatCurrency(asset.acquisitionCost)}</p>
-                <p className="text-xs text-zinc-600 mt-0.5">
-                  {new Date(asset.acquisitionDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 mb-1">Accumulated Depreciation</p>
-                <p className="text-2xl font-bold text-red-400">{formatCurrency(asset.accumulatedDeprec)}</p>
-                <p className="text-xs text-zinc-600 mt-0.5">{depreciationPct.toFixed(1)}% of cost</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 mb-1">Current Book Value</p>
-                <p className="text-2xl font-bold text-emerald-400">{formatCurrency(asset.currentBookValue)}</p>
-                <p className="text-xs text-zinc-600 mt-0.5">
-                  Salvage: {formatCurrency(asset.salvageValue)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 mb-1">Useful Life</p>
-                <p className="text-2xl font-bold text-zinc-100">{asset.usefulLifeYears}y</p>
-                <p className="text-xs text-zinc-600 mt-0.5">
-                  {asset.usefulLifeYears * 12} periods total
-                </p>
-              </div>
-            </div>
-
-            {/* Depreciation progress bar */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
-                <span>Depreciation progress</span>
-                <span>{depreciationPct.toFixed(1)}%</span>
-              </div>
-              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-500 to-red-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(depreciationPct, 100)}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Depreciation Schedule */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
-                Depreciation Schedule
-              </h2>
-              {!hasLines && (
-                <span className="text-xs text-zinc-600 italic">Projected — no entries posted yet</span>
+              )}
+              {!asset.notes && (
+                <div className="col-span-3">
+                  <p className="text-[13px] text-zinc-500">No maintenance records.</p>
+                </div>
               )}
             </div>
+          </details>
 
-            <div className="border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-zinc-900 z-10">
-                    <tr className="border-b border-zinc-800">
-                      <th className="text-left px-5 py-3 text-zinc-500 text-xs uppercase tracking-wide font-medium">Fiscal Year</th>
-                      <th className="text-left px-4 py-3 text-zinc-500 text-xs uppercase tracking-wide font-medium">Period</th>
-                      <th className="text-right px-4 py-3 text-zinc-500 text-xs uppercase tracking-wide font-medium">Depreciation</th>
-                      <th className="text-right px-4 py-3 text-zinc-500 text-xs uppercase tracking-wide font-medium">Accum. Depr.</th>
-                      <th className="text-right px-4 py-3 text-zinc-500 text-xs uppercase tracking-wide font-medium">Book Value After</th>
-                      {hasLines && (
-                        <th className="text-left px-4 py-3 text-zinc-500 text-xs uppercase tracking-wide font-medium">Posted</th>
-                      )}
+          {/* Depreciation Ledger */}
+          {asset.depreciationLines.length > 0 && (
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-800/50 bg-zinc-900/30">
+                <span className="text-[13px] font-semibold text-zinc-100">Depreciation Ledger</span>
+              </div>
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="border-b border-zinc-800/50">
+                    <th className="text-left px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Fiscal Year</th>
+                    <th className="text-left px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Period</th>
+                    <th className="text-right px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Depreciation</th>
+                    <th className="text-right px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Accum. Deprec.</th>
+                    <th className="text-right px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Book Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {asset.depreciationLines.map((l, i) => (
+                    <tr key={l.id} className={`hover:bg-zinc-800/20 ${i !== asset.depreciationLines.length - 1 ? 'border-b border-zinc-800/30' : ''}`}>
+                      <td className="px-4 py-2 text-zinc-400">{l.fiscalYear}</td>
+                      <td className="px-4 py-2 text-zinc-500">{l.periodNumber}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-zinc-300">{formatCurrency(l.depreciationAmount)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-amber-400">{formatCurrency(l.accumulatedDepreciation)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-emerald-400">{formatCurrency(l.bookValueAfter)}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800/50">
-                    {hasLines
-                      ? asset.depreciationLines.map(line => (
-                          <tr key={line.id} className="hover:bg-zinc-900/40 transition-colors">
-                            <td className="px-5 py-3 text-xs font-mono text-zinc-300">{line.fiscalYear}</td>
-                            <td className="px-4 py-3 text-xs text-zinc-400">Period {line.periodNumber}</td>
-                            <td className="px-4 py-3 text-right text-xs font-mono text-red-400">
-                              {formatCurrency(line.depreciationAmount)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-xs font-mono text-zinc-300">
-                              {formatCurrency(line.accumulatedDepreciation)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-xs font-mono font-semibold text-emerald-400">
-                              {formatCurrency(line.bookValueAfter)}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-zinc-500">
-                              {new Date(line.postedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                            </td>
-                          </tr>
-                        ))
-                      : projected.slice(0, 60).map((row, i) => (
-                          <tr key={i} className="hover:bg-zinc-900/40 transition-colors">
-                            <td className="px-5 py-3 text-xs font-mono text-zinc-500">{row.fiscalYear}</td>
-                            <td className="px-4 py-3 text-xs text-zinc-600">Period {row.periodNumber}</td>
-                            <td className="px-4 py-3 text-right text-xs font-mono text-zinc-500">
-                              {formatCurrency(row.depreciationAmount)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-xs font-mono text-zinc-500">
-                              {formatCurrency(row.accumulatedDepreciation)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-xs font-mono text-zinc-400">
-                              {formatCurrency(row.bookValueAfter)}
-                            </td>
-                          </tr>
-                        ))
-                    }
-                  </tbody>
-                </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </main>
+
+        {/* FactBox — FA Statistics */}
+        <aside className="w-72 shrink-0 border-l border-zinc-800/50 p-4 space-y-4 bg-[#0f0f1a]">
+          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/30">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">FA Statistics</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Book Value</div>
+                <div className="text-xl font-bold text-emerald-400 tabular-nums">{formatCurrency(asset.currentBookValue)}</div>
               </div>
-              {!hasLines && projected.length > 60 && (
-                <div className="px-5 py-2 border-t border-zinc-800 text-xs text-zinc-600 italic">
-                  Showing first 60 of {projected.length} projected periods
+              <div className="pt-2 border-t border-zinc-800/50 space-y-2 text-[12px]">
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Acquisition Cost</span>
+                  <span className="text-zinc-200 tabular-nums">{formatCurrency(asset.acquisitionCost)}</span>
                 </div>
-              )}
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Accum. Depreciation</span>
+                  <span className="text-amber-400 tabular-nums">{formatCurrency(asset.accumulatedDeprec)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Book Value</span>
+                  <span className="text-emerald-400 tabular-nums">{formatCurrency(asset.currentBookValue)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">% Depreciated</span>
+                  <span className="text-zinc-200">{depreciationPct}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Useful Life</span>
+                  <span className="text-zinc-200">{asset.usefulLifeYears} years</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Method</span>
+                  <span className="text-zinc-200 text-[11px]">{methodLabel(asset.depreciationMethod)}</span>
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div className="pt-2">
+                <div className="w-full bg-zinc-800 rounded-full h-1.5">
+                  <div
+                    className="bg-amber-500 h-1.5 rounded-full transition-all"
+                    style={{ width: `${Math.min(parseFloat(depreciationPct), 100)}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-zinc-600 mt-1">{depreciationPct}% depreciated</div>
+              </div>
             </div>
           </div>
 
-          {/* Dispose Asset */}
-          {asset.status === 'active' && (
-            <DisposeAssetForm assetId={asset.id} assetName={asset.name} />
-          )}
-
-          {asset.status === 'disposed' && asset.disposedAt && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-4">Disposal Record</h2>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-zinc-500 mb-1">Disposal Date</p>
-                  <p className="text-zinc-200">
-                    {new Date(asset.disposedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-zinc-500 mb-1">Disposal Amount</p>
-                  <p className="text-zinc-200">
-                    {asset.disposalAmount != null ? formatCurrency(asset.disposalAmount) : '—'}
-                  </p>
-                </div>
-              </div>
+          {/* Navigate links */}
+          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/30">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Related</span>
             </div>
-          )}
-
-        </div>
-      </main>
-    </div>
+            <div className="py-1">
+              <Link href="/finance/gl-entries" className="flex items-center justify-between px-4 py-2 text-[12px] text-zinc-400 hover:text-zinc-200 hover:bg-[rgba(99,102,241,0.05)] transition-colors">
+                FA Ledger Entries <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+              <Link href="/finance/fixed-assets" className="flex items-center justify-between px-4 py-2 text-[12px] text-zinc-400 hover:text-zinc-200 hover:bg-[rgba(99,102,241,0.05)] transition-colors">
+                Depreciation Books <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </>
   )
 }

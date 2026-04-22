@@ -1,8 +1,12 @@
-import Link from 'next/link'
+export const dynamic = 'force-dynamic'
+
+import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
+import Link from 'next/link'
+import { Plus, Edit2, Trash2, ChevronRight, RefreshCw, FileText } from 'lucide-react'
 
 function formatCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(amount)
 }
 
 function maskAccount(num: string) {
@@ -10,168 +14,234 @@ function maskAccount(num: string) {
   return '•••• ' + num.slice(-4)
 }
 
-function accountTypeBadge(type: string) {
-  const map: Record<string, string> = {
-    checking: 'bg-blue-500/10 text-blue-400',
-    savings: 'bg-emerald-500/10 text-emerald-400',
-    credit_line: 'bg-amber-500/10 text-amber-400',
-  }
-  return map[type] ?? 'bg-zinc-700 text-zinc-400'
-}
+export default async function BankAccountsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string; currency?: string; blocked?: string }>
+}) {
+  const sp = await searchParams
+  const filterSearch = sp.search ?? ''
+  const filterCurrency = sp.currency ?? ''
+  const filterBlocked = sp.blocked ?? ''
 
-export default async function BankAccountsPage() {
   const accounts = await prisma.bankAccount.findMany({
-    orderBy: { createdAt: 'desc' },
+    where: {
+      ...(filterSearch ? {
+        OR: [
+          { accountCode: { contains: filterSearch } },
+          { bankName: { contains: filterSearch } },
+          { name: { contains: filterSearch } },
+          { accountNumber: { contains: filterSearch } },
+        ],
+      } : {}),
+      ...(filterCurrency ? { currency: filterCurrency } : {}),
+      ...(filterBlocked === 'yes' ? { isActive: false } : {}),
+      ...(filterBlocked === 'no' ? { isActive: true } : {}),
+    },
     include: {
       reconciliations: {
-        where: { status: 'completed' },
         orderBy: { statementDate: 'desc' },
         take: 1,
-        select: { statementDate: true },
+        select: { statementDate: true, statementNo: true },
       },
       _count: { select: { transactions: { where: { isReconciled: false } } } },
     },
+    orderBy: { accountCode: 'asc' },
   })
 
-  const totalCash = accounts.reduce((s, a) => s + a.currentBalance, 0)
-  const needsReconciliation = accounts.filter((a) => a._count.transactions > 0).length
-  const activeAccounts = accounts.filter((a) => a.isActive).length
+  const buildHref = (overrides: Record<string, string>) => {
+    const p = { search: filterSearch, currency: filterCurrency, blocked: filterBlocked, ...overrides }
+    const qs = Object.entries(p).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
+    return `/finance/bank-accounts${qs ? '?' + qs : ''}`
+  }
+
+  const currencies = Array.from(new Set(accounts.map(a => a.currency))).sort()
+
+  const actions = (
+    <div className="flex items-center gap-1.5">
+      <Link
+        href="/finance/bank-accounts/new"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-medium rounded transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" /> New
+      </Link>
+      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+        <Edit2 className="w-3.5 h-3.5" /> Edit
+      </button>
+      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+        <Trash2 className="w-3.5 h-3.5" /> Delete
+      </button>
+      <div className="w-px h-5 bg-zinc-700 mx-1" />
+      <Link
+        href="/finance/bank-reconciliation"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors"
+      >
+        <FileText className="w-3.5 h-3.5" /> Bank Account Statement
+      </Link>
+      <Link
+        href="/finance/bank-reconciliation"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors"
+      >
+        <RefreshCw className="w-3.5 h-3.5" /> Reconcile
+      </Link>
+    </div>
+  )
 
   return (
-    <div className="min-h-[100dvh] bg-[#0f0f1a]">
-      {/* Top Bar */}
-      <header className="h-14 border-b border-zinc-800 bg-[#0f0f1a] flex items-center px-6 gap-4 sticky top-0 z-10">
-        <div>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Finance</span>
-          <h1 className="text-base font-semibold text-zinc-100 leading-tight">Bank Accounts</h1>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <Link
-            href="/finance/bank-accounts/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Account
-          </Link>
-        </div>
-      </header>
+    <>
+      <TopBar
+        title="Bank Accounts"
+        breadcrumb={[{ label: 'Finance', href: '/finance' }]}
+        actions={actions}
+      />
 
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Total Accounts</div>
-            <div className="text-2xl font-bold text-zinc-100">{activeAccounts}</div>
-            <div className="text-xs text-zinc-500 mt-1">{accounts.length} total including inactive</div>
+      <div className="flex min-h-[100dvh] bg-[#0f0f1a]">
+        {/* Filter Pane */}
+        <aside className="w-60 shrink-0 border-r border-zinc-800/50 bg-[#0f0f1a] p-4 space-y-5">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">Search</div>
+            <form>
+              <input
+                name="search"
+                defaultValue={filterSearch}
+                placeholder="No., Name, Bank…"
+                className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded text-[12px] text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500"
+              />
+              <input type="hidden" name="currency" value={filterCurrency} />
+              <input type="hidden" name="blocked" value={filterBlocked} />
+              <button type="submit" className="sr-only">Search</button>
+            </form>
           </div>
-          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Total Cash Position</div>
-            <div className="text-2xl font-bold text-emerald-400 tabular-nums">{formatCurrency(totalCash)}</div>
-            <div className="text-xs text-zinc-500 mt-1">Across all active accounts</div>
-          </div>
-          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Needs Reconciliation</div>
-            <div className={`text-2xl font-bold tabular-nums ${needsReconciliation > 0 ? 'text-amber-400' : 'text-zinc-100'}`}>
-              {needsReconciliation}
-            </div>
-            <div className="text-xs text-zinc-500 mt-1">Accounts with unreconciled transactions</div>
-          </div>
-        </div>
 
-        {/* Account Cards */}
-        {accounts.length === 0 ? (
-          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-12 text-center">
-            <div className="text-zinc-500 text-sm">No bank accounts yet.</div>
-            <Link
-              href="/finance/bank-accounts/new"
-              className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
-            >
-              Add your first account
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {accounts.map((account) => {
-              const lastRecon = account.reconciliations[0]
-              return (
-                <div
-                  key={account.id}
-                  className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-5 flex flex-col gap-4"
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">Currency</div>
+            <div className="space-y-0.5">
+              <Link
+                href={buildHref({ currency: '' })}
+                className={`block px-2 py-1.5 rounded text-[12px] transition-colors ${
+                  !filterCurrency ? 'bg-[rgba(99,102,241,0.15)] text-indigo-300' : 'text-zinc-400 hover:bg-[rgba(99,102,241,0.05)] hover:text-zinc-200'
+                }`}
+              >
+                All Currencies
+              </Link>
+              {currencies.map(c => (
+                <Link
+                  key={c}
+                  href={buildHref({ currency: c })}
+                  className={`block px-2 py-1.5 rounded text-[12px] transition-colors ${
+                    filterCurrency === c ? 'bg-[rgba(99,102,241,0.15)] text-indigo-300' : 'text-zinc-400 hover:bg-[rgba(99,102,241,0.05)] hover:text-zinc-200'
+                  }`}
                 >
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-                        {account.bankName}
-                      </div>
-                      <div className="text-base font-semibold text-zinc-100 mt-0.5">
-                        {account.name || account.accountCode}
-                      </div>
-                      <div className="font-mono text-sm text-zinc-400 mt-0.5">
-                        {maskAccount(account.accountNumber)}
-                      </div>
-                    </div>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium capitalize ${accountTypeBadge(account.accountType)}`}
-                    >
-                      {account.accountType.replace('_', ' ')}
-                    </span>
-                  </div>
+                  {c}
+                </Link>
+              ))}
+            </div>
+          </div>
 
-                  {/* Balance */}
-                  <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
-                      Current Balance
-                    </div>
-                    <div
-                      className={`text-3xl font-bold tabular-nums ${
-                        account.currentBalance < 0 ? 'text-red-400' : 'text-zinc-100'
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">Blocked</div>
+            <div className="space-y-0.5">
+              {[
+                { value: '', label: 'All' },
+                { value: 'no', label: 'Active' },
+                { value: 'yes', label: 'Blocked' },
+              ].map(opt => (
+                <Link
+                  key={opt.value}
+                  href={buildHref({ blocked: opt.value })}
+                  className={`block px-2 py-1.5 rounded text-[12px] transition-colors ${
+                    filterBlocked === opt.value
+                      ? 'bg-[rgba(99,102,241,0.15)] text-indigo-300'
+                      : 'text-zinc-400 hover:bg-[rgba(99,102,241,0.05)] hover:text-zinc-200'
+                  }`}
+                >
+                  {opt.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-6 overflow-auto">
+          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-zinc-800/80 bg-zinc-900/40">
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">No.</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Name</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Bank Name</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Bank Account No.</th>
+                  <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Balance (LCY)</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Currency</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">SWIFT Code</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">IBAN</th>
+                  <th className="px-4 py-2.5 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-16 text-zinc-500 text-[13px]">
+                      No bank accounts.{' '}
+                      <Link href="/finance/bank-accounts/new" className="text-indigo-400 hover:underline">
+                        Create one
+                      </Link>
+                    </td>
+                  </tr>
+                ) : (
+                  accounts.map((account, idx) => (
+                    <tr
+                      key={account.id}
+                      className={`hover:bg-[rgba(99,102,241,0.05)] transition-colors ${
+                        idx !== accounts.length - 1 ? 'border-b border-zinc-800/40' : ''
                       }`}
                     >
-                      {formatCurrency(account.currentBalance, account.currency)}
-                    </div>
-                  </div>
-
-                  {/* Reconciliation info */}
-                  <div className="flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-zinc-500">Last reconciled: </span>
-                      <span className="text-zinc-300">
-                        {lastRecon
-                          ? new Date(lastRecon.statementDate).toLocaleDateString()
-                          : 'Never'}
-                      </span>
-                    </div>
-                    {account._count.transactions > 0 && (
-                      <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded text-[11px] font-medium">
-                        {account._count.transactions} unreconciled
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-1 border-t border-zinc-800">
-                    <Link
-                      href={`/finance/bank-accounts/${account.id}`}
-                      className="flex-1 text-center py-1.5 text-sm text-zinc-300 hover:text-zinc-100 bg-zinc-800/50 hover:bg-zinc-800 rounded transition-colors"
-                    >
-                      View
-                    </Link>
-                    <Link
-                      href={`/finance/bank-accounts/${account.id}/reconcile`}
-                      className="flex-1 text-center py-1.5 text-sm text-zinc-300 hover:text-zinc-100 bg-zinc-800/50 hover:bg-zinc-800 rounded transition-colors"
-                    >
-                      Reconcile
-                    </Link>
-                  </div>
-                </div>
-              )
-            })}
+                      <td className="px-4 py-2.5">
+                        <Link
+                          href={`/finance/bank-accounts/${account.id}`}
+                          className="font-mono text-[12px] text-indigo-400 hover:text-indigo-300"
+                        >
+                          {account.accountCode}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-zinc-200">
+                        <Link href={`/finance/bank-accounts/${account.id}`} className="hover:text-white transition-colors">
+                          {account.name ?? account.bankName}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-zinc-400">{account.bankName}</td>
+                      <td className="px-4 py-2.5 text-zinc-400 font-mono text-[12px]">
+                        {maskAccount(account.accountNumber)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                        <span className={account.currentBalance < 0 ? 'text-red-400' : 'text-zinc-200'}>
+                          {formatCurrency(account.currentBalance, account.currency)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-700 text-zinc-300">
+                          {account.currency}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-zinc-500 font-mono text-[12px]">
+                        {account.swiftCode ?? '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-zinc-500 font-mono text-[12px]">
+                        {account.ibanNumber ?? '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-zinc-600">
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
+          <div className="mt-3 text-[12px] text-zinc-500">{accounts.length} records</div>
+        </main>
       </div>
-    </div>
+    </>
   )
 }

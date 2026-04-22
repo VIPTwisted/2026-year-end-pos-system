@@ -1,121 +1,131 @@
 'use client'
-import { useState, useEffect } from 'react'
+
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
-import { Button } from '@/components/ui/button'
-import { Save } from 'lucide-react'
+import { Save, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 
-type AbsenceCode = { id: string; code: string; description: string; type: string }
-type Employee = { id: string; firstName: string; lastName: string }
+export const dynamic = 'force-dynamic'
+
+const CAUSES = ['Sick Leave', 'Vacation', 'Personal', 'Bereavement', 'FMLA', 'Other']
+const UOM = ['Days', 'Hours']
 
 export default function NewAbsencePage() {
   const router = useRouter()
-  const [codes, setCodes] = useState<AbsenceCode[]>([])
-  const [employees, setEmployees] = useState<Employee[]>([])
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  const today = new Date().toISOString().split('T')[0]
-  const [form, setForm] = useState({
-    employeeId: '',
-    codeId: '',
-    fromDate: today,
-    toDate: today,
-    quantity: 1,
-    unit: 'days',
-    description: '',
-  })
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  const today = new Date()
 
-  useEffect(() => {
-    fetch('/api/hr/absence/codes').then(r => r.json()).then(setCodes).catch(() => {})
-    fetch('/api/hr/employees').then(r => r.json()).then(setEmployees).catch(() => {})
-  }, [])
+  const [employeeNo, setEmployeeNo] = useState('')
+  const [employeeName, setEmployeeName] = useState('')
+  const [causeOfAbsence, setCauseOfAbsence] = useState('Sick Leave')
+  const [fromDate, setFromDate] = useState(fmt(today))
+  const [toDate, setToDate] = useState(fmt(today))
+  const [qty, setQty] = useState('1')
+  const [unitOfMeasure, setUnitOfMeasure] = useState('Days')
+  const [notes, setNotes] = useState('')
 
-  const inp = 'w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-blue-500'
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
+    if (!fromDate || !toDate) { setError('From/To dates are required'); return }
     setSaving(true)
+    setError('')
     try {
-      await fetch('/api/hr/absence/registrations', {
+      const res = await fetch('/api/hr/absence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
-          fromDate: new Date(form.fromDate).toISOString(),
-          toDate: new Date(form.toDate).toISOString(),
-          quantity: parseFloat(String(form.quantity)),
-          status: 'pending',
+          employeeNo: employeeNo || null,
+          employeeName: employeeName || null,
+          causeOfAbsence,
+          fromDate,
+          toDate,
+          qty: parseFloat(qty) || 0,
+          unitOfMeasure,
+          notes: notes || null,
         }),
       })
+      if (!res.ok) throw new Error('Failed to register absence')
       router.push('/hr/absence')
-    } finally {
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error')
       setSaving(false)
     }
   }
 
   return (
     <>
-      <TopBar title="New Absence Registration" />
-      <main className="flex-1 p-6 overflow-auto bg-[#0f0f1a]">
-      <div className="max-w-2xl mx-auto">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-6">
-            <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-4">Absence Details</h2>
-            <div className="space-y-4">
+      <TopBar title="New Absence" />
+      <main className="flex-1 overflow-auto bg-[#0f0f1a] min-h-0">
+        <div className="px-6 py-4 space-y-5 max-w-2xl">
+
+          <Link href="/hr/absence" className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300">
+            <ArrowLeft className="w-3 h-3" /> Back to Absence
+          </Link>
+
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">HR</p>
+              <h2 className="text-[18px] font-semibold text-zinc-100">Register Absence</h2>
+            </div>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-medium"
+            >
+              <Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Register'}
+            </button>
+          </div>
+
+          {error && <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2">{error}</div>}
+
+          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <div className="px-4 py-2 bg-zinc-800/40 border-b border-zinc-800/60">
+              <span className="text-[11px] font-semibold text-zinc-300 uppercase tracking-widest">Absence Details</span>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Employee *</label>
-                <select required className={inp} value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}>
-                  <option value="">Select employee...</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Employee No.</label>
+                <input value={employeeNo} onChange={e => setEmployeeNo(e.target.value)} placeholder="EMP-001" className="w-full bg-zinc-900/60 border border-zinc-700/50 rounded-md px-3 py-2 text-[13px] text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500/60" />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Employee Name</label>
+                <input value={employeeName} onChange={e => setEmployeeName(e.target.value)} placeholder="Full name" className="w-full bg-zinc-900/60 border border-zinc-700/50 rounded-md px-3 py-2 text-[13px] text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500/60" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Cause of Absence</label>
+                <select value={causeOfAbsence} onChange={e => setCauseOfAbsence(e.target.value)} className="w-full bg-zinc-900/60 border border-zinc-700/50 rounded-md px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:border-blue-500/60">
+                  {CAUSES.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Absence Code *</label>
-                <select required className={inp} value={form.codeId} onChange={e => setForm(f => ({ ...f, codeId: e.target.value }))}>
-                  <option value="">Select code...</option>
-                  {codes.map(c => <option key={c.id} value={c.id}>{c.code} — {c.description}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-zinc-400 mb-1">From Date *</label>
-                  <input type="date" required className={inp} value={form.fromDate} onChange={e => setForm(f => ({ ...f, fromDate: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-400 mb-1">To Date *</label>
-                  <input type="date" required className={inp} value={form.toDate} onChange={e => setForm(f => ({ ...f, toDate: e.target.value }))} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Quantity *</label>
-                  <input type="number" step="0.5" min="0.5" required className={inp} value={form.quantity}
-                    onChange={e => setForm(f => ({ ...f, quantity: parseFloat(e.target.value) || 0 }))} />
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Unit</label>
-                  <select className={inp} value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}>
-                    <option value="days">Days</option>
-                    <option value="hours">Hours</option>
-                  </select>
-                </div>
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">From Date</label>
+                <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-full bg-zinc-900/60 border border-zinc-700/50 rounded-md px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:border-blue-500/60" />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Description</label>
-                <textarea className={inp + ' resize-none'} rows={2} value={form.description}
-                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Optional notes..." />
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">To Date</label>
+                <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-full bg-zinc-900/60 border border-zinc-700/50 rounded-md px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:border-blue-500/60" />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Quantity</label>
+                <input type="number" min="0" step="0.5" value={qty} onChange={e => setQty(e.target.value)} className="w-full bg-zinc-900/60 border border-zinc-700/50 rounded-md px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:border-blue-500/60" />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Unit of Measure</label>
+                <select value={unitOfMeasure} onChange={e => setUnitOfMeasure(e.target.value)} className="w-full bg-zinc-900/60 border border-zinc-700/50 rounded-md px-3 py-2 text-[13px] text-zinc-100 focus:outline-none focus:border-blue-500/60">
+                  {UOM.map(u => <option key={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Notes</label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Optional notes…" className="w-full bg-zinc-900/60 border border-zinc-700/50 rounded-md px-3 py-2 text-[13px] text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500/60 resize-none" />
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-            <Button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 gap-2">
-              <Save className="w-4 h-4" />{saving ? 'Saving...' : 'Save Registration'}
-            </Button>
-          </div>
-        </form>
-      </div>
+
+        </div>
       </main>
     </>
   )

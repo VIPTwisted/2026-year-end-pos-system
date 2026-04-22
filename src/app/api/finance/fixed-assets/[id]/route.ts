@@ -70,3 +70,25 @@ export async function PATCH(
 
   return NextResponse.json(asset)
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
+  const existing = await prisma.fixedAsset.findUnique({ where: { id } })
+  if (!existing) {
+    return NextResponse.json({ error: 'Asset not found' }, { status: 404 })
+  }
+
+  if (existing.accumulatedDeprec > 0) {
+    return NextResponse.json(
+      { error: 'Cannot delete an asset that has depreciation entries. Dispose the asset instead.' },
+      { status: 409 }
+    )
+  }
+
+  await prisma.fixedAsset.delete({ where: { id } })
+  return NextResponse.json({ success: true })
+}

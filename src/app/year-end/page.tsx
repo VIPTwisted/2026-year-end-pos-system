@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { YearEndWizard } from './YearEndWizard'

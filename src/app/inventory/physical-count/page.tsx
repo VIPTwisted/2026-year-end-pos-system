@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 /**
  * Physical Inventory Count — Journal List
  * Route: /inventory/physical-count/

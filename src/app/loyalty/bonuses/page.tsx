@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { TopBar } from '@/components/layout/TopBar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Zap } from 'lucide-react'

@@ -71,3 +71,30 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to update bank account' }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const account = await prisma.bankAccount.findUnique({
+      where: { id },
+      include: { _count: { select: { transactions: true, statements: true } } },
+    })
+    if (!account) {
+      return NextResponse.json({ error: 'Bank account not found' }, { status: 404 })
+    }
+    if (account._count.transactions > 0 || account._count.statements > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete a bank account that has transactions or statements. Block it instead.' },
+        { status: 409 }
+      )
+    }
+    await prisma.bankAccount.delete({ where: { id } })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('[DELETE /api/finance/bank-accounts/[id]]', err)
+    return NextResponse.json({ error: 'Failed to delete bank account' }, { status: 500 })
+  }
+}

@@ -1,429 +1,236 @@
-'use client'
+export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { notFound } from 'next/navigation'
+import { TopBar } from '@/components/layout/TopBar'
+import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+import { Edit2, Trash2, RefreshCw, ChevronDown } from 'lucide-react'
 
-interface BankAccount {
-  id: string
-  accountCode: string
-  name: string
-  bankName: string
-  accountNumber: string
-  routingNumber: string | null
-  accountType: string
-  currentBalance: number
-  currency: string
-  isActive: boolean
-  isPrimary: boolean
-  notes: string | null
-  createdAt: string
-  updatedAt: string
+function formatCurrency(n: number, currency = 'USD') {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(n)
 }
 
-interface BankTransaction {
-  id: string
-  accountId: string
-  date: string
-  description: string
-  amount: number
-  runningBalance: number
-  reference: string | null
-  category: string | null
-  isReconciled: boolean
-  reconciledAt: string | null
-  createdAt: string
+function formatDate(d: Date | string) {
+  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })
 }
 
-interface Toast {
-  msg: string
-  type: 'ok' | 'err'
-}
+export default async function BankAccountDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
 
-const CATEGORIES = ['revenue', 'payroll', 'supplies', 'transfer', 'tax', 'rent', 'utilities', 'other']
-
-function formatCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)
-}
-
-function maskAccount(num: string) {
-  if (num.length <= 4) return num
-  return '•••• ' + num.slice(-4)
-}
-
-function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-export default function BankAccountDetailPage() {
-  const params = useParams()
-  const id = params.id as string
-
-  const [account, setAccount] = useState<BankAccount | null>(null)
-  const [transactions, setTransactions] = useState<BankTransaction[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [toast, setToast] = useState<Toast | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  // Add transaction form
-  const [showTxForm, setShowTxForm] = useState(false)
-  const [txForm, setTxForm] = useState({
-    date: new Date().toISOString().split('T')[0],
-    description: '',
-    amount: '',
-    reference: '',
-    category: '',
-    type: 'deposit', // deposit | withdrawal
+  const account = await prisma.bankAccount.findUnique({
+    where: { id },
+    include: {
+      glAccount: { select: { code: true, name: true } },
+      transactions: {
+        orderBy: { date: 'desc' },
+        take: 20,
+      },
+      reconciliations: {
+        orderBy: { statementDate: 'desc' },
+        take: 5,
+      },
+      _count: { select: { transactions: true } },
+    },
   })
 
-  function notify(msg: string, type: 'ok' | 'err' = 'ok') {
-    setToast({ msg, type })
-    setTimeout(() => setToast(null), 2800)
-  }
+  if (!account) notFound()
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/finance/bank-accounts/${id}`)
-      if (!res.ok) throw new Error('Failed to load')
-      const data = (await res.json()) as BankAccount & { transactions: BankTransaction[] }
-      setAccount(data)
-      setTransactions(data.transactions ?? [])
-    } catch {
-      setError('Failed to load account')
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
+  const unreconciledCount = account.transactions.filter(t => !t.isReconciled).length
 
-  useEffect(() => { load() }, [load])
-
-  async function addTransaction(e: React.FormEvent) {
-    e.preventDefault()
-    if (!txForm.description || !txForm.amount) {
-      notify('Description and amount are required', 'err')
-      return
-    }
-    const amountNum = parseFloat(txForm.amount)
-    if (isNaN(amountNum) || amountNum <= 0) {
-      notify('Enter a valid positive amount', 'err')
-      return
-    }
-    const finalAmount = txForm.type === 'withdrawal' ? -amountNum : amountNum
-
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/finance/bank-accounts/${id}/transactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: txForm.date,
-          description: txForm.description,
-          amount: finalAmount,
-          reference: txForm.reference || undefined,
-          category: txForm.category || undefined,
-        }),
-      })
-      if (!res.ok) {
-        const d = (await res.json()) as { error?: string }
-        notify(d.error ?? 'Failed to add transaction', 'err')
-        return
-      }
-      notify('Transaction added')
-      setTxForm({ date: new Date().toISOString().split('T')[0], description: '', amount: '', reference: '', category: '', type: 'deposit' })
-      setShowTxForm(false)
-      await load()
-    } catch {
-      notify('Network error', 'err')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] bg-[#0f0f1a] flex items-center justify-center">
-        <div className="text-zinc-500 text-sm">Loading...</div>
-      </div>
-    )
-  }
-
-  if (error || !account) {
-    return (
-      <div className="min-h-[100dvh] bg-[#0f0f1a] flex items-center justify-center">
-        <div className="text-red-400 text-sm">{error ?? 'Account not found'}</div>
-      </div>
-    )
-  }
+  const actions = (
+    <div className="flex items-center gap-2">
+      <Link
+        href={`/finance/bank-accounts/${id}/edit`}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-medium rounded transition-colors"
+      >
+        <Edit2 className="w-3.5 h-3.5" /> Edit
+      </Link>
+      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+        <Trash2 className="w-3.5 h-3.5" /> Delete
+      </button>
+      <Link
+        href={`/finance/bank-accounts/${id}/reconcile`}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors"
+      >
+        <RefreshCw className="w-3.5 h-3.5" /> Reconcile
+      </Link>
+    </div>
+  )
 
   return (
-    <div className="min-h-[100dvh] bg-[#0f0f1a]">
-      {/* Top Bar */}
-      <header className="h-14 border-b border-zinc-800 bg-[#0f0f1a] flex items-center px-6 gap-4 sticky top-0 z-10">
-        <Link
-          href="/finance/bank-accounts"
-          className="text-zinc-400 hover:text-zinc-100 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <div>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{account.bankName}</span>
-          <h1 className="text-base font-semibold text-zinc-100 leading-tight">
-            {account.name || account.accountCode}
-          </h1>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <Link
-            href={`/finance/bank-accounts/${account.id}/reconcile`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-sm font-medium rounded transition-colors"
-          >
-            Reconcile
-          </Link>
-          <button
-            onClick={() => setShowTxForm((v) => !v)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Transaction
-          </button>
-        </div>
-      </header>
+    <>
+      <TopBar
+        title={`${account.accountCode} · ${account.name ?? account.bankName}`}
+        breadcrumb={[
+          { label: 'Finance', href: '/finance' },
+          { label: 'Bank Accounts', href: '/finance/bank-accounts' },
+        ]}
+        actions={actions}
+      />
 
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Account Header */}
-        <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex gap-6">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Account Number</div>
-                <div className="font-mono text-zinc-300">{maskAccount(account.accountNumber)}</div>
-              </div>
-              {account.routingNumber && (
-                <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Routing Number</div>
-                  <div className="font-mono text-zinc-300">{account.routingNumber}</div>
-                </div>
+      <div className="flex min-h-[100dvh] bg-[#0f0f1a]">
+        <main className="flex-1 p-6 overflow-auto space-y-4">
+
+          {/* General FastTab */}
+          <details open className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">General</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="No." value={account.accountCode} />
+              <Field label="Name" value={account.name ?? account.bankName} />
+              <Field label="Bank Name" value={account.bankName} />
+              <Field label="Account No." value={account.accountNumber} />
+              <Field label="Routing No." value={account.routingNumber ?? '—'} />
+              <Field label="Account Type" value={account.accountType.replace('_', ' ')} />
+              <Field label="Currency Code" value={account.currency} />
+              <Field label="Last Statement No." value={account.lastStatementNo ?? '—'} />
+              <Field label="Last Statement Date" value={account.lastStatementDate ? formatDate(account.lastStatementDate) : '—'} />
+              {account.glAccount && (
+                <Field label="G/L Account">
+                  <Link href={`/finance/chart-of-accounts`} className="text-blue-400 hover:text-blue-300">
+                    {account.glAccount.code} · {account.glAccount.name}
+                  </Link>
+                </Field>
               )}
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Account Type</div>
-                <div className="text-zinc-300 capitalize">{account.accountType.replace('_', ' ')}</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Currency</div>
-                <div className="text-zinc-300">{account.currency}</div>
-              </div>
             </div>
-            <div className="text-right">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Current Balance</div>
-              <div className={`text-3xl font-bold tabular-nums ${account.currentBalance < 0 ? 'text-red-400' : 'text-zinc-100'}`}>
-                {formatCurrency(account.currentBalance, account.currency)}
-              </div>
+          </details>
+
+          {/* Communication FastTab */}
+          <details className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Communication</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="Contact Name" value={account.contactName ?? '—'} />
+              <Field label="Phone No." value={account.phone ?? '—'} />
+              <Field label="E-Mail" value={account.email ?? '—'} />
+              <Field label="Address" value={account.address ?? '—'} />
+              <Field label="City" value={account.city ?? '—'} />
+              <Field label="State" value={account.state ?? '—'} />
+              <Field label="ZIP Code" value={account.zip ?? '—'} />
+              <Field label="Country/Region" value={account.country ?? '—'} />
             </div>
-          </div>
-          {account.notes && (
-            <div className="mt-4 pt-4 border-t border-zinc-800 text-sm text-zinc-400">{account.notes}</div>
-          )}
-        </div>
+          </details>
 
-        {/* Add Transaction Inline Form */}
-        {showTxForm && (
-          <div className="bg-[#16213e] border border-blue-500/30 rounded-lg p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-4">New Transaction</div>
-            <form onSubmit={addTransaction} className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {/* Type toggle */}
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Type</label>
-                <div className="flex rounded overflow-hidden border border-zinc-700">
-                  <button
-                    type="button"
-                    onClick={() => setTxForm((f) => ({ ...f, type: 'deposit' }))}
-                    className={`flex-1 py-2 text-sm font-medium transition-colors ${txForm.type === 'deposit' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'}`}
-                  >
-                    Deposit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTxForm((f) => ({ ...f, type: 'withdrawal' }))}
-                    className={`flex-1 py-2 text-sm font-medium transition-colors ${txForm.type === 'withdrawal' ? 'bg-red-500/20 text-red-400' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'}`}
-                  >
-                    Withdrawal
-                  </button>
-                </div>
+          {/* Transfer FastTab */}
+          <details className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Transfer</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="SWIFT Code" value={account.swiftCode ?? '—'} />
+              <Field label="IBAN No." value={account.ibanNumber ?? '—'} />
+            </div>
+          </details>
+
+          {/* Posting FastTab */}
+          <details className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Posting</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="Bank Acc. Posting Group" value="—" />
+              <Field label="Currency Code" value={account.currency} />
+              <Field label="Primary" value={account.isPrimary ? 'Yes' : 'No'} />
+              <Field label="Blocked" value={account.isActive ? 'No' : 'Yes'} />
+            </div>
+          </details>
+
+          {/* Recent Transactions */}
+          {account.transactions.length > 0 && (
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-800/50 bg-zinc-900/30">
+                <span className="text-[13px] font-semibold text-zinc-100">Recent Transactions</span>
               </div>
-
-              {/* Date */}
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Date</label>
-                <input
-                  type="date"
-                  value={txForm.date}
-                  onChange={(e) => setTxForm((f) => ({ ...f, date: e.target.value }))}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Amount */}
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={txForm.amount}
-                    onChange={(e) => setTxForm((f) => ({ ...f, amount: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded pl-7 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500 tabular-nums"
-                  />
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Description *</label>
-                <input
-                  type="text"
-                  value={txForm.description}
-                  onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="What is this transaction for?"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Category</label>
-                <select
-                  value={txForm.category}
-                  onChange={(e) => setTxForm((f) => ({ ...f, category: e.target.value }))}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
-                >
-                  <option value="">— None —</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Reference */}
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Reference <span className="text-zinc-600">(optional)</span></label>
-                <input
-                  type="text"
-                  value={txForm.reference}
-                  onChange={(e) => setTxForm((f) => ({ ...f, reference: e.target.value }))}
-                  placeholder="Check #, wire ref..."
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Submit */}
-              <div className="md:col-span-3 flex items-center gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
-                >
-                  {saving ? 'Adding...' : 'Add Transaction'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowTxForm(false)}
-                  className="px-6 py-2 text-sm text-zinc-300 hover:text-zinc-100 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Transaction History */}
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-3">
-            Transaction History
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-zinc-800/50">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800">
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Date</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Description</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Category</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Reference</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Amount</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Balance</th>
-                  <th className="text-center px-4 py-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-12 text-zinc-500 text-sm">
-                      No transactions yet. Add your first transaction above.
-                    </td>
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="border-b border-zinc-800/50">
+                    <th className="text-left px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Date</th>
+                    <th className="text-left px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Description</th>
+                    <th className="text-left px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Reference</th>
+                    <th className="text-right px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Amount</th>
+                    <th className="text-right px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Balance</th>
+                    <th className="text-center px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Reconciled</th>
                   </tr>
-                ) : (
-                  transactions.map((tx) => (
-                    <tr key={tx.id} className="border-b border-zinc-800 hover:bg-zinc-800/20 transition-colors">
-                      <td className="px-4 py-3 text-zinc-300 tabular-nums whitespace-nowrap">{fmtDate(tx.date)}</td>
-                      <td className="px-4 py-3 text-zinc-200 max-w-xs truncate">{tx.description}</td>
-                      <td className="px-4 py-3">
-                        {tx.category ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-700 text-zinc-300 capitalize">
-                            {tx.category}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-600 text-[11px]">—</span>
-                        )}
+                </thead>
+                <tbody>
+                  {account.transactions.map((tx, i) => (
+                    <tr key={tx.id} className={`hover:bg-zinc-800/20 ${i !== account.transactions.length - 1 ? 'border-b border-zinc-800/30' : ''}`}>
+                      <td className="px-4 py-2 text-zinc-400">{formatDate(tx.date)}</td>
+                      <td className="px-4 py-2 text-zinc-300">{tx.description}</td>
+                      <td className="px-4 py-2 text-zinc-500 font-mono text-[11px]">{tx.reference ?? '—'}</td>
+                      <td className={`px-4 py-2 text-right tabular-nums font-semibold ${tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {formatCurrency(tx.amount, account.currency)}
                       </td>
-                      <td className="px-4 py-3 font-mono text-zinc-400 text-xs">
-                        {tx.reference ?? <span className="text-zinc-600">—</span>}
-                      </td>
-                      <td className={`px-4 py-3 text-right tabular-nums font-semibold ${tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {tx.amount >= 0 ? '+' : ''}{formatCurrency(tx.amount, account.currency)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-zinc-300 font-mono text-sm">
+                      <td className="px-4 py-2 text-right tabular-nums text-zinc-400">
                         {formatCurrency(tx.runningBalance, account.currency)}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        {tx.isReconciled ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-400">
-                            Cleared
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-700 text-zinc-400">
-                            Pending
-                          </span>
-                        )}
+                      <td className="px-4 py-2 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
+                          tx.isReconciled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                        }`}>
+                          {tx.isReconciled ? 'Yes' : 'No'}
+                        </span>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </main>
 
-      {/* Toast */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all ${
-            toast.type === 'ok'
-              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
-              : 'bg-red-500/10 border border-red-500/20 text-red-400'
-          }`}
-        >
-          {toast.msg}
-        </div>
-      )}
+        {/* FactBox Sidebar */}
+        <aside className="w-72 shrink-0 border-l border-zinc-800/50 p-4 space-y-4 bg-[#0f0f1a]">
+          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/30">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Statistics</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Current Balance</div>
+                <div className={`text-xl font-bold tabular-nums ${account.currentBalance < 0 ? 'text-red-400' : 'text-zinc-100'}`}>
+                  {formatCurrency(account.currentBalance, account.currency)}
+                </div>
+              </div>
+              <div className="pt-2 border-t border-zinc-800/50 space-y-2">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-zinc-500">Total Transactions</span>
+                  <span className="text-zinc-200 font-semibold">{account._count.transactions}</span>
+                </div>
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-zinc-500">Unreconciled</span>
+                  <span className={`font-semibold ${unreconciledCount > 0 ? 'text-amber-400' : 'text-zinc-200'}`}>
+                    {unreconciledCount}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-zinc-500">Last Statement</span>
+                  <span className="text-zinc-200">{account.lastStatementNo ?? '—'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </>
+  )
+}
+
+function Field({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">{label}</div>
+      <div className="text-[13px] text-zinc-200">{children ?? value ?? '—'}</div>
     </div>
   )
 }

@@ -1,49 +1,43 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { initCrmTables, cuid } from '@/lib/crm-db'
 
-export async function GET() {
-  try {
-    const contacts = await prisma.contact.findMany({
-      include: {
-        customer: { select: { id: true, firstName: true, lastName: true } },
-        _count: { select: { opportunities: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-    return NextResponse.json(contacts)
-  } catch (err) {
-    console.error(err)
-    return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 })
-  }
+export async function GET(req: NextRequest) {
+  await initCrmTables()
+  const { searchParams } = new URL(req.url)
+  const search = searchParams.get('search') ?? ''
+  const type = searchParams.get('type') ?? ''
+  const salesperson = searchParams.get('salesperson') ?? ''
+  const territory = searchParams.get('territory') ?? ''
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = await prisma.$queryRaw`
+    SELECT * FROM BCContact
+    WHERE (${search} = '' OR name LIKE ${'%' + search + '%'} OR email LIKE ${'%' + search + '%'} OR contactNo LIKE ${'%' + search + '%'})
+      AND (${type} = '' OR contactType = ${type})
+      AND (${salesperson} = '' OR salesperson = ${salesperson})
+      AND (${territory} = '' OR territory = ${territory})
+    ORDER BY lastModified DESC
+  `
+  return NextResponse.json(rows)
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const { firstName, lastName, email, phone, company, title, customerId, notes } = body
+  await initCrmTables()
+  const body = await req.json()
+  const { name, contactType, companyName, phone, email, salesperson, territory } = body
+  if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 })
 
-    if (!firstName || !lastName) {
-      return NextResponse.json({ error: 'firstName and lastName are required' }, { status: 400 })
-    }
-
-    const contact = await prisma.contact.create({
-      data: {
-        firstName,
-        lastName,
-        email: email ?? null,
-        phone: phone ?? null,
-        company: company ?? null,
-        title: title ?? null,
-        customerId: customerId ?? null,
-        notes: notes ?? null,
-      },
-      include: {
-        customer: { select: { id: true, firstName: true, lastName: true } },
-      },
-    })
-    return NextResponse.json(contact, { status: 201 })
-  } catch (err) {
-    console.error(err)
-    return NextResponse.json({ error: 'Failed to create contact' }, { status: 500 })
-  }
+  const id = cuid()
+  const contactNo = 'CT' + Date.now().toString().slice(-6)
+  await prisma.$executeRaw`
+    INSERT INTO BCContact (id, contactNo, name, contactType, companyName, phone, email, salesperson, territory)
+    VALUES (${id}, ${contactNo}, ${name}, ${contactType ?? 'Company'}, ${companyName ?? null},
+            ${phone ?? null}, ${email ?? null}, ${salesperson ?? null}, ${territory ?? null})
+  `
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = await prisma.$queryRaw`SELECT * FROM BCContact WHERE id = ${id}`
+  return NextResponse.json(rows[0], { status: 201 })
 }

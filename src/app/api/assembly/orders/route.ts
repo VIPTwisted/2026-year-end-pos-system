@@ -4,18 +4,16 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
-  const storeId = searchParams.get('storeId')
+  const itemNo = searchParams.get('itemNo')
 
   const orders = await prisma.assemblyOrder.findMany({
     where: {
       ...(status ? { status } : {}),
-      ...(storeId ? { storeId } : {}),
+      ...(itemNo ? { itemNo } : {}),
     },
     include: {
-      product: { select: { id: true, name: true, sku: true } },
-      store: { select: { id: true, name: true } },
-      bom: { select: { id: true, type: true } },
-      lines: { include: { component: { select: { id: true, name: true, sku: true } } } },
+      bom: { select: { id: true, bomNo: true, versionCode: true } },
+      lines: { orderBy: { lineNo: 'asc' } },
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -23,59 +21,58 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
+  try {
+    const body = await req.json()
 
-  // Auto-number: ASM-YYYY-NNNN
-  const year = new Date().getFullYear()
-  const prefix = `ASM-${year}-`
-  const last = await prisma.assemblyOrder.findFirst({
-    where: { orderNumber: { startsWith: prefix } },
-    orderBy: { orderNumber: 'desc' },
-    select: { orderNumber: true },
-  })
-  const seq = last ? parseInt(last.orderNumber.slice(prefix.length)) + 1 : 1
-  const orderNumber = `${prefix}${String(seq).padStart(4, '0')}`
+    // Auto-number: ASM-YYYY-NNNN
+    const year = new Date().getFullYear()
+    const prefix = `ASM-${year}-`
+    const last = await prisma.assemblyOrder.findFirst({
+      where: { orderNo: { startsWith: prefix } },
+      orderBy: { orderNo: 'desc' },
+      select: { orderNo: true },
+    })
+    const seq = last ? parseInt(last.orderNo.slice(prefix.length)) + 1 : 1
+    const orderNo = `${prefix}${String(seq).padStart(4, '0')}`
 
-  // Fetch BOM if available for the product to auto-populate lines
-  const bom = await prisma.assemblyBOM.findUnique({
-    where: { productId: body.productId },
-    include: { lines: true },
-  })
-
-  const order = await prisma.assemblyOrder.create({
-    data: {
-      orderNumber,
-      productId: body.productId,
-      bomId: bom?.id ?? body.bomId ?? null,
-      quantity: body.quantity,
-      quantityToAssemble: body.quantityToAssemble ?? 0,
-      dueDate: body.dueDate ? new Date(body.dueDate) : null,
-      storeId: body.storeId,
-      notes: body.notes ?? null,
-      status: 'open',
-      lines: bom
-        ? {
-            create: bom.lines.map(l => ({
-              componentId: l.componentId,
-              quantity: l.quantity * (body.quantity ?? 1),
-              unitOfMeasure: l.unitOfMeasure,
-            })),
-          }
-        : body.lines
-        ? {
-            create: body.lines.map((l: { componentId: string; quantity: number; unitOfMeasure?: string }) => ({
-              componentId: l.componentId,
-              quantity: l.quantity,
-              unitOfMeasure: l.unitOfMeasure ?? 'EACH',
-            })),
-          }
-        : undefined,
-    },
-    include: {
-      product: { select: { id: true, name: true, sku: true } },
-      store: { select: { id: true, name: true } },
-      lines: { include: { component: { select: { id: true, name: true, sku: true } } } },
-    },
-  })
-  return NextResponse.json(order, { status: 201 })
+    const order = await prisma.assemblyOrder.create({
+      data: {
+        orderNo,
+        itemNo: body.itemNo ?? null,
+        description: body.description ?? null,
+        qtyToAssemble: body.qtyToAssemble ?? 1,
+        unitOfMeasure: body.unitOfMeasure ?? 'EACH',
+        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        locationCode: body.locationCode ?? null,
+        bomId: body.bomId ?? null,
+        bomVersionCode: body.bomVersionCode ?? '1',
+        notes: body.notes ?? null,
+        status: 'Open',
+        lines: body.lines && Array.isArray(body.lines)
+          ? {
+              create: body.lines.map((l: {
+                lineNo?: number; type?: string; componentNo?: string; description?: string;
+                qtyPer?: number; quantity?: number; unitOfMeasure?: string; unitCost?: number
+              }) => ({
+                lineNo: l.lineNo ?? 1,
+                type: l.type ?? 'Item',
+                componentNo: l.componentNo ?? null,
+                description: l.description ?? null,
+                qtyPer: l.qtyPer ?? 1,
+                quantity: l.quantity ?? l.qtyPer ?? 1,
+                unitOfMeasure: l.unitOfMeasure ?? 'EACH',
+                unitCost: l.unitCost ?? 0,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        bom: { select: { id: true, bomNo: true } },
+        lines: { orderBy: { lineNo: 'asc' } },
+      },
+    })
+    return NextResponse.json(order, { status: 201 })
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Create failed' }, { status: 500 })
+  }
 }

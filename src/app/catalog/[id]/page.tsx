@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { ChevronLeft, BookOpen, Tag, Package, Globe, FileText, Archive } from 'lucide-react'

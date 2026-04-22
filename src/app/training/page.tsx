@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { TopBar } from '@/components/layout/TopBar'
 import { TRAINING_MODULES } from '@/lib/training-data'
 import { TrainingHub } from './TrainingHub'

@@ -21,16 +21,84 @@ model Store {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  employees         Employee[]
-  orders            Order[]
-  inventory         Inventory[]
-  shifts            Shift[]
-  purchaseOrders    PurchaseOrder[]
-  workOrders        WorkOrder[]
-  posShifts         PosShift[]
-  warehouseZones    WarehouseZone[]
-  salesQuotes       SalesQuote[]
-  productionOrders  ProductionOrder[]
+  employees             Employee[]
+  orders                Order[]
+  inventory             Inventory[]
+  shifts                Shift[]
+  purchaseOrders        PurchaseOrder[]
+  workOrders            WorkOrder[]
+  posShifts             PosShift[]
+  warehouseZones        WarehouseZone[]
+  warehouseBins         WarehouseBin[]
+  warehouseReceipts     WarehouseReceipt[]
+  warehouseShipments    WarehouseShipment[]
+  warehousePicks        WarehousePick[]
+  warehousePutAways     WarehousePutAway[]
+  warehouseMovements    WarehouseMovement[]
+  warehouseInternalPicks WarehouseInternalPick[]
+  salesQuotes           SalesQuote[]
+  productionOrders      ProductionOrder[]
+  generalJournals       GeneralJournal[]
+  shopifyStores         ShopifyStore[]
+  storeCommerceDevices  StoreCommerceDevice[]
+  networkPrinters       NetworkPrinter[]
+  transfersFrom         TransferOrder[]        @relation("TransferFromStore")
+  transfersTo           TransferOrder[]        @relation("TransferToStore")
+}
+
+model ShopifyStore {
+  id              String   @id @default(cuid())
+  storeId         String?
+  shopDomain      String   @unique
+  accessToken     String?
+  storefrontToken String?
+  webhookSecret   String?
+  syncProducts    Boolean  @default(true)
+  syncCustomers   Boolean  @default(true)
+  syncOrders      Boolean  @default(true)
+  syncInventory   Boolean  @default(true)
+  lastSyncAt      DateTime?
+  status          String   @default("disconnected")
+  errorMessage    String?
+  productCount    Int      @default(0)
+  customerCount   Int      @default(0)
+  orderCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  store           Store?   @relation(fields: [storeId], references: [id])
+  syncLogs        ShopifySyncLog[]
+}
+
+model ShopifySyncLog {
+  id             String   @id @default(cuid())
+  shopifyStoreId String
+  syncType       String
+  status         String
+  recordsSync    Int      @default(0)
+  errorMsg       String?
+  startedAt      DateTime @default(now())
+  endedAt        DateTime?
+  shopifyStore   ShopifyStore @relation(fields: [shopifyStoreId], references: [id], onDelete: Cascade)
+}
+
+model StoreCommerceDevice {
+  id               String   @id @default(cuid())
+  deviceId         String   @unique
+  deviceName       String
+  deviceType       String   @default("StoreCommerce")
+  storeId          String?
+  registerId       String?
+  activationStatus String   @default("inactive")
+  activationCode   String?
+  cloudPOSUrl      String?
+  hardwareProfileId String?
+  offlineEnabled   Boolean  @default(false)
+  lastSeenAt       DateTime?
+  appVersion       String?
+  osInfo           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  store            Store?   @relation(fields: [storeId], references: [id])
 }
 
 model User {
@@ -65,6 +133,203 @@ model Employee {
   shifts         Shift[]
   payrollEntries PayrollEntry[]
   goals          EmployeeGoal[]
+  selfServiceRequests    SelfServiceRequest[]
+  accrualEnrollments     LeaveAccrualEnrollment[]
+  questionnaireResponses QuestionnaireResponse[]
+  lifeEvents             LifeEvent[]
+  fmlaRequests           FMLARequest[]
+  i9Verification         I9Verification?
+  garnishments           Garnishment[]
+  performanceGoals       PerformanceGoal[]
+}
+
+// ─── MODULE: Life Events ────────────────────────────────────────────────────
+
+model LifeEvent {
+  id            String   @id @default(cuid())
+  employeeId    String
+  eventType     String   // marriage | divorce | birth | adoption | death | address_change | spouse_job_loss
+  eventDate     DateTime
+  status        String   @default("pending") // pending | in_review | approved | processed | expired
+  documentation String?
+  changesJson   String?
+  processedBy   String?
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  employee      Employee @relation(fields: [employeeId], references: [id])
+}
+
+// ─── MODULE: FMLA Requests ──────────────────────────────────────────────────
+
+model FMLARequest {
+  id               String   @id @default(cuid())
+  employeeId       String
+  requestType      String   @default("continuous") // continuous | intermittent | reduced_schedule
+  fmlaReason       String   // serious_health | family_member | military | birth_adoption
+  startDate        DateTime
+  endDate          DateTime?
+  hoursApproved    Float?
+  hoursUsed        Float    @default(0)
+  status           String   @default("pending") // pending | approved | denied | active | exhausted | closed
+  certificationDue DateTime?
+  certReceived     Boolean  @default(false)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  employee         Employee @relation(fields: [employeeId], references: [id])
+}
+
+// ─── MODULE: I-9 Verification ───────────────────────────────────────────────
+
+model I9Verification {
+  id             String   @id @default(cuid())
+  employeeId     String   @unique
+  hireDate       DateTime
+  section1Date   DateTime?
+  section2Date   DateTime?
+  reVerifyDate   DateTime?
+  listADoc       String?
+  listBDoc       String?
+  listCDoc       String?
+  status         String   @default("pending") // pending | complete | reverify_needed | expired
+  expirationDate DateTime?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  employee       Employee @relation(fields: [employeeId], references: [id])
+}
+
+// ─── MODULE: Garnishments ───────────────────────────────────────────────────
+
+model Garnishment {
+  id           String   @id @default(cuid())
+  employeeId   String
+  caseNumber   String?
+  garnishType  String   // child_support | alimony | tax_levy | creditor | student_loan
+  issuingState String?
+  agency       String?
+  amount       Float    @default(0)
+  amountType   String   @default("fixed") // fixed | percent
+  maxPercent   Float?
+  startDate    DateTime
+  endDate      DateTime?
+  status       String   @default("active") // active | suspended | completed
+  totalPaid    Float    @default(0)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  employee     Employee @relation(fields: [employeeId], references: [id])
+}
+
+// ─── MODULE: Performance Goals ──────────────────────────────────────────────
+
+model PerformanceGoal {
+  id            String   @id @default(cuid())
+  employeeId    String
+  title         String
+  description   String?
+  category      String   @default("individual") // individual | team | company
+  status        String   @default("active") // draft | active | completed | cancelled
+  targetDate    DateTime?
+  completedAt   DateTime?
+  progressPct   Int      @default(0)
+  priority      String   @default("medium") // low | medium | high
+  reviewCycleId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  employee      Employee @relation(fields: [employeeId], references: [id])
+}
+
+model SelfServiceRequest {
+  id            String    @id @default(cuid())
+  employeeId    String
+  requestType   String
+  status        String    @default("pending")
+  details       String?
+  attachmentUrl String?
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  employee      Employee  @relation(fields: [employeeId], references: [id])
+}
+
+model LeaveAccrualPlan {
+  id                String    @id @default(cuid())
+  name              String
+  leaveTypeId       String?
+  accrualFrequency  String    @default("monthly")
+  accrualAmount     Float     @default(0)
+  maxBalance        Float?
+  carryOverLimit    Float?
+  waitingPeriodDays Int       @default(0)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  enrollments       LeaveAccrualEnrollment[]
+}
+
+model LeaveAccrualEnrollment {
+  id             String    @id @default(cuid())
+  planId         String
+  employeeId     String
+  startDate      DateTime
+  currentBalance Float     @default(0)
+  totalAccrued   Float     @default(0)
+  totalUsed      Float     @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  plan           LeaveAccrualPlan @relation(fields: [planId], references: [id])
+  employee       Employee         @relation(fields: [employeeId], references: [id])
+}
+
+model Questionnaire {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  type        String    @default("survey")
+  status      String    @default("draft")
+  anonymous   Boolean   @default(false)
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  questions   QuestionnaireQuestion[]
+  responses   QuestionnaireResponse[]
+}
+
+model QuestionnaireQuestion {
+  id              String    @id @default(cuid())
+  questionnaireId String
+  sortOrder       Int
+  questionText    String
+  questionType    String    @default("text")
+  required        Boolean   @default(true)
+  optionsJson     String?
+  createdAt       DateTime  @default(now())
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  answers         QuestionnaireAnswer[]
+}
+
+model QuestionnaireResponse {
+  id              String    @id @default(cuid())
+  questionnaireId String
+  employeeId      String?
+  submittedAt     DateTime  @default(now())
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id])
+  employee        Employee?     @relation(fields: [employeeId], references: [id])
+  answers         QuestionnaireAnswer[]
+}
+
+model QuestionnaireAnswer {
+  id          String    @id @default(cuid())
+  responseId  String
+  questionId  String
+  answerText  String?
+  answerValue Float?
+  createdAt   DateTime  @default(now())
+  response    QuestionnaireResponse    @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question    QuestionnaireQuestion    @relation(fields: [questionId], references: [id])
 }
 
 model Shift {
@@ -135,6 +400,15 @@ model Product {
   productionOrders   ProductionOrder[]   @relation("ProductionOrderProduct")
   productionLines    ProductionOrderLine[] @relation("ProductionOrderLineProduct")
   subcontractingLines SubcontractingLine[] @relation("SubcontractingLineProduct")
+  engineeringChanges EngineeringChangeLine[]
+  whReceiptLines     WarehouseReceiptLine[]
+  whShipmentLines    WarehouseShipmentLine[]
+  whActivityLines    WarehouseActivityLine[]
+  whPickLines        WarehousePickLine[]
+  whPutAwayLines     WarehousePutAwayLine[]
+  whMovementLines    WarehouseMovementLine[]
+  whInternalPickLines WarehouseInternalPickLine[]
+  whBinContents      WarehouseBinContent[]
 }
 
 model ProductAttribute {
@@ -250,9 +524,16 @@ model Customer {
   projects           Project[]
   contracts          Contract[]
   salesQuotes        SalesQuote[]
+  salesOrders        SalesOrder[]      @relation("SalesOrderSellTo")
+  salesInvoices      SalesInvoice[]    @relation("SalesInvoiceSellTo")
+  salesCreditMemos   SalesCreditMemo[] @relation("SalesCreditMemoSellTo")
+  salesReturnOrders  SalesReturnOrder[] @relation("SalesReturnOrderSellTo")
   serviceContracts   ServiceContract[] @relation("CustomerServiceContracts")
   serviceItems       ServiceItem[]     @relation("CustomerServiceItems")
   serviceOrders      ServiceOrder[]    @relation("CustomerServiceOrders")
+  segmentMemberships ContactSegmentMember[]
+  proformaInvoices   ProformaInvoice[]
+  subscriptionOrders SubscriptionOrder[]
 }
 
 model Order {
@@ -605,6 +886,64 @@ model JournalLine {
   account Account      @relation(fields: [accountId], references: [id])
 }
 
+// ─── Business Central: G/L Entries (read-only ledger) ────────────────────────
+
+model GlEntry {
+  id            String   @id @default(cuid())
+  entryNo       Int      @default(0)
+  postingDate   DateTime @default(now())
+  documentType  String?  // Invoice | Credit Memo | Payment | Refund | General
+  documentNo    String?
+  accountId     String?
+  accountNo     String?
+  accountName   String?
+  description   String?
+  debitAmount   Float    @default(0)
+  creditAmount  Float    @default(0)
+  amount        Float    @default(0)
+  vatAmount     Float    @default(0)
+  sourceCode    String?
+  reasonCode    String?
+  userId        String?
+  journalId     String?
+  fiscalYear    String?
+  periodNo      Int?
+  open          Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+// ─── Business Central: Accounting Periods ────────────────────────────────────
+
+model AccountingPeriod {
+  id               String   @id @default(cuid())
+  startingDate     DateTime @unique
+  name             String
+  newFiscalYear    Boolean  @default(false)
+  closed           Boolean  @default(false)
+  dateLocked       Boolean  @default(false)
+  inventoryClosed  Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ─── Business Central: Cost Types (Cost Accounting) ──────────────────────────
+
+model CostType {
+  id              String   @id @default(cuid())
+  no              String   @unique
+  name            String
+  type            String   @default("cost_type")  // cost_type | heading | total | begin_total | end_total
+  glAccountRange  String?
+  costCenterId    String?
+  blocked         Boolean  @default(false)
+  indentation     Int      @default(0)
+  totalingRange   String?
+  netChange       Float    @default(0)
+  balance         Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 // ─── Business Central: Vendor / AP ───────────────────────────────────────────
 
 model VendorGroup {
@@ -645,6 +984,8 @@ model Vendor {
   purchaseOrders       VendorPO[]
   scorecards           VendorScorecard[]
   subcontractingOrders SubcontractingOrder[]
+  incomingDocuments    IncomingDocument[]
+  projectSubcontracts  ProjectSubcontract[]
 }
 
 model VendorInvoice {
@@ -772,22 +1113,42 @@ model CustomerPaymentSettlement {
 // ─── Business Central: Bank & Cash Management ─────────────────────────────────
 
 model BankAccount {
-  id             String   @id @default(cuid())
-  accountCode    String   @unique
-  bankName       String
-  accountNumber  String
-  accountType    String   @default("checking")  // checking | savings
-  currency       String   @default("USD")
-  currentBalance Float    @default(0)
-  glAccountId    String?
-  isActive       Boolean  @default(true)
-  isPrimary      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  accountCode     String   @unique
+  name            String?
+  bankName        String
+  accountNumber   String
+  routingNumber   String?
+  accountType     String   @default("checking")  // checking | savings | credit_line
+  currency        String   @default("USD")
+  currentBalance  Float    @default(0)
+  glAccountId     String?
+  isActive        Boolean  @default(true)
+  isPrimary       Boolean  @default(false)
+  // Communication
+  contactName     String?
+  phone           String?
+  email           String?
+  address         String?
+  city            String?
+  state           String?
+  zip             String?
+  country         String?
+  // Transfer / SWIFT
+  swiftCode       String?
+  ibanNumber      String?
+  // Posting
+  lastStatementNo String?
+  lastStatementDate DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  glAccount      Account?          @relation(fields: [glAccountId], references: [id])
-  statements     BankStatement[]
-  vendorPayments VendorPayment[]
+  glAccount        Account?             @relation(fields: [glAccountId], references: [id])
+  statements       BankStatement[]
+  vendorPayments   VendorPayment[]
+  reconciliations  BankReconciliation[]
+  transactions     BankTransaction[]
 }
 
 model BankStatement {
@@ -5086,32 +5447,49 @@ model SalesOpportunityProduct {
 }
 
 model SalesQuote {
-  id               String           @id @default(cuid())
-  quoteNumber      String           @unique
-  customerId       String?
-  storeId          String?
-  status           String           @default("draft")
-  validUntil       DateTime?
-  subtotal         Float            @default(0)
-  discountAmount   Float            @default(0)
-  taxAmount        Float            @default(0)
-  total            Float            @default(0)
-  notes            String?
-  terms            String?
-  convertedOrderId String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id                  String           @id @default(cuid())
+  quoteNumber         String           @unique
+  // D365 BC fields
+  sellToCustomerId    String?
+  sellToCustomerName  String?
+  billToCustomerId    String?
+  billToCustomerName  String?
+  externalDocNo       String?
+  salespersonCode     String?
+  customerId          String?
+  storeId             String?
+  status              String           @default("Open")  // Open | Sent | Accepted | Rejected
+  quoteDate           DateTime         @default(now())
+  postingDate         DateTime         @default(now())
+  validUntil          DateTime?
+  // Ship-to
+  shipToName          String?
+  shipToAddress       String?
+  shippingAgentCode   String?
+  // Totals
+  subtotal            Float            @default(0)
+  discountAmount      Float            @default(0)
+  taxAmount           Float            @default(0)
+  total               Float            @default(0)
+  // Legacy
+  notes               String?
+  terms               String?
+  convertedOrderId    String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
-  customer Customer?        @relation(fields: [customerId], references: [id])
-  store    Store?           @relation(fields: [storeId], references: [id])
-  lines    SalesQuoteLine[]
+  customer            Customer?        @relation(fields: [customerId], references: [id])
+  store               Store?           @relation(fields: [storeId], references: [id])
+  lines               SalesQuoteLine[]
 }
 
 model SalesQuoteLine {
   id          String      @id @default(cuid())
   quoteId     String
   productId   String?
-  productName String
+  lineType    String      @default("Item")
+  itemNo      String?
+  productName String      @default("")
   description String?
   quantity    Float       @default(1)
   unitPrice   Float       @default(0)
@@ -5124,57 +5502,190 @@ model SalesQuoteLine {
 }
 
 model SalesOrder {
-  id          String          @id @default(cuid())
-  orderNumber String          @unique @default(cuid())
-  accountName String?
-  quoteId     String?
-  status      String          @default("new")
-  dueDate     DateTime?
-  totalAmount Float           @default(0)
-  notes       String?
-  ownerId     String?
-  items       SalesOrderItem[]
-  invoices    SalesInvoice[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id                  String           @id @default(cuid())
+  orderNumber         String           @unique @default(cuid())
+  // D365 BC fields
+  sellToCustomerId    String?
+  sellToCustomerName  String?
+  billToCustomerId    String?
+  billToCustomerName  String?
+  quoteId             String?
+  externalDocNo       String?
+  salespersonCode     String?
+  status              String           @default("Open")   // Open | Released | Pending Approval | Pending Prepayment
+  orderDate           DateTime         @default(now())
+  postingDate         DateTime         @default(now())
+  // Ship-to
+  shipToName          String?
+  shipToAddress       String?
+  shipToCity          String?
+  shipToState         String?
+  shipToZip           String?
+  shippingAgentCode   String?
+  // Totals
+  subtotal            Float            @default(0)
+  discountAmount      Float            @default(0)
+  taxAmount           Float            @default(0)
+  totalAmount         Float            @default(0)
+  // Legacy
+  accountName         String?
+  dueDate             DateTime?
+  notes               String?
+  ownerId             String?
+  items               SalesOrderItem[]
+  invoices            SalesInvoice[]
+  shipments           SalesShipment[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  sellToCustomer      Customer?        @relation("SalesOrderSellTo", fields: [sellToCustomerId], references: [id])
 }
 
 model SalesOrderItem {
   id           String     @id @default(cuid())
   orderId      String
-  order        SalesOrder @relation(fields: [orderId], references: [id])
-  productName  String
+  order        SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineType     String     @default("Item")  // Item | G/L Account | Resource | Comment
+  itemNo       String?
+  description  String     @default("")
   quantity     Float      @default(1)
-  pricePerUnit Float
-  lineTotal    Float
+  unitPrice    Float      @default(0)
+  discountPct  Float      @default(0)
+  lineTotal    Float      @default(0)
+  // Legacy compat
+  productName  String     @default("")
+  pricePerUnit Float      @default(0)
   createdAt    DateTime   @default(now())
 }
 
 model SalesInvoice {
-  id            String             @id @default(cuid())
-  invoiceNumber String             @unique @default(cuid())
-  accountName   String?
-  orderId       String?
-  order         SalesOrder?        @relation(fields: [orderId], references: [id])
-  status        String             @default("draft")
-  dueDate       DateTime?
-  totalAmount   Float              @default(0)
-  paidAmount    Float              @default(0)
-  notes         String?
-  items         SalesInvoiceItem[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  invoiceNumber       String             @unique @default(cuid())
+  // D365 BC fields
+  sellToCustomerId    String?
+  sellToCustomerName  String?
+  externalDocNo       String?
+  salespersonCode     String?
+  orderId             String?
+  order               SalesOrder?        @relation(fields: [orderId], references: [id])
+  status              String             @default("Open")  // Open | Released | Posted | Cancelled
+  postingDate         DateTime           @default(now())
+  dueDate             DateTime?
+  // Totals
+  subtotal            Float              @default(0)
+  discountAmount      Float              @default(0)
+  taxAmount           Float              @default(0)
+  totalAmount         Float              @default(0)
+  remainingAmount     Float              @default(0)
+  paidAmount          Float              @default(0)
+  // Legacy
+  accountName         String?
+  notes               String?
+  items               SalesInvoiceItem[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  sellToCustomer      Customer?          @relation("SalesInvoiceSellTo", fields: [sellToCustomerId], references: [id])
 }
 
 model SalesInvoiceItem {
   id           String       @id @default(cuid())
   invoiceId    String
-  invoice      SalesInvoice @relation(fields: [invoiceId], references: [id])
-  productName  String
+  invoice      SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  lineType     String       @default("Item")
+  itemNo       String?
+  description  String       @default("")
   quantity     Float        @default(1)
-  pricePerUnit Float
-  lineTotal    Float
+  unitPrice    Float        @default(0)
+  discountPct  Float        @default(0)
+  lineTotal    Float        @default(0)
+  // Legacy compat
+  productName  String       @default("")
+  pricePerUnit Float        @default(0)
   createdAt    DateTime     @default(now())
+}
+
+model SalesCreditMemo {
+  id                  String                @id @default(cuid())
+  creditMemoNo        String                @unique @default(cuid())
+  sellToCustomerId    String?
+  sellToCustomerName  String?
+  externalDocNo       String?
+  salespersonCode     String?
+  status              String                @default("Open")  // Open | Released | Posted
+  postingDate         DateTime              @default(now())
+  dueDate             DateTime?
+  subtotal            Float                 @default(0)
+  discountAmount      Float                 @default(0)
+  taxAmount           Float                 @default(0)
+  totalAmount         Float                 @default(0)
+  notes               String?
+  lines               SalesCreditMemoLine[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  sellToCustomer      Customer?             @relation("SalesCreditMemoSellTo", fields: [sellToCustomerId], references: [id])
+}
+
+model SalesCreditMemoLine {
+  id           String          @id @default(cuid())
+  creditMemoId String
+  creditMemo   SalesCreditMemo @relation(fields: [creditMemoId], references: [id], onDelete: Cascade)
+  lineType     String          @default("Item")
+  itemNo       String?
+  description  String          @default("")
+  quantity     Float           @default(1)
+  unitPrice    Float           @default(0)
+  discountPct  Float           @default(0)
+  lineTotal    Float           @default(0)
+  createdAt    DateTime        @default(now())
+}
+
+model SalesReturnOrder {
+  id                  String                @id @default(cuid())
+  returnNo            String                @unique @default(cuid())
+  sellToCustomerId    String?
+  sellToCustomerName  String?
+  externalDocNo       String?
+  status              String                @default("Open")  // Open | Released | Posted
+  returnDate          DateTime              @default(now())
+  postingDate         DateTime              @default(now())
+  subtotal            Float                 @default(0)
+  totalAmount         Float                 @default(0)
+  notes               String?
+  lines               SalesReturnOrderLine[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  sellToCustomer      Customer?             @relation("SalesReturnOrderSellTo", fields: [sellToCustomerId], references: [id])
+}
+
+model SalesReturnOrderLine {
+  id             String           @id @default(cuid())
+  returnOrderId  String
+  returnOrder    SalesReturnOrder @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  lineType       String           @default("Item")
+  itemNo         String?
+  description    String           @default("")
+  quantity       Float            @default(1)
+  unitPrice      Float            @default(0)
+  lineTotal      Float            @default(0)
+  createdAt      DateTime         @default(now())
+}
+
+model SalesShipment {
+  id                  String   @id @default(cuid())
+  shipmentNo          String   @unique @default(cuid())
+  orderId             String?
+  order               SalesOrder? @relation(fields: [orderId], references: [id])
+  sellToCustomerName  String?
+  postingDate         DateTime @default(now())
+  shipToName          String?
+  shipToAddress       String?
+  shippingAgentCode   String?
+  status              String   @default("Posted")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Competitor {
@@ -5746,10 +6257,15 @@ model Project {
   tasks         ProjectTask[]
   planningLines ProjectPlanLine[]
   ledgerEntries ProjectLedgerEntry[]
-  invoices      ProjectInvoice[]
-  timesheets    TimeSheet[]
-  budgetLines   ProjectBudgetLine[]
-  actuals       ProjectActual[]
+  invoices         ProjectInvoice[]
+  timesheets       TimeSheet[]
+  budgetLines      ProjectBudgetLine[]
+  actuals          ProjectActual[]
+  proformaInvoices ProformaInvoice[]
+  invoiceProposals ProjectInvoiceProposal[]
+  projectSubcontracts ProjectSubcontract[]
+  retentionSchedules  VendorRetentionSchedule[]
+  fundingSources      ProjectFundingSource[]
 }
 
 model ProjectTask {
@@ -6527,7 +7043,8 @@ model WarehouseZone {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  store Store @relation(fields: [storeId], references: [id])
+  store Store        @relation(fields: [storeId], references: [id])
+  bins  WarehouseBin[]
 
   @@unique([storeId, code])
 }
@@ -6558,21 +7075,79 @@ model AgentPresence {
 }
 
 model AssemblyBOM {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  bomNo           String   @unique
+  description     String?
+  itemNo          String?
+  unitOfMeasure   String   @default("EACH")
+  versionCode     String   @default("1")
+  status          String   @default("Certified") // Certified | Under Development | Closed
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lines  AssemblyBOMLine[]
+  orders AssemblyOrder[]
+}
+
+model AssemblyBOMLine {
+  id            String      @id @default(cuid())
+  bomId         String
+  lineNo        Int         @default(1)
+  type          String      @default("Item")    // Item | Resource
+  componentNo   String?
+  description   String?
+  qtyPer        Float       @default(1)
+  unitOfMeasure String      @default("EACH")
+  leadTimeDays  Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  bom AssemblyBOM @relation(fields: [bomId], references: [id], onDelete: Cascade)
 }
 
 model AssemblyOrder {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  orderNo            String    @unique
+  itemNo             String?
+  description        String?
+  qtyToAssemble      Float     @default(1)
+  qtyAssembled       Float     @default(0)
+  unitOfMeasure      String    @default("EACH")
+  dueDate            DateTime?
+  startingDate       DateTime?
+  endingDate         DateTime?
+  locationCode       String?
+  binCode            String?
+  bomId              String?
+  bomVersionCode     String    @default("1")
+  status             String    @default("Open") // Open | Released | In Progress | Finished
+  isPosted           Boolean   @default(false)
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  bom   AssemblyBOM?       @relation(fields: [bomId], references: [id])
+  lines AssemblyOrderLine[]
 }
 
 model AssemblyOrderLine {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String        @id @default(cuid())
+  orderId         String
+  lineNo          Int           @default(1)
+  type            String        @default("Item")
+  componentNo     String?
+  description     String?
+  qtyPer          Float         @default(1)
+  quantity        Float         @default(1)
+  qtyConsumed     Float         @default(0)
+  availableQty    Float         @default(0)
+  unitOfMeasure   String        @default("EACH")
+  unitCost        Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  order AssemblyOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -6582,15 +7157,35 @@ model AuditLog {
 }
 
 model BankReconciliation {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(cuid())
+  bankAccountId  String
+  statementDate  DateTime
+  statementNo    String?
+  openingBalance Float     @default(0)
+  closingBalance Float     @default(0)
+  status         String    @default("open")   // open | completed
+  reconciledAt   DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  bankAccount    BankAccount @relation(fields: [bankAccountId], references: [id])
+  lines          BankReconciliationLine[]
 }
 
 model BankTransaction {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(cuid())
+  bankAccountId  String
+  date           DateTime  @default(now())
+  description    String
+  amount         Float
+  runningBalance Float     @default(0)
+  reference      String?
+  category       String?
+  isReconciled   Boolean   @default(false)
+  reconciledAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  bankAccount    BankAccount @relation(fields: [bankAccountId], references: [id])
 }
 
 model BenefitEnrollment {
@@ -6660,15 +7255,46 @@ model CaseSurvey {
 }
 
 model CashFlowForecast {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  name                String?
+  description         String?
+  forecastDate        DateTime  @default(now())
+  includeAR           Boolean   @default(true)
+  includeAP           Boolean   @default(true)
+  includeSalesOrders  Boolean   @default(true)
+  includePOs          Boolean   @default(true)
+  includePayroll      Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  manualLines CashFlowManualLine[]
 }
 
 model CashFlowManualLine {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String    @id @default(cuid())
+  forecastId   String?
+  description  String
+  amount       Float     @default(0)
+  expectedDate DateTime  @default(now())
+  category     String    @default("other")  // ar | ap | payroll | tax | capex | other
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  forecast CashFlowForecast? @relation(fields: [forecastId], references: [id], onDelete: SetNull)
+}
+
+model CashFlowAccount {
+  id              String   @id @default(cuid())
+  accountNo       String   @unique
+  name            String
+  sourceType      String   @default("Liquid Funds") // Liquid Funds | Receivables | Sales Orders | Purch. Orders | Payroll | Fixed Assets | Manual | G/L Account
+  glIntegration   Boolean  @default(false)
+  glAccountNo     String?
+  description     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model CashManagementEntry {
@@ -6996,12 +7622,6 @@ model FulfillmentProviderInstance {
   updatedAt DateTime @updatedAt
 }
 
-model FulfillmentRule {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model GroupPricingRule {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -7027,15 +7647,46 @@ model InjuryCase {
 }
 
 model IntercompanyPartner {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  partnerCode     String   @unique
+  partnerName     String
+  partnerType     String   @default("Company")  // Company | Individual
+  inboxType       String   @default("Database") // Database | Email | File
+  inboxDetails    String?
+  outboxType      String   @default("Database")
+  autoAcceptTxns  Boolean  @default(false)
+  glAccountNo     String?
+  currency        String   @default("USD")
+  isActive        Boolean  @default(true)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions IntercompanyTransaction[]
 }
 
 model IntercompanyTransaction {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(cuid())
+  transactionNo   String    @unique
+  partnerId       String
+  direction       String    @default("sending")   // sending | receiving
+  type            String    @default("invoice")   // invoice | credit | payment | journal
+  documentNo      String?
+  documentType    String?
+  postingDate     DateTime  @default(now())
+  amount          Float     @default(0)
+  currency        String    @default("USD")
+  amountInBase    Float     @default(0)
+  glAccountNo     String?
+  description     String?
+  status          String    @default("pending")   // pending | posted | handled | rejected
+  isEliminated    Boolean   @default(false)
+  eliminatedAt    DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  partner IntercompanyPartner @relation(fields: [partnerId], references: [id])
 }
 
 model ItemCharge {
@@ -7075,12 +7726,6 @@ model LeavePlan {
 }
 
 model LeavePlanEnrollment {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model LifeEvent {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -7165,18 +7810,6 @@ model OrderQueue {
   updatedAt DateTime @updatedAt
 }
 
-model PerformanceGoal {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model PerformanceGoalReview {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model PhysicalCount {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -7190,15 +7823,18 @@ model PhysicalCountLine {
 }
 
 model PriceList {
-  id        String          @id @default(cuid())
-  name      String
-  currency  String          @default("USD")
-  startDate DateTime?
-  endDate   DateTime?
-  isActive  Boolean         @default(true)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  lines     PriceListLine[]
+  id          String          @id @default(cuid())
+  code        String          @unique @default(cuid())
+  name        String
+  description String?
+  currency    String          @default("USD")
+  status      String          @default("Draft")  // Draft | Active | Inactive
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  lines       PriceListLine[]
 }
 
 model PriceListLine {
@@ -7650,26 +8286,116 @@ model TradeAgreement {
 }
 
 model TransferLine {
-  id              String        @id @default(cuid())
-  transferOrderId String
-  productId       String?
-  quantity        Float         @default(0)
-  status          String        @default("draft")
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  transferOrder   TransferOrder @relation(fields: [transferOrderId], references: [id], onDelete: Cascade)
+  id               String        @id @default(cuid())
+  transferOrderId  String
+  orderId          String?
+  productId        String?
+  quantity         Float         @default(0)
+  quantityShipped  Float         @default(0)
+  quantityReceived Float         @default(0)
+  unitOfMeasure    String        @default("EACH")
+  status           String        @default("draft")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  transferOrder    TransferOrder @relation(fields: [transferOrderId], references: [id], onDelete: Cascade)
 }
 
 model TransferOrder {
   id             String         @id @default(cuid())
-  transferNumber String         @unique
+  orderNumber    String         @unique @default(cuid())
+  transferNumber String?
   fromStoreId    String?
   toStoreId      String?
+  inTransitCode  String?
   status         String         @default("draft")
   requestedDate  DateTime?
+  shipmentDate   DateTime?
+  receiptDate    DateTime?
+  notes          String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   lines          TransferLine[]
+  fromStore      Store?         @relation("TransferFromStore", fields: [fromStoreId], references: [id])
+  toStore        Store?         @relation("TransferToStore", fields: [toStoreId], references: [id])
+}
+
+model InventoryAdjustment {
+  id               String    @id @default(cuid())
+  journalTemplate  String    @default("ITEM")
+  journalBatch     String    @default("DEFAULT")
+  lineNo           Int       @default(1)
+  entryType        String    @default("Positive Adjmt.")
+  productId        String?
+  description      String?
+  locationCode     String?
+  quantity         Float     @default(0)
+  unitCost         Float     @default(0)
+  postingDate      DateTime  @default(now())
+  documentNo       String?
+  storeId          String?
+  status           String    @default("open")
+  postedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model ItemCategory {
+  id                       String         @id @default(cuid())
+  code                     String         @unique
+  description              String?
+  parentId                 String?
+  defCostingMethod         String?        @default("FIFO")
+  defGenProdPostingGroup   String?
+  indentationLevel         Int            @default(0)
+  isActive                 Boolean        @default(true)
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+  parent                   ItemCategory?  @relation("ItemCategoryTree", fields: [parentId], references: [id])
+  children                 ItemCategory[] @relation("ItemCategoryTree")
+}
+
+model UnitOfMeasure {
+  id                         String   @id @default(cuid())
+  code                       String   @unique
+  description                String?
+  internationalStandardCode  String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model ItemTrackingEntry {
+  id             String    @id @default(cuid())
+  productId      String?
+  entryType      String    @default("lot")
+  lotNo          String?
+  serialNo       String?
+  quantity       Float     @default(0)
+  remainingQty   Float     @default(0)
+  description    String?
+  expirationDate DateTime?
+  locationCode   String?
+  storeId        String?
+  openedAt       DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model PhysicalInventoryJournal {
+  id               String    @id @default(cuid())
+  journalBatch     String    @default("PHYS-INV")
+  postingDate      DateTime  @default(now())
+  documentNo       String?
+  productId        String?
+  description      String?
+  locationCode     String?
+  qtyCalculated    Float     @default(0)
+  qtyPhysInventory Float     @default(0)
+  unitCost         Float     @default(0)
+  storeId          String?
+  status           String    @default("open")
+  postedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model VariantAttributeAssignment {
@@ -7690,52 +8416,358 @@ model VendorReturn {
   updatedAt DateTime @updatedAt
 }
 
+// ─── WAREHOUSE ACTIVITY (Put-Away / Pick documents) ───────────────────────
 model WarehouseActivity {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String                @id @default(cuid())
+  activityNo        String                @unique
+  type              String                @default("put_away") // put_away | pick | movement
+  storeId           String?
+  assignedUserId    String?
+  locationCode      String?
+  sourceType        String?               // receipt | shipment | internal
+  sourceId          String?
+  status            String                @default("open") // open | in_progress | completed | cancelled
+  completedAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  receiptId         String?
+  shipmentId        String?
+  receipt           WarehouseReceipt?     @relation(fields: [receiptId], references: [id])
+  shipment          WarehouseShipment?    @relation(fields: [shipmentId], references: [id])
+  lines             WarehouseActivityLine[]
 }
 
 model WarehouseActivityLine {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String            @id @default(cuid())
+  activityId      String
+  lineNo          Int               @default(0)
+  actionType      String            @default("take") // take | place
+  productId       String?
+  variantCode     String?
+  unitOfMeasure   String            @default("EACH")
+  quantity        Float             @default(0)
+  qtyHandled      Float             @default(0)
+  fromBinId       String?
+  toBinId         String?
+  binId           String?
+  zoneCode        String?
+  lotNo           String?
+  serialNo        String?
+  isHandled       Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  activity        WarehouseActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  product         Product?          @relation(fields: [productId], references: [id])
 }
 
+// ─── WAREHOUSE BINS ────────────────────────────────────────────────────────
 model WarehouseBin {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String              @id @default(cuid())
+  storeId         String
+  zoneId          String?
+  code            String
+  description     String?
+  binType         String              @default("STORAGE") // RECEIVE | SHIP | PUTAWAY | PICK | PUTPICK | QC | FIXED | STORAGE
+  rankNo          Int                 @default(0)
+  maxQty          Float?
+  maxCubage       Float?
+  maxWeight       Float?
+  isEmpty         Boolean             @default(true)
+  isBlocked       Boolean             @default(false)
+  isDedicated     Boolean             @default(false)
+  isSpecial       Boolean             @default(false)
+  isDefault       Boolean             @default(false)
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  store           Store               @relation(fields: [storeId], references: [id])
+  zone            WarehouseZone?      @relation(fields: [zoneId], references: [id])
+  contents        WarehouseBinContent[]
+
+  @@unique([storeId, code])
 }
 
 model WarehouseBinContent {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String          @id @default(cuid())
+  binId           String
+  productId       String?
+  variantCode     String?
+  unitOfMeasure   String          @default("EACH")
+  quantity        Float           @default(0)
+  qtyBase         Float           @default(0)
+  minQty          Float           @default(0)
+  maxQty          Float?
+  lotNo           String?
+  serialNo        String?
+  isDefault       Boolean         @default(false)
+  isFixed         Boolean         @default(false)
+  lastUpdated     DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  bin             WarehouseBin    @relation(fields: [binId], references: [id], onDelete: Cascade)
+  product         Product?        @relation(fields: [productId], references: [id])
 }
 
+// ─── WAREHOUSE RECEIPTS ────────────────────────────────────────────────────
 model WarehouseReceipt {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String                  @id @default(cuid())
+  receiptNo       String                  @unique
+  storeId         String?
+  locationCode    String?
+  vendorDocNo     String?
+  postingDate     DateTime?
+  expectedDate    DateTime?
+  sourceType      String?                 // purchase_order | transfer | return
+  sourceId        String?
+  assignedUserId  String?
+  sortingMethod   String?
+  status          String                  @default("open") // open | partially_put_away | posted
+  postedAt        DateTime?
+  postedBy        String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  store           Store?                  @relation(fields: [storeId], references: [id])
+  lines           WarehouseReceiptLine[]
+  activities      WarehouseActivity[]
 }
 
 model WarehouseReceiptLine {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String            @id @default(cuid())
+  receiptId       String
+  lineNo          Int               @default(0)
+  sourceDocument  String?
+  sourceNo        String?
+  productId       String?
+  description     String?
+  unitOfMeasure   String            @default("EACH")
+  qtyExpected     Float             @default(0)
+  qtyReceived     Float             @default(0)
+  qtyToReceive    Float             @default(0)
+  zoneCode        String?
+  binCode         String?
+  lotNo           String?
+  serialNo        String?
+  variantCode     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  receipt         WarehouseReceipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  product         Product?          @relation(fields: [productId], references: [id])
 }
 
+// ─── WAREHOUSE SHIPMENTS ───────────────────────────────────────────────────
 model WarehouseShipment {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String                    @id @default(cuid())
+  shipmentNo      String                    @unique
+  storeId         String?
+  locationCode    String?
+  shippingDate    DateTime?
+  sourceType      String?                   // sales_order | transfer | return
+  sourceId        String?
+  assignedUserId  String?
+  status          String                    @default("open") // open | partially_picked | picked | posted
+  postedAt        DateTime?
+  postedBy        String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  store           Store?                    @relation(fields: [storeId], references: [id])
+  lines           WarehouseShipmentLine[]
+  activities      WarehouseActivity[]
 }
 
 model WarehouseShipmentLine {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String              @id @default(cuid())
+  shipmentId      String
+  lineNo          Int                 @default(0)
+  sourceDocument  String?
+  sourceNo        String?
+  productId       String?
+  description     String?
+  unitOfMeasure   String              @default("EACH")
+  qtyOutstanding  Float               @default(0)
+  qtyPicked       Float               @default(0)
+  qtyToShip       Float               @default(0)
+  zoneCode        String?
+  binCode         String?
+  lotNo           String?
+  serialNo        String?
+  variantCode     String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  shipment        WarehouseShipment   @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  product         Product?            @relation(fields: [productId], references: [id])
+}
+
+// ─── WAREHOUSE PICKS ──────────────────────────────────────────────────────
+model WarehousePick {
+  id              String              @id @default(cuid())
+  pickNo          String              @unique
+  storeId         String?
+  locationCode    String?
+  assignedUserId  String?
+  activityType    String              @default("Pick")
+  sourceType      String?             // shipment | internal_pick
+  sourceId        String?
+  status          String              @default("open") // open | in_progress | completed | cancelled
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  store           Store?              @relation(fields: [storeId], references: [id])
+  lines           WarehousePickLine[]
+}
+
+model WarehousePickLine {
+  id              String          @id @default(cuid())
+  pickId          String
+  lineNo          Int             @default(0)
+  actionType      String          @default("Take") // Take | Place
+  productId       String?
+  description     String?
+  unitOfMeasure   String          @default("EACH")
+  quantity        Float           @default(0)
+  qtyHandled      Float           @default(0)
+  fromZoneCode    String?
+  fromBinCode     String?
+  toZoneCode      String?
+  toBinCode       String?
+  lotNo           String?
+  serialNo        String?
+  isHandled       Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  pick            WarehousePick   @relation(fields: [pickId], references: [id], onDelete: Cascade)
+  product         Product?        @relation(fields: [productId], references: [id])
+}
+
+// ─── WAREHOUSE PUT-AWAYS ──────────────────────────────────────────────────
+model WarehousePutAway {
+  id              String                  @id @default(cuid())
+  putAwayNo       String                  @unique
+  storeId         String?
+  locationCode    String?
+  assignedUserId  String?
+  sourceType      String?                 // receipt
+  sourceId        String?
+  status          String                  @default("open") // open | in_progress | completed | cancelled
+  completedAt     DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  store           Store?                  @relation(fields: [storeId], references: [id])
+  lines           WarehousePutAwayLine[]
+}
+
+model WarehousePutAwayLine {
+  id              String            @id @default(cuid())
+  putAwayId       String
+  lineNo          Int               @default(0)
+  actionType      String            @default("Take") // Take | Place
+  productId       String?
+  description     String?
+  unitOfMeasure   String            @default("EACH")
+  quantity        Float             @default(0)
+  qtyHandled      Float             @default(0)
+  fromZoneCode    String?
+  fromBinCode     String?
+  toZoneCode      String?
+  toBinCode       String?
+  lotNo           String?
+  serialNo        String?
+  isHandled       Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  putAway         WarehousePutAway  @relation(fields: [putAwayId], references: [id], onDelete: Cascade)
+  product         Product?          @relation(fields: [productId], references: [id])
+}
+
+// ─── WAREHOUSE MOVEMENTS ─────────────────────────────────────────────────
+model WarehouseMovement {
+  id              String                    @id @default(cuid())
+  movementNo      String                    @unique
+  storeId         String?
+  locationCode    String?
+  assignedUserId  String?
+  description     String?
+  status          String                    @default("open") // open | in_progress | completed | cancelled
+  completedAt     DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  store           Store?                    @relation(fields: [storeId], references: [id])
+  lines           WarehouseMovementLine[]
+}
+
+model WarehouseMovementLine {
+  id              String              @id @default(cuid())
+  movementId      String
+  lineNo          Int                 @default(0)
+  actionType      String              @default("Take") // Take | Place
+  productId       String?
+  description     String?
+  unitOfMeasure   String              @default("EACH")
+  quantity        Float               @default(0)
+  qtyHandled      Float               @default(0)
+  fromZoneCode    String?
+  fromBinCode     String?
+  toZoneCode      String?
+  toBinCode       String?
+  lotNo           String?
+  serialNo        String?
+  isHandled       Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  movement        WarehouseMovement   @relation(fields: [movementId], references: [id], onDelete: Cascade)
+  product         Product?            @relation(fields: [productId], references: [id])
+}
+
+// ─── WAREHOUSE INTERNAL PICKS ─────────────────────────────────────────────
+model WarehouseInternalPick {
+  id              String                      @id @default(cuid())
+  internalPickNo  String                      @unique
+  storeId         String?
+  locationCode    String?
+  assignedUserId  String?
+  toZoneCode      String?
+  toBinCode       String?
+  status          String                      @default("open") // open | pick_created | completed | cancelled
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  store           Store?                      @relation(fields: [storeId], references: [id])
+  lines           WarehouseInternalPickLine[]
+}
+
+model WarehouseInternalPickLine {
+  id                String                @id @default(cuid())
+  internalPickId    String
+  lineNo            Int                   @default(0)
+  productId         String?
+  description       String?
+  unitOfMeasure     String                @default("EACH")
+  quantity          Float                 @default(0)
+  qtyToHandle       Float                 @default(0)
+  fromZoneCode      String?
+  fromBinCode       String?
+  toZoneCode        String?
+  toBinCode         String?
+  lotNo             String?
+  serialNo          String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  internalPick      WarehouseInternalPick @relation(fields: [internalPickId], references: [id], onDelete: Cascade)
+  product           Product?              @relation(fields: [productId], references: [id])
 }
 
 // TODO: expand with calendar/shift scheduling, queue management, subcontracting flag
@@ -7752,10 +8784,11 @@ model WorkCenter {
   queueTime      Float           @default(0) // hours
   costPerHour    Float           @default(0)
   isActive       Boolean         @default(true)
-  machineCenters MachineCenter[]
-  routingLines   RoutingLine[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  machineCenters      MachineCenter[]
+  routingLines        RoutingLine[]
+  capacityLedgerEntries CapacityLedgerEntry[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 }
 
 // TODO: expand with maintenance schedules, downtime tracking
@@ -7772,6 +8805,30 @@ model MachineCenter {
   updatedAt     DateTime   @updatedAt
 }
 
+// Posted capacity usage entries — analog to BC Capacity Ledger Entries
+model CapacityLedgerEntry {
+  id              String      @id @default(cuid())
+  entryNo         Int         @default(0)
+  postingDate     DateTime    @default(now())
+  type            String      @default("work_center") // work_center | machine_center
+  workCenterId    String?
+  workCenter      WorkCenter? @relation(fields: [workCenterId], references: [id])
+  machineCenterId String?
+  operationNo     String      @default("")
+  description     String      @default("")
+  setupTime       Float       @default(0)
+  runTime         Float       @default(0)
+  stopTime        Float       @default(0)
+  capacityType    String      @default("direct") // direct | revaluated
+  outputQuantity  Float       @default(0)
+  scrapQuantity   Float       @default(0)
+  unitCost        Float       @default(0)
+  directCost      Float       @default(0)
+  productionOrderId String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
 model WorkSchedule {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -7782,4 +8839,1531 @@ model WrapUpCode {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── MODULE 1: General Journal (GL Posting) ────────────────────────────────
+
+model GeneralJournal {
+  id            String   @id @default(cuid())
+  journalNumber String   @unique
+  description   String?
+  postingDate   DateTime
+  status        String   @default("draft") // draft | posted | reversed
+  batchId       String?
+  storeId       String?
+  totalDebit    Float    @default(0)
+  totalCredit   Float    @default(0)
+  postedAt      DateTime?
+  postedBy      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lines         GeneralJournalLine[]
+  store         Store?   @relation(fields: [storeId], references: [id])
+}
+
+model GeneralJournalLine {
+  id            String  @id @default(cuid())
+  journalId     String
+  lineNo        Int
+  accountType   String  // GL | Customer | Vendor | Bank | FixedAsset
+  accountId     String?
+  accountCode   String?
+  description   String?
+  debit         Float   @default(0)
+  credit        Float   @default(0)
+  documentNo    String?
+  externalDoc   String?
+  costCenterId  String?
+  dimensionCode String?
+  createdAt     DateTime @default(now())
+  journal       GeneralJournal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+}
+
+// ─── MODULE 2: Incoming Documents (OCR Vendor Invoice Capture) ─────────────
+
+model IncomingDocument {
+  id             String   @id @default(cuid())
+  documentNumber String   @unique
+  fileName       String?
+  fileUrl        String?
+  sourceType     String   @default("upload") // upload | email | scanner
+  status         String   @default("pending") // pending | processing | matched | posted | rejected
+  documentType   String?  // vendor_invoice | purchase_order | receipt | contract | other
+  vendorId       String?
+  vendorName     String?
+  vendorVatNo    String?
+  invoiceNumber  String?
+  invoiceDate    DateTime?
+  dueDate        DateTime?
+  amount         Float?
+  currency       String   @default("USD")
+  taxAmount      Float?
+  lineItemsJson  String?
+  ocrConfidence  Float?
+  notes          String?
+  matchedPOId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  vendor         Vendor?  @relation(fields: [vendorId], references: [id])
+}
+
+// ─── MODULE 3: Job Queue Scheduler ─────────────────────────────────────────
+
+model JobQueueEntry {
+  id              String    @id @default(cuid())
+  jobCode         String    @unique
+  description     String
+  objectType      String    @default("codeunit") // codeunit | report | xmlport
+  objectId        String?
+  status          String    @default("ready") // ready | running | on_hold | error | finished
+  scheduledFor    DateTime?
+  lastRunAt       DateTime?
+  lastRunStatus   String?
+  nextRunAt       DateTime?
+  recurringJob    Boolean   @default(false)
+  recurrenceType  String?   // daily | weekly | monthly | minutes
+  recurrenceValue Int?
+  maxAttempts     Int       @default(3)
+  attemptCount    Int       @default(0)
+  errorMessage    String?
+  paramJson       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  logs            JobQueueLog[]
+}
+
+model JobQueueLog {
+  id         String   @id @default(cuid())
+  jobId      String
+  startedAt  DateTime
+  endedAt    DateTime?
+  status     String   // success | error | timeout
+  message    String?
+  durationMs Int?
+  createdAt  DateTime @default(now())
+  job        JobQueueEntry @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model OrchestrationFlow {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  status         String   @default("draft") // draft | active | inactive
+  version        Int      @default(1)
+  triggerType    String   @default("order_created") // order_created | order_updated | inventory_low | manual
+  stepsJson      String?
+  conditionsJson String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  runs           OrchestrationFlowRun[]
+}
+
+model OrchestrationFlowRun {
+  id          String    @id @default(cuid())
+  flowId      String
+  orderId     String?
+  status      String    @default("running") // running | completed | failed | skipped
+  currentStep Int       @default(1)
+  logJson     String?
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  flow        OrchestrationFlow @relation(fields: [flowId], references: [id])
+}
+
+model FulfillmentRule {
+  id             String   @id @default(cuid())
+  name           String
+  ruleType       String   // cost | distance | priority | inventory | custom
+  priority       Int      @default(1)
+  isActive       Boolean  @default(true)
+  conditionsJson String?
+  actionsJson    String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ─── MODULE: Engineering Change Management ─────────────────────────────────
+
+model EngineeringChangeOrder {
+  id            String   @id @default(cuid())
+  ecoNumber     String   @unique
+  title         String
+  description   String?
+  status        String   @default("draft") // draft | review | approved | rejected | implemented
+  priority      String   @default("normal") // low | normal | high | critical
+  requestedBy   String?
+  approvedBy    String?
+  approvedAt    DateTime?
+  effectiveDate DateTime?
+  affectedItems Int      @default(0)
+  changeType    String   @default("design") // design | process | material | software | documentation
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lines         EngineeringChangeLine[]
+}
+
+model EngineeringChangeLine {
+  id          String  @id @default(cuid())
+  ecoId       String
+  productId   String?
+  bomId       String?
+  lineType    String  @default("product") // product | bom | routing | document
+  changeDesc  String
+  fromValue   String?
+  toValue     String?
+  createdAt   DateTime @default(now())
+  eco         EngineeringChangeOrder @relation(fields: [ecoId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+}
+
+// ─── MODULE: Price Attribute Setup ─────────────────────────────────────────
+
+model PriceAttribute {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  attributeType String   @default("product") // product | customer | order | channel
+  dataType      String   @default("text") // text | number | boolean | date | list
+  optionsJson   String?
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PriceComponentCode {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  description   String?
+  componentType String   @default("base") // base | discount | surcharge | tax | freight
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── MODULE: Financial Report Builder ──────────────────────────────────────
+
+model FinancialReportDefinition {
+  id          String   @id @default(cuid())
+  name        String
+  reportType  String   @default("income_statement") // income_statement | balance_sheet | cash_flow | custom
+  description String?
+  rowsJson    String?
+  columnsJson String?
+  filtersJson String?
+  isPublished Boolean  @default(false)
+  lastRunAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── MODULE: Data Management Jobs ──────────────────────────────────────────
+
+model DataManagementJob {
+  id           String    @id @default(cuid())
+  jobName      String
+  jobType      String    // import | export
+  entityName   String    // Customers | Products | Orders | Inventory | Vendors | etc.
+  status       String    @default("pending") // pending | running | completed | failed | cancelled
+  fileFormat   String    @default("csv") // csv | xlsx | json | xml
+  fileUrl      String?
+  recordCount  Int       @default(0)
+  successCount Int       @default(0)
+  errorCount   Int       @default(0)
+  errorsJson   String?
+  scheduledFor DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ─── MODULE: Org Hierarchy ──────────────────────────────────────────────────
+
+model OrgUnit {
+  id          String    @id @default(cuid())
+  name        String
+  unitType    String    @default("department") // company | division | department | team | store | warehouse
+  code        String    @unique
+  parentId    String?
+  managerId   String?
+  description String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  parent      OrgUnit?  @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children    OrgUnit[] @relation("OrgHierarchy")
+}
+
+// ─── MODULE: Contact Segments ───────────────────────────────────────────────
+
+model ContactSegment {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  segmentType   String    @default("static") // static | dynamic
+  criteriaJson  String?
+  memberCount   Int       @default(0)
+  lastRefreshed DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  memberships   ContactSegmentMember[]
+}
+
+model ContactSegmentMember {
+  id         String   @id @default(cuid())
+  segmentId  String
+  customerId String?
+  contactId  String?
+  addedAt    DateTime @default(now())
+  segment    ContactSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  customer   Customer?      @relation(fields: [customerId], references: [id])
+}
+
+// ─── MODULE: IVR Flow Designer ─────────────────────────────────────────────
+
+model IVRFlow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  phoneNumber String?
+  status      String   @default("draft") // draft | active | inactive
+  stepsJson   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  runs        IVRFlowRun[]
+}
+
+model IVRFlowRun {
+  id        String   @id @default(cuid())
+  flowId    String
+  callerNum String?
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+  outcome   String?  // completed | abandoned | transferred | error
+  flow      IVRFlow  @relation(fields: [flowId], references: [id])
+}
+
+// ─── MODULE: Voice Channel Config ──────────────────────────────────────────
+
+model VoiceChannel {
+  id            String   @id @default(cuid())
+  name          String
+  phoneNumber   String   @unique
+  provider      String   @default("azure") // azure | twilio | teams
+  status        String   @default("inactive") // active | inactive | error
+  queueId       String?
+  maxConcurrent Int      @default(10)
+  recordCalls   Boolean  @default(false)
+  transcription Boolean  @default(false)
+  ivrFlowId     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── MODULE: Agent Scripts ─────────────────────────────────────────────────
+
+model AgentScript {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  scriptType  String   @default("greeting") // greeting | closing | escalation | objection | custom
+  channel     String   @default("all") // all | voice | chat | email
+  contentJson String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── MODULE: Sentiment Analysis ────────────────────────────────────────────
+
+model ConversationSentiment {
+  id             String   @id @default(cuid())
+  conversationId String?
+  channel        String   @default("chat")
+  sentiment      String   @default("neutral") // positive | neutral | negative | mixed
+  sentimentScore Float    @default(0)
+  keywords       String?
+  analyzedAt     DateTime @default(now())
+  agentId        String?
+  customerId     String?
+}
+
+// ─── MODULE: CRM Connectors ────────────────────────────────────────────────
+
+model ContactCenterConnector {
+  id            String   @id @default(cuid())
+  name          String
+  connectorType String   // salesforce | servicenow | zendesk | dynamics | custom
+  status        String   @default("disconnected") // connected | disconnected | error | syncing
+  configJson    String?
+  lastSyncAt    DateTime?
+  syncEnabled   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── Service: AI Agents ───────────────────────────────────────────────────────
+
+model ServiceAIAgent {
+  id             String   @id @default(cuid())
+  name           String
+  agentType      String   @default("case")     // case | knowledge | intent | email | chat
+  status         String   @default("inactive") // active | inactive | training | error
+  modelConfig    String?  // JSON: model settings, temperature, etc.
+  promptSystem   String?  // system prompt
+  channels       String?  // comma-separated: chat,email,voice
+  escalationRule String?  // when to escalate to human
+  casesHandled   Int      @default(0)
+  resolutionRate Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ─── Service: Routing / Workstreams ──────────────────────────────────────────
+
+model ServiceWorkstream {
+  id             String   @id @default(cuid())
+  name           String
+  channel        String   @default("chat")       // chat | email | voice | social
+  capacity       Int      @default(5)
+  routingMode    String   @default("round_robin") // round_robin | least_active | skill_match | priority
+  sessionTimeout Int      @default(30)           // minutes
+  isActive       Boolean  @default(true)
+  skillsRequired String?  // comma-separated
+  queueId        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ================================================================================
+// PROJECT OPERATIONS — Invoicing, Subcontracts, Retention, Funding
+// ================================================================================
+
+model ProformaInvoice {
+  id            String    @id @default(cuid())
+  invoiceNumber String    @unique
+  projectId     String
+  customerId    String?
+  invoiceDate   DateTime  @default(now())
+  status        String    @default("draft") // draft | sent | confirmed | invoiced | cancelled
+  subtotal      Float     @default(0)
+  taxAmount     Float     @default(0)
+  total         Float     @default(0)
+  notes         String?
+  linesJson     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project  Project   @relation(fields: [projectId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+}
+
+model ProjectInvoiceProposal {
+  id              String    @id @default(cuid())
+  proposalNumber  String    @unique
+  projectId       String
+  fundingSourceId String?
+  periodStart     DateTime
+  periodEnd       DateTime
+  status          String    @default("draft") // draft | posted | cancelled
+  totalAmount     Float     @default(0)
+  linesJson       String?
+  postedAt        DateTime?
+  postedBy        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model ProjectSubcontract {
+  id            String    @id @default(cuid())
+  subcontractNo String    @unique
+  projectId     String
+  vendorId      String?
+  description   String?
+  value         Float     @default(0)
+  retentionPct  Float     @default(0)
+  status        String    @default("draft") // draft | active | completed | cancelled
+  startDate     DateTime?
+  endDate       DateTime?
+  paymentBlock  Boolean   @default(false)
+  pmVerified    Boolean   @default(false)
+  invoicesJson  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+  vendor  Vendor? @relation(fields: [vendorId], references: [id])
+}
+
+model VendorRetentionSchedule {
+  id             String    @id @default(cuid())
+  projectId      String
+  vendorId       String?
+  subcontractId  String?
+  phase          String?
+  retentionPct   Float     @default(10)
+  heldAmount     Float     @default(0)
+  releasedAmount Float     @default(0)
+  releaseDate    DateTime?
+  status         String    @default("holding") // holding | partial | released
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model ProjectFundingSource {
+  id              String   @id @default(cuid())
+  projectId       String
+  name            String
+  sourceType      String   @default("customer") // customer | grant | internal | investor | loan
+  fundingAmount   Float    @default(0)
+  allocatedAmount Float    @default(0)
+  invoicedAmount  Float    @default(0)
+  billingRule     String   @default("percentage") // percentage | milestone | time_material
+  limitAmount     Float?
+  priority        Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+// ─── MODULE: Global Address Book ─────────────────────────────────────────────
+
+model GlobalAddressBook {
+  id               String   @id @default(cuid())
+  partyType        String   @default("person")
+  name             String
+  shortName        String?
+  email            String?
+  phone            String?
+  address1         String?
+  address2         String?
+  city             String?
+  state            String?
+  postalCode       String?
+  country          String   @default("US")
+  taxId            String?
+  linkedEntityType String?
+  linkedEntityId   String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ─── MODULE: Electronic Reporting ────────────────────────────────────────────
+
+model ERConfiguration {
+  id          String    @id @default(cuid())
+  name        String
+  formatType  String    @default("xlsx")
+  category    String    @default("finance")
+  version     String    @default("1.0")
+  status      String    @default("draft")
+  schemaJson  String?
+  templateUrl String?
+  lastRunAt   DateTime?
+  runCount    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── MODULE: Release Management ──────────────────────────────────────────────
+
+model FeatureFlag {
+  id          String    @id @default(cuid())
+  featureKey  String    @unique
+  featureName String
+  description String?
+  module      String?
+  waveRelease String?
+  status      String    @default("disabled")
+  enabledAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── MODULE: Network Printers ─────────────────────────────────────────────────
+
+model NetworkPrinter {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  networkPath String?
+  printerType String    @default("receipt")
+  status      String    @default("active")
+  storeId     String?
+  isDefault   Boolean   @default(false)
+  lastPingAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  store       Store?    @relation(fields: [storeId], references: [id])
+}
+
+// ─── MODULE: Dual-Write ───────────────────────────────────────────────────────
+
+model DualWriteMapping {
+  id            String    @id @default(cuid())
+  mappingName   String
+  sourceEntity  String
+  targetEntity  String
+  status        String    @default("paused")
+  syncDirection String    @default("bidirectional")
+  lastSyncAt    DateTime?
+  errorCount    Int       @default(0)
+  recordsSynced Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// ─── MODULE: Data Lake ────────────────────────────────────────────────────────
+
+model DataLakeExport {
+  id           String    @id @default(cuid())
+  exportName   String
+  entities     String
+  destination  String?
+  scheduleType String    @default("continuous")
+  status       String    @default("inactive")
+  lastExportAt DateTime?
+  rowsExported Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ─── MODULE: Landed Cost Voyages ──────────────────────────────────────────────
+
+model Voyage {
+  id               String           @id @default(cuid())
+  voyageNo         String           @unique
+  description      String?
+  vendorNo         String?
+  voyageStatus     String           @default("open") // open | posted | cancelled
+  shipDate         DateTime?
+  estimatedArrival DateTime?
+  currency         String           @default("USD")
+  totalAmountLCY   Float            @default(0)
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  costLines   VoyageCostLine[]
+}
+
+model VoyageCostLine {
+  id               String   @id @default(cuid())
+  voyageId         String
+  costType         String   @default("freight") // freight | customs | insurance | handling | other
+  description      String?
+  amount           Float    @default(0)
+  allocationMethod String   @default("by_value") // by_value | by_qty | by_cbm | equally
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  voyage Voyage @relation(fields: [voyageId], references: [id], onDelete: Cascade)
+}
+
+// ─── MODULE: Freight Reconciliation ──────────────────────────────────────────
+
+model FreightReconciliation {
+  id              String    @id @default(cuid())
+  carrier         String
+  serviceCode     String?
+  billOfLadingNo  String?
+  invoiceAmount   Float     @default(0)
+  expectedAmount  Float     @default(0)
+  difference      Float     @default(0)
+  status          String    @default("open") // open | reconciled | disputed
+  glEntryCreated  Boolean   @default(false)
+  glEntryRef      String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ─── MODULE: Product Lifecycle ────────────────────────────────────────────────
+
+model ProductLifecycle {
+  id             String    @id @default(cuid())
+  itemNo         String
+  description    String?
+  lifecyclePhase String    @default("introduction") // introduction | growth | maturity | decline | discontinued
+  effectiveDate  DateTime  @default(now())
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ─── MODULE: Catch Weight ─────────────────────────────────────────────────────
+
+model CatchWeightItem {
+  id            String   @id @default(cuid())
+  itemNo        String
+  description   String?
+  nominalWeight Float    @default(0)
+  actualWeight  Float    @default(0)
+  qty           Float    @default(0)
+  variancePct   Float    @default(0)
+  unit          String   @default("kg")
+  lotNo         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── MODULE: Hazardous Materials ─────────────────────────────────────────────
+
+model HazmatItem {
+  id                  String   @id @default(cuid())
+  itemNo              String
+  description         String?
+  unNo                String?
+  hazardClass         String?
+  packingGroup        String?  // I | II | III
+  flashPoint          Float?
+  properShippingName  String?
+  regulatoryBody      String?  // DOT | IATA | IMDG
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ─── MODULE: Price Simulations ────────────────────────────────────────────────
+
+model PriceSimulation {
+  id               String    @id @default(cuid())
+  simulationNo     String    @unique
+  description      String?
+  status           String    @default("draft") // draft | active | archived
+  priceList        String?
+  dateFrom         DateTime?
+  dateTo           DateTime?
+  simulationType   String    @default("what_if") // what_if | planned
+  totalImpact      Float     @default(0)
+  linesJson        String?
+  activatedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// IomSimulation — alias intentionally omitted; use existing IOMSimulation model above
+
+// ─── MODULE: Subscription Orders ─────────────────────────────────────────────
+
+model SubscriptionOrder {
+  id            String    @id @default(cuid())
+  orderNo       String    @unique
+  customerId    String?
+  itemId        String?
+  itemName      String?
+  frequency     String    @default("monthly") // weekly | biweekly | monthly | quarterly | annual
+  nextOrderDate DateTime?
+  status        String    @default("active") // active | paused | cancelled
+  qty           Float     @default(1)
+  unitPrice     Float     @default(0)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+}
+
+// ─── MODULE: IVR Flow Nodes ────────────────────────────────────────────────
+
+model IvrFlowNode {
+  id            String   @id @default(cuid())
+  flowId        String
+  stepNo        Int
+  nodeType      String   @default("Message") // Menu | Message | Transfer | CollectInput | Queue
+  configJson    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── MODULE: Agent Script Steps ────────────────────────────────────────────
+
+model AgentScriptStep {
+  id                String   @id @default(cuid())
+  scriptId          String
+  stepNo            Int
+  stepType          String   @default("Greeting") // Greeting | Question | Action | ObjectionHandler | Close
+  scriptText        String?
+  suggestedResponse String?
+  nextStepLogic     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ─── MODULE: Call Queues ───────────────────────────────────────────────────
+
+model CallQueue {
+  id              String   @id @default(cuid())
+  name            String
+  maxLength       Int      @default(20)
+  waitMusic       String?
+  overflowQueueId String?
+  timeoutSeconds  Int      @default(300)
+  priorityRules   String?
+  agentsAssigned  Int      @default(0)
+  avgWaitSeconds  Int      @default(0)
+  overflowAction  String   @default("voicemail") // voicemail | disconnect | transfer
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── MODULE: Project Timesheets ───────────────────────────────────────────────
+
+model Timesheet {
+  id            String          @id @default(cuid())
+  timesheetNo   String          @unique
+  resourceNo    String
+  resourceName  String?
+  startDate     DateTime
+  endDate       DateTime
+  status        String          @default("open") // open | submitted | approved | rejected
+  totalHours    Float           @default(0)
+  notes         String?
+  submittedAt   DateTime?
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  lines         TimesheetLine[]
+}
+
+model TimesheetLine {
+  id           String   @id @default(cuid())
+  timesheetId  String
+  dayDate      DateTime
+  dayOfWeek    String
+  lineType     String   @default("Resource")
+  projectNo    String?
+  taskNo       String?
+  description  String?
+  hours        Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  timesheet    Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+}
+
+// ─── MODULE: Expense Sheets ───────────────────────────────────────────────────
+
+model ExpenseSheet {
+  id           String        @id @default(cuid())
+  sheetNo      String        @unique
+  employeeId   String?
+  employeeName String?
+  periodStart  DateTime
+  periodEnd    DateTime
+  status       String        @default("open")
+  totalAmount  Float         @default(0)
+  currency     String        @default("USD")
+  notes        String?
+  submittedAt  DateTime?
+  approvedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  lines        ExpenseSheetLine[]
+}
+
+model ExpenseSheetLine {
+  id              String   @id @default(cuid())
+  expenseSheetId  String
+  expenseDate     DateTime
+  expenseType     String   @default("Other")
+  description     String?
+  amount          Float    @default(0)
+  currency        String   @default("USD")
+  projectNo       String?
+  taskNo          String?
+  receiptAttached Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  expenseSheet    ExpenseSheet @relation(fields: [expenseSheetId], references: [id], onDelete: Cascade)
+}
+
+// ─── MODULE: Payroll Runs ─────────────────────────────────────────────────────
+
+model PayrollRun {
+  id                  String          @id @default(cuid())
+  runNo               String          @unique
+  periodStart         DateTime
+  periodEnd           DateTime
+  payDate             DateTime
+  paymentMethod       String          @default("Direct Deposit")
+  description         String?
+  status              String          @default("draft")
+  employeeCount       Int             @default(0)
+  totalGross          Float           @default(0)
+  totalTax            Float           @default(0)
+  totalNI             Float           @default(0)
+  totalNet            Float           @default(0)
+  totalEmployerCosts  Float           @default(0)
+  selectionMode       String          @default("all_active")
+  selectionFilter     String?
+  approvedAt          DateTime?
+  postedAt            DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  lines               PayrollRunLine[]
+}
+
+model PayrollRunLine {
+  id             String   @id @default(cuid())
+  payrollRunId   String
+  employeeId     String?
+  employeeNo     String?
+  employeeName   String?
+  department     String?
+  grossPay       Float    @default(0)
+  incomeTax      Float    @default(0)
+  ni             Float    @default(0)
+  netPay         Float    @default(0)
+  employerNI     Float    @default(0)
+  bankAccount    String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  payrollRun     PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+}
+
+// ─── MODULE: Employee Absence ─────────────────────────────────────────────────
+
+model EmployeeAbsence {
+  id              String   @id @default(cuid())
+  employeeId      String?
+  employeeNo      String?
+  employeeName    String?
+  causeOfAbsence  String   @default("Sick Leave")
+  fromDate        DateTime
+  toDate          DateTime
+  qty             Float    @default(0)
+  unitOfMeasure   String   @default("Days")
+  notes           String?
+  returnDate      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── MODULE: HR Timesheets (Attendance) ──────────────────────────────────────
+
+model HrTimesheet {
+  id           String   @id @default(cuid())
+  employeeId   String?
+  employeeNo   String?
+  employeeName String?
+  weekStart    DateTime
+  monHours     Float    @default(0)
+  tueHours     Float    @default(0)
+  wedHours     Float    @default(0)
+  thuHours     Float    @default(0)
+  friHours     Float    @default(0)
+  satHours     Float    @default(0)
+  sunHours     Float    @default(0)
+  totalHours   Float    @default(0)
+  status       String   @default("open")
+  submittedAt  DateTime?
+  approvedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── MODULE: Ledger Entries ───────────────────────────────────────────────────
+
+model CustomerLedgerEntry {
+  id              String   @id @default(cuid())
+  entryNo         Int      @default(0)
+  postingDate     DateTime @default(now())
+  documentType    String   @default("Invoice")
+  documentNo      String?
+  customerId      String?
+  customerNo      String?
+  customerName    String?
+  description     String?
+  currency        String   @default("USD")
+  debitAmount     Float    @default(0)
+  creditAmount    Float    @default(0)
+  remainingAmount Float    @default(0)
+  isOpen          Boolean  @default(true)
+  dueDate         DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model VendorLedgerEntry {
+  id              String   @id @default(cuid())
+  entryNo         Int      @default(0)
+  postingDate     DateTime @default(now())
+  documentType    String   @default("Invoice")
+  documentNo      String?
+  vendorId        String?
+  vendorNo        String?
+  vendorName      String?
+  description     String?
+  currency        String   @default("USD")
+  debitAmount     Float    @default(0)
+  creditAmount    Float    @default(0)
+  remainingAmount Float    @default(0)
+  isOpen          Boolean  @default(true)
+  dueDate         DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ItemLedgerEntry {
+  id             String   @id @default(cuid())
+  entryNo        Int      @default(0)
+  postingDate    DateTime @default(now())
+  entryType      String   @default("Purchase")
+  itemId         String?
+  itemNo         String?
+  description    String?
+  locationCode   String?
+  qty            Float    @default(0)
+  remainingQty   Float    @default(0)
+  unitOfMeasure  String   @default("PCS")
+  lotNo          String?
+  serialNo       String?
+  documentNo     String?
+  invoicedQty    Float    @default(0)
+  costAmount     Float    @default(0)
+  salesAmount    Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ─── MODULE: Finance Setup — Posting Groups ──────────────────────────────────
+
+model GenBusinessPostingGroup {
+  id                    String   @id @default(cuid())
+  code                  String   @unique
+  description           String?
+  defVatBusPostingGroup String?
+  autoInsertDefault     Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model GenProductPostingGroup {
+  id                      String   @id @default(cuid())
+  code                    String   @unique
+  description             String?
+  defVatProdPostingGroup  String?
+  costingMethodOverride   String?  // FIFO | LIFO | Average | Standard | Specific
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model CustomerPostingGroup {
+  id                     String   @id @default(cuid())
+  code                   String   @unique
+  description            String?
+  receivablesAccount     String?
+  paymentDiscDebitAcc    String?
+  paymentDiscCreditAcc   String?
+  interestAccount        String?
+  additionalFeeAccount   String?
+  debitRoundingAcc       String?
+  creditRoundingAcc      String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model VendorPostingGroup {
+  id                     String   @id @default(cuid())
+  code                   String   @unique
+  description            String?
+  payablesAccount        String?
+  paymentDiscDebitAcc    String?
+  paymentDiscCreditAcc   String?
+  invoiceRoundingAccount String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model InventoryPostingGroup {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── MODULE: Finance Setup — VAT Posting Setup ───────────────────────────────
+
+model VatPostingSetup {
+  id                  String   @id @default(cuid())
+  vatBusPostingGroup  String
+  vatProdPostingGroup String
+  vatPercent          Float    @default(0)
+  vatCalculationType  String   @default("Normal") // Normal | ReverseCharge | FullVAT | NoTaxableVAT
+  salesVatAccount     String?
+  purchaseVatAccount  String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([vatBusPostingGroup, vatProdPostingGroup])
+}
+
+// ─── MODULE: Finance Setup — Payment Terms ───────────────────────────────────
+
+model PaymentTerm {
+  id                       String   @id @default(cuid())
+  code                     String   @unique
+  description              String?
+  dueDateCalculation       String?  // e.g. 30D, CM+30D
+  discountDateCalculation  String?
+  discountPercent          Float    @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+// ─── MODULE: Finance Setup — Payment Methods ─────────────────────────────────
+
+model PaymentMethod {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  description     String?
+  balAccountType  String?  // GLAccount | BankAccount
+  balAccountNo    String?
+  directDebit     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── MODULE: Finance Setup — Currencies ──────────────────────────────────────
+
+model FinanceCurrency {
+  id                    String   @id @default(cuid())
+  code                  String   @unique
+  description           String?
+  exchangeRateAmount    Float    @default(1)
+  relationalExchRateAmt Float    @default(1)
+  lastDateModified      DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ─── MODULE: Finance Setup — Countries/Regions ───────────────────────────────
+
+model FinanceCountry {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  euCountryCode    String?
+  vatScheme        String?
+  intrastatCode    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ─── MODULE: Bank Reconciliation Lines ───────────────────────────────────────
+
+model BankReconciliationLine {
+  id               String   @id @default(cuid())
+  reconciliationId String
+  transactionDate  DateTime?
+  description      String?
+  statementAmount  Float    @default(0)
+  appliedAmount    Float    @default(0)
+  difference       Float    @default(0)
+  matched          Boolean  @default(false)
+  type             String   @default("Difference")
+  status           String   @default("open")   // open | matched
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  reconciliation   BankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+}
+
+// ─── MODULE: VAT Returns ─────────────────────────────────────────────────────
+
+model VatReturn {
+  id           String    @id @default(cuid())
+  returnNo     String    @unique @default(cuid())
+  returnPeriod String
+  startDate    DateTime
+  endDate      DateTime
+  status       String    @default("Open") // Open | Submitted | Accepted | Closed
+  box1OutputVat  Float   @default(0)
+  box4InputVat   Float   @default(0)
+  box3NetVat     Float   @default(0)
+  box5NetVatDue  Float   @default(0)
+  box6TotalSales Float   @default(0)
+  box7TotalPurchases Float @default(0)
+  totalVatDue  Float     @default(0)
+  netVatDue    Float     @default(0)
+  submittedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ─── MODULE: Payment Journal ──────────────────────────────────────────────────
+
+model PaymentJournalBatch {
+  id          String   @id @default(cuid())
+  batchName   String   @unique
+  description String?
+  batchType   String   @default("Payment") // Payment | Receipt
+  status      String   @default("open") // open | posted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lines       PaymentJournalLine[]
+}
+
+model PaymentJournalLine {
+  id               String   @id @default(cuid())
+  batchId          String
+  lineNo           Int
+  postingDate      DateTime @default(now())
+  documentType     String   @default("Payment") // Payment | Refund
+  accountType      String   @default("Vendor")  // Customer | Vendor | GLAccount
+  accountNo        String?
+  accountName      String?
+  appliesToDocType String?  // Invoice | Credit Memo
+  appliesToDocNo   String?
+  description      String?
+  amount           Float    @default(0)
+  balAccountType   String   @default("Bank") // Bank | GLAccount
+  balAccountNo     String?
+  currencyCode     String   @default("USD")
+  status           String   @default("open") // open | posted
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  batch            PaymentJournalBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+}
+
+// ─── MODULE: General Journal Batch ───────────────────────────────────────────
+
+model GeneralJournalBatch {
+  id          String   @id @default(cuid())
+  batchName   String   @unique
+  description String?
+  batchType   String   @default("General") // General | CashReceipt | Sales | Purchases
+  status      String   @default("open")    // open | posted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lines       GeneralJournalBatchLine[]
+}
+
+model GeneralJournalBatchLine {
+  id               String   @id @default(cuid())
+  batchId          String
+  lineNo           Int
+  postingDate      DateTime @default(now())
+  documentType     String?  // Invoice | Credit Memo | Payment | Refund | blank
+  accountType      String   @default("GLAccount") // GLAccount | Customer | Vendor | Bank | FixedAsset
+  accountNo        String?
+  accountName      String?
+  description      String?
+  debit            Float    @default(0)
+  credit           Float    @default(0)
+  balAccountType   String?
+  balAccountNo     String?
+  currencyCode     String   @default("USD")
+  departmentCode   String?
+  projectCode      String?
+  status           String   @default("open") // open | posted
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  batch            GeneralJournalBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+}
+
+// ─── MODULE: Reminders & Finance Charge Memos ────────────────────────────────
+
+model Reminder {
+  id             String    @id @default(cuid())
+  reminderNo     String    @unique @default(cuid())
+  customerId     String?
+  customerNo     String?
+  customerName   String?
+  reminderLevel  Int       @default(1)
+  postingDate    DateTime  @default(now())
+  dueDate        DateTime?
+  amountLCY      Float     @default(0)
+  reminderFee    Float     @default(0)
+  status         String    @default("Open") // Open | Issued | Canceled
+  issuedAt       DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  lines          ReminderLine[]
+}
+
+model ReminderLine {
+  id              String   @id @default(cuid())
+  reminderId      String
+  lineNo          Int
+  documentType    String?  // Invoice | Credit Memo
+  documentNo      String?
+  postingDate     DateTime?
+  dueDate         DateTime?
+  originalAmount  Float    @default(0)
+  remainingAmount Float    @default(0)
+  interestAmount  Float    @default(0)
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  reminder        Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+}
+
+model FinanceChargeMemo {
+  id           String    @id @default(cuid())
+  memoNo       String    @unique @default(cuid())
+  customerId   String?
+  customerName String?
+  postingDate  DateTime  @default(now())
+  dueDate      DateTime?
+  amount       Float     @default(0)
+  interestRate Float     @default(0)
+  status       String    @default("Open") // Open | Issued | Canceled
+  issuedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ─── MODULE: Year-End Closing Entries ────────────────────────────────────────
+
+model ClosingEntry {
+  id              String    @id @default(cuid())
+  fiscalYearId    String?
+  fiscalYear      String
+  accountNo       String
+  accountName     String?
+  closingAmount   Float     @default(0)
+  retainedEarningsAccountNo String?
+  status          String    @default("ready") // ready | posted
+  postedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ─── MODULE: VAT Statement Lines ─────────────────────────────────────────────
+
+model VatStatementLine {
+  id           String  @id @default(cuid())
+  statementName String @default("Default")
+  rowNo        String
+  description  String?
+  rowType      String  @default("AccountTotaling") // AccountTotaling | RowTotaling | Description
+  amountType   String  @default("Amount")          // Amount | BaseAmount | Unrealized
+  accountFilter String?
+  calculatedAmount Float @default(0)
+  printOnPage  Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── Administration Models ───────────────────────────────────────────────────
+
+model CompanyInfo {
+  id            String   @id @default("singleton")
+  name          String?
+  address       String?
+  city          String?
+  postCode      String?
+  country       String?
+  phone         String?
+  email         String?
+  vatNo         String?
+  taxRegNo      String?
+  iban          String?
+  swift         String?
+  bankAccountNo String?
+  giroNo        String?
+  logoUrl       String?
+  updatedAt     DateTime @updatedAt
+}
+
+model AdminPermissionSet {
+  id          String            @id @default(cuid())
+  roleId      String            @unique
+  name        String
+  setType     String            @default("User-Defined")
+  permissions AdminPermission[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model AdminPermission {
+  id         String             @id @default(cuid())
+  permSetId  String
+  permSet    AdminPermissionSet @relation(fields: [permSetId], references: [id], onDelete: Cascade)
+  objectType String
+  objectId   String?
+  objectName String?
+  canRead    Boolean            @default(false)
+  canInsert  Boolean            @default(false)
+  canModify  Boolean            @default(false)
+  canDelete  Boolean            @default(false)
+  canExecute Boolean            @default(false)
+  createdAt  DateTime           @default(now())
+}
+
+model AdminWorkflow {
+  id          String              @id @default(cuid())
+  code        String              @unique
+  description String
+  category    String?
+  enabled     Boolean             @default(false)
+  steps       AdminWorkflowStep[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model AdminWorkflowStep {
+  id                String        @id @default(cuid())
+  workflowId        String
+  workflow          AdminWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepNo            Int
+  event             String
+  response          String?
+  approverType      String?
+  approverLimitType String?
+  dueDateFormula    String?
+  createdAt         DateTime      @default(now())
+}
+
+model AdminChangeLog {
+  id           String   @id @default(cuid())
+  tableCaption String
+  fieldName    String
+  oldValue     String?
+  newValue     String?
+  documentNo   String?
+  userId       String?
+  userName     String?
+  createdAt    DateTime @default(now())
+}
+
+// ─── MODULE: Service Management (BC-style) ───────────────────────────────────
+
+model ServiceLoaner {
+  id                String    @id @default(cuid())
+  loanerNo          String    @unique
+  description       String
+  itemNo            String?
+  serialNo          String?
+  status            String    @default("Available")
+  lentToCustomerId  String?
+  dateLent          DateTime?
+  dateReturned      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model FaultCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model ResolutionCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String
+  createdAt   DateTime @default(now())
+}
+
+// ─── MODULE: Inventory Ledger (BC-style) ──────────────────────────────────────
+
+model ValueEntry {
+  id                  String   @id @default(cuid())
+  entryNo             Int      @default(0)
+  postingDate         DateTime @default(now())
+  itemId              String?
+  itemNo              String?
+  entryType           String   @default("Direct Cost")
+  itemLedgerEntryType String   @default("Purchase")
+  valuedQty           Float    @default(0)
+  costAmountActual    Float    @default(0)
+  costAmountExpected  Float    @default(0)
+  invoiceNo           String?
+  documentNo          String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model ItemVariant {
+  id          String   @id @default(cuid())
+  itemId      String
+  variantCode String
+  description String?
+  salesPrice  Float    @default(0)
+  inventory   Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([itemId, variantCode])
+}
+
+model ItemAttribute {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  attributeType String   @default("Text")
+  unitOfMeasure String?
+  blocked       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model StockkepingUnit {
+  id           String   @id @default(cuid())
+  itemId       String
+  variantCode  String?
+  locationCode String
+  reorderPoint Float    @default(0)
+  reorderQty   Float    @default(0)
+  safetyStock  Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── MODULE: G/L Register ────────────────────────────────────────────────────
+
+model GlRegister {
+  id           String   @id @default(cuid())
+  registerNo   Int      @unique @default(autoincrement())
+  creationDate DateTime @default(now())
+  sourceCode   String   @default("GENJNL")
+  userId       String?
+  fromEntryNo  Int      @default(0)
+  toEntryNo    Int      @default(0)
+  journalBatch String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── MODULE: Journal Template ────────────────────────────────────────────────
+
+model JournalTemplate {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  description    String?
+  templateType   String   @default("General") // General | Sales | Purchases | Payment | CashReceipt | Assets | Intercompany
+  balAccountType String   @default("G/L Account")
+  balAccountNo   String?
+  noSeries       String?
+  recurring      Boolean  @default(false)
+  sourceCode     String?
+  reasonCode     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

@@ -6,14 +6,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const order = await prisma.assemblyOrder.findUnique({
     where: { id },
     include: {
-      product: { select: { id: true, name: true, sku: true, salePrice: true } },
-      store: { select: { id: true, name: true } },
-      bom: { select: { id: true, type: true, description: true } },
-      lines: {
-        include: {
-          component: { select: { id: true, name: true, sku: true } },
-        },
-      },
+      bom: { select: { id: true, bomNo: true, versionCode: true } },
+      lines: { orderBy: { lineNo: 'asc' } },
     },
   })
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -21,47 +15,43 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const body = await req.json()
+  try {
+    const { id } = await params
+    const body = await req.json()
 
-  const order = await prisma.assemblyOrder.findUnique({ where: { id }, select: { status: true } })
-  if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const order = await prisma.assemblyOrder.findUnique({ where: { id }, select: { status: true } })
+    if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const TRANSITIONS: Record<string, string[]> = {
-    open: ['released'],
-    released: ['finished', 'open'],
-    finished: [],
-  }
-  if (body.status && !TRANSITIONS[order.status]?.includes(body.status)) {
-    return NextResponse.json(
-      { error: `Cannot transition from ${order.status} to ${body.status}` },
-      { status: 400 }
-    )
-  }
-
-  // Handle line picks if provided
-  if (body.lines && Array.isArray(body.lines)) {
-    for (const l of body.lines as { id: string; quantityPicked: number }[]) {
-      await prisma.assemblyOrderLine.update({
-        where: { id: l.id },
-        data: { quantityPicked: l.quantityPicked },
-      })
+    const TRANSITIONS: Record<string, string[]> = {
+      Open: ['Released'],
+      Released: ['In Progress', 'Open'],
+      'In Progress': ['Finished', 'Released'],
+      Finished: [],
     }
-  }
+    if (body.status && !TRANSITIONS[order.status]?.includes(body.status)) {
+      return NextResponse.json(
+        { error: `Cannot transition from ${order.status} to ${body.status}` },
+        { status: 400 }
+      )
+    }
 
-  const updated = await prisma.assemblyOrder.update({
-    where: { id },
-    data: {
-      ...(body.status ? { status: body.status } : {}),
-      ...(body.quantityToAssemble !== undefined ? { quantityToAssemble: body.quantityToAssemble } : {}),
-      ...(body.notes !== undefined ? { notes: body.notes } : {}),
-      ...(body.dueDate !== undefined ? { dueDate: body.dueDate ? new Date(body.dueDate) : null } : {}),
-    },
-    include: {
-      product: { select: { id: true, name: true, sku: true } },
-      store: { select: { id: true, name: true } },
-      lines: { include: { component: { select: { id: true, name: true, sku: true } } } },
-    },
-  })
-  return NextResponse.json(updated)
+    const updated = await prisma.assemblyOrder.update({
+      where: { id },
+      data: {
+        ...(body.status ? { status: body.status } : {}),
+        ...(body.qtyToAssemble !== undefined ? { qtyToAssemble: body.qtyToAssemble } : {}),
+        ...(body.qtyAssembled !== undefined ? { qtyAssembled: body.qtyAssembled } : {}),
+        ...(body.notes !== undefined ? { notes: body.notes } : {}),
+        ...(body.dueDate !== undefined ? { dueDate: body.dueDate ? new Date(body.dueDate) : null } : {}),
+        ...(body.isPosted !== undefined ? { isPosted: body.isPosted } : {}),
+      },
+      include: {
+        bom: { select: { id: true, bomNo: true } },
+        lines: { orderBy: { lineNo: 'asc' } },
+      },
+    })
+    return NextResponse.json(updated)
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Update failed' }, { status: 500 })
+  }
 }

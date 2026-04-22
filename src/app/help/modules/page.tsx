@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { TopBar } from '@/components/layout/TopBar'
 import Link from 'next/link'
 import { ChevronRight, BookOpen, DollarSign, ShoppingCart, Package, Users, BarChart3, Building2, GraduationCap, Factory, Globe, TrendingUp } from 'lucide-react'

@@ -4,9 +4,8 @@ import { notFound } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { AccountEditForm } from './AccountEditForm'
-
-type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
+import Link from 'next/link'
+import { Edit2, Trash2, Printer, ChevronDown } from 'lucide-react'
 
 const TYPE_BADGE: Record<string, string> = {
   asset:     'bg-blue-500/10 text-blue-400',
@@ -16,15 +15,7 @@ const TYPE_BADGE: Record<string, string> = {
   expense:   'bg-amber-500/10 text-amber-400',
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  asset:     'Asset',
-  liability: 'Liability',
-  equity:    'Equity',
-  revenue:   'Revenue',
-  expense:   'Expense',
-}
-
-function normalBalance(type: string): string {
+function normalBalance(type: string) {
   return type === 'asset' || type === 'expense' ? 'Debit (DR)' : 'Credit (CR)'
 }
 
@@ -48,156 +39,189 @@ export default async function GLAccountDetailPage({
 
   if (!account) notFound()
 
-  // Compute running balance from journal lines (most recent first)
-  // We need to display running balance, so reverse the array for chronological order
-  const chronoLines = [...account.journalLines].reverse()
-  let running = 0
-  const linesWithBalance = chronoLines.map(line => {
-    // For debit-normal accounts (asset/expense): debit increases, credit decreases
-    // For credit-normal accounts: credit increases, debit decreases
-    const isDebitNormal = account.type === 'asset' || account.type === 'expense'
-    running += isDebitNormal
-      ? (line.debit - line.credit)
-      : (line.credit - line.debit)
-    return { ...line, runningBalance: running }
-  })
-  // Reverse back to most-recent-first for display
-  const displayLines = [...linesWithBalance].reverse()
+  const totalDebit = account.journalLines.reduce((s, l) => s + l.debit, 0)
+  const totalCredit = account.journalLines.reduce((s, l) => s + l.credit, 0)
+
+  const actions = (
+    <div className="flex items-center gap-2">
+      <Link
+        href={`/finance/chart-of-accounts/${id}/edit`}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-medium rounded transition-colors"
+      >
+        <Edit2 className="w-3.5 h-3.5" /> Edit
+      </Link>
+      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+        <Trash2 className="w-3.5 h-3.5" /> Delete
+      </button>
+      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+        <Printer className="w-3.5 h-3.5" /> Print
+      </button>
+    </div>
+  )
 
   return (
     <>
       <TopBar
-        title={`${account.code} — ${account.name}`}
+        title={`${account.code} · ${account.name}`}
         breadcrumb={[
-          { label: 'Finance',           href: '/finance' },
+          { label: 'Finance', href: '/finance' },
           { label: 'Chart of Accounts', href: '/finance/chart-of-accounts' },
         ]}
-        showBack
+        actions={actions}
       />
 
-      <main className="flex-1 p-6 overflow-auto bg-[#0f0f1a] min-h-[100dvh]">
-        <div className="max-w-5xl mx-auto space-y-6">
+      <div className="flex min-h-[100dvh] bg-[#0f0f1a]">
+        {/* ── Main FastTabs ────────────────────────────────────────────────── */}
+        <main className="flex-1 p-6 overflow-auto space-y-4">
 
-          {/* ── Account Header Card ─────────────────────────────────────────── */}
-          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-6">
-            <div className="flex items-start justify-between flex-wrap gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="font-mono text-2xl font-bold text-zinc-100">{account.code}</span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold uppercase tracking-widest ${TYPE_BADGE[account.type] ?? 'bg-zinc-700 text-zinc-400'}`}>
-                    {TYPE_LABELS[account.type] ?? account.type}
-                  </span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${account.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-700 text-zinc-400'}`}>
-                    {account.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <h1 className="text-xl font-bold text-zinc-100">{account.name}</h1>
-                {account.subtype && (
-                  <p className="text-[13px] text-zinc-500 mt-0.5 capitalize">{account.subtype}</p>
-                )}
+          {/* General FastTab */}
+          <details open className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">General</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="No." value={account.code} />
+              <Field label="Name" value={account.name} />
+              <Field label="Account Type">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${TYPE_BADGE[account.type] ?? 'bg-zinc-700 text-zinc-400'}`}>
+                  {account.type}
+                </span>
+              </Field>
+              <Field label="Direct Posting">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${
+                  account.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-700 text-zinc-400'
+                }`}>
+                  {account.isActive ? 'Yes' : 'No'}
+                </span>
+              </Field>
+              <Field label="Blocked">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-700 text-zinc-400">
+                  No
+                </span>
+              </Field>
+              <Field label="Normal Balance" value={normalBalance(account.type)} />
+              <Field label="Subtype" value={account.subtype ?? '—'} />
+              <Field label="Main Account Type" value={account.mainAccountType ?? '—'} />
+            </div>
+          </details>
+
+          {/* Posting FastTab */}
+          <details className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Posting</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="Gen. Posting Type" value="—" />
+              <Field label="Gen. Bus. Posting Group" value="—" />
+              <Field label="Gen. Prod. Posting Group" value="—" />
+              <Field label="VAT Bus. Posting Group" value="—" />
+              <Field label="VAT Prod. Posting Group" value="—" />
+            </div>
+          </details>
+
+          {/* Consolidation FastTab */}
+          <details className="group bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors list-none">
+              <span className="text-[13px] font-semibold text-zinc-100">Consolidation</span>
+              <ChevronDown className="w-4 h-4 text-zinc-500 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
+              <Field label="Consol. Debit Acc." value="—" />
+              <Field label="Consol. Credit Acc." value="—" />
+              <Field label="Opening Account" value={account.openingAccountId ?? '—'} />
+            </div>
+          </details>
+
+          {/* Journal Lines (recent entries) */}
+          {account.journalLines.length > 0 && (
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-800/50 bg-zinc-900/30">
+                <span className="text-[13px] font-semibold text-zinc-100">G/L Entries (last 20)</span>
               </div>
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="border-b border-zinc-800/50">
+                    <th className="text-left px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Date</th>
+                    <th className="text-left px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Reference</th>
+                    <th className="text-left px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Description</th>
+                    <th className="text-right px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Debit</th>
+                    <th className="text-right px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500">Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {account.journalLines.map((l, i) => (
+                    <tr key={l.id} className={`hover:bg-zinc-800/20 ${i !== account.journalLines.length - 1 ? 'border-b border-zinc-800/30' : ''}`}>
+                      <td className="px-4 py-2 text-zinc-400">{formatDate(l.entry.date)}</td>
+                      <td className="px-4 py-2 text-zinc-400 font-mono text-[11px]">{l.entry.reference}</td>
+                      <td className="px-4 py-2 text-zinc-300">{l.memo ?? l.entry.description ?? '—'}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-zinc-300">{l.debit > 0 ? formatCurrency(l.debit) : ''}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-zinc-300">{l.credit > 0 ? formatCurrency(l.credit) : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </main>
 
-              {/* Balance KPI */}
-              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-4 min-w-[160px] text-right">
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Current Balance</div>
-                <div className={`text-2xl font-bold tabular-nums ${(account.balance ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        {/* ── FactBox Sidebar ───────────────────────────────────────────────── */}
+        <aside className="w-72 shrink-0 border-l border-zinc-800/50 p-4 space-y-4 bg-[#0f0f1a]">
+          {/* Account Balance FactBox */}
+          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/30">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Account Balance</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Balance</div>
+                <div className={`text-xl font-bold tabular-nums ${(account.balance ?? 0) >= 0 ? 'text-zinc-100' : 'text-red-400'}`}>
                   {formatCurrency(account.balance ?? 0)}
                 </div>
-                <div className="text-[11px] text-zinc-600 mt-1">Normal: {normalBalance(account.type)}</div>
               </div>
-            </div>
-
-            {/* Meta grid */}
-            <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-zinc-800/50">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Type</div>
-                <div className="text-[13px] text-zinc-300 capitalize">{account.type}</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Subtype</div>
-                <div className="text-[13px] text-zinc-300 capitalize">{account.subtype ?? '—'}</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Statement</div>
-                <div className="text-[13px] text-zinc-300 capitalize">
-                  {account.mainAccountType === 'balance_sheet' ? 'Balance Sheet'
-                    : account.mainAccountType === 'profit_loss' ? 'Profit & Loss'
-                    : '—'}
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-800/50">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Total Debit</div>
+                  <div className="text-sm font-semibold text-zinc-200 tabular-nums">{formatCurrency(totalDebit)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Total Credit</div>
+                  <div className="text-sm font-semibold text-zinc-200 tabular-nums">{formatCurrency(totalCredit)}</div>
                 </div>
               </div>
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Journal Lines</div>
-                <div className="text-[13px] text-zinc-300">{account.journalLines.length}</div>
-              </div>
             </div>
           </div>
 
-          {/* ── Recent Journal Lines ────────────────────────────────────────── */}
+          {/* Entries FactBox */}
           <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-800/50">
-              <h2 className="text-[13px] font-semibold text-zinc-200">Recent Journal Lines</h2>
-              <span className="text-[11px] text-zinc-600">Last {account.journalLines.length} entries</span>
+            <div className="px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/30">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Entries</span>
             </div>
-
-            {displayLines.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-14 text-zinc-600">
-                <p className="text-[13px]">No journal activity yet</p>
+            <div className="p-4 space-y-2">
+              <div className="flex items-center justify-between text-[12px]">
+                <span className="text-zinc-500">Journal Lines</span>
+                <span className="text-zinc-200 font-semibold">{account.journalLines.length}</span>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="border-b border-zinc-800/80 bg-zinc-900/40">
-                      <th className="text-left px-5 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Date</th>
-                      <th className="text-left py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Reference</th>
-                      <th className="text-left py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Description</th>
-                      <th className="text-right py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Debit</th>
-                      <th className="text-right py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Credit</th>
-                      <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Running Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayLines.map((line, idx) => (
-                      <tr
-                        key={line.id}
-                        className={`hover:bg-zinc-800/30 transition-colors ${idx !== displayLines.length - 1 ? 'border-b border-zinc-800/40' : ''}`}
-                      >
-                        <td className="px-5 py-2.5 text-zinc-500 text-[12px] whitespace-nowrap">
-                          {formatDate(line.entry.date)}
-                        </td>
-                        <td className="py-2.5 pr-4 font-mono text-[11px] text-zinc-400">
-                          {line.entry.reference}
-                        </td>
-                        <td className="py-2.5 pr-6 text-zinc-400 max-w-[220px] truncate" title={line.memo ?? line.entry.description ?? ''}>
-                          {line.memo ?? line.entry.description ?? <span className="text-zinc-700">—</span>}
-                        </td>
-                        <td className="py-2.5 pr-6 text-right tabular-nums text-blue-400 font-medium">
-                          {line.debit > 0 ? formatCurrency(line.debit) : <span className="text-zinc-700">—</span>}
-                        </td>
-                        <td className="py-2.5 pr-6 text-right tabular-nums text-purple-400 font-medium">
-                          {line.credit > 0 ? formatCurrency(line.credit) : <span className="text-zinc-700">—</span>}
-                        </td>
-                        <td className={`px-5 py-2.5 text-right tabular-nums font-semibold ${line.runningBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {formatCurrency(line.runningBalance)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              <Link
+                href={`/finance/gl-entries?accountId=${account.id}`}
+                className="block text-center mt-2 py-1.5 text-[12px] text-blue-400 hover:text-blue-300 bg-zinc-900/40 rounded transition-colors"
+              >
+                View G/L Entries →
+              </Link>
+            </div>
           </div>
-
-          {/* ── Edit Form ───────────────────────────────────────────────────── */}
-          <AccountEditForm
-            id={account.id}
-            initialName={account.name}
-            initialSubtype={account.subtype ?? ''}
-            initialIsActive={account.isActive}
-          />
-
-        </div>
-      </main>
+        </aside>
+      </div>
     </>
+  )
+}
+
+function Field({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">{label}</div>
+      <div className="text-[13px] text-zinc-200">{children ?? value ?? '—'}</div>
+    </div>
   )
 }

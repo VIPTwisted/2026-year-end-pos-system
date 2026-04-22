@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { TopBar } from '@/components/layout/TopBar'
 import Link from 'next/link'
 import { ChevronRight, FileText, Sparkles, TrendingUp, Bug, Zap } from 'lucide-react'

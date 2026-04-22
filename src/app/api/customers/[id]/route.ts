@@ -12,7 +12,6 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
         take: 10,
       },
       arInvoices: { orderBy: { dueDate: 'desc' }, take: 5 },
-      cases: { orderBy: { createdAt: 'desc' }, take: 5 },
     },
   })
   if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })

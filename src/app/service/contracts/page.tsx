@@ -1,163 +1,181 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { formatDate, formatCurrency } from '@/lib/utils'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FileCheck2, Plus } from 'lucide-react'
+import { Plus, ChevronRight } from 'lucide-react'
 
-const STATUS_VARIANT: Record<string, 'success' | 'secondary' | 'destructive' | 'warning'> = {
-  active: 'success',
-  expired: 'secondary',
+function fmtDate(d: Date | string | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+function fmtCurrency(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
+}
+
+const STATUS_VARIANT: Record<string, 'warning' | 'default' | 'success' | 'secondary' | 'destructive'> = {
+  Draft:     'warning',
+  Signed:    'success',
+  Cancelled: 'destructive',
+  Expired:   'secondary',
+  active:    'success',
+  draft:     'warning',
   cancelled: 'destructive',
-  draft: 'warning',
+  expired:   'secondary',
 }
 
-const BILLING_LABEL: Record<string, string> = {
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  annually: 'Annual',
-  one_time: 'One-time',
-}
+export default async function ServiceContractsListPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>
+}) {
+  const sp = await searchParams
+  const custId   = sp.customer ?? ''
+  const status   = sp.status ?? ''
+  const dateFrom = sp.dateFrom ?? ''
+  const dateTo   = sp.dateTo ?? ''
 
-export default async function ServiceContractsPage() {
   const contracts = await prisma.serviceContract.findMany({
-    include: {
-      customer: true,
-      serviceItems: true,
-      serviceCases: true,
+    where: {
+      ...(custId   ? { customerId: custId }                      : {}),
+      ...(status   ? { status }                                   : {}),
+      ...(dateFrom ? { startDate: { gte: new Date(dateFrom) } }   : {}),
+      ...(dateTo   ? { startDate: { lte: new Date(dateTo) } }     : {}),
     },
+    include: { customer: true },
     orderBy: { createdAt: 'desc' },
   })
 
-  const active = contracts.filter(c => c.status === 'active')
-  const totalValue = active.reduce((sum, c) => sum + c.value, 0)
-  const expiringSoon = active.filter(c => {
-    if (!c.endDate) return false
-    const daysUntil = Math.ceil((c.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    return daysUntil <= 30
+  const customers = await prisma.customer.findMany({
+    select: { id: true, firstName: true, lastName: true },
+    orderBy: { firstName: 'asc' }, take: 200,
   })
 
   return (
     <>
       <TopBar title="Service Contracts" />
-      <main className="flex-1 p-6 overflow-auto space-y-6">
+      <main className="flex-1 overflow-auto">
 
-        <div className="grid grid-cols-4 gap-4">
-          <Card><CardContent className="pt-5 pb-5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Total Contracts</p>
-            <p className="text-2xl font-bold text-zinc-100">{contracts.length}</p>
-          </CardContent></Card>
-          <Card><CardContent className="pt-5 pb-5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Active</p>
-            <p className="text-2xl font-bold text-emerald-400">{active.length}</p>
-          </CardContent></Card>
-          <Card><CardContent className="pt-5 pb-5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Expiring ≤30d</p>
-            <p className={`text-2xl font-bold ${expiringSoon.length > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>{expiringSoon.length}</p>
-          </CardContent></Card>
-          <Card><CardContent className="pt-5 pb-5">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Active Value</p>
-            <p className="text-2xl font-bold text-zinc-100">{formatCurrency(totalValue)}</p>
-          </CardContent></Card>
+        {/* Ribbon */}
+        <div className="border-b border-zinc-800 bg-zinc-950 px-4 py-2 flex items-center gap-1">
+          <Button asChild size="sm" className="h-7 px-2.5 text-xs gap-1">
+            <Link href="/service/contracts/new"><Plus className="w-3.5 h-3.5" />New</Link>
+          </Button>
         </div>
 
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-100">Contracts</h2>
-              <p className="text-sm text-zinc-500">{contracts.length} contracts</p>
+        <div className="flex min-h-0 flex-1">
+          {/* Filter Pane */}
+          <form method="GET" action="/service/contracts"
+            className="w-52 shrink-0 border-r border-zinc-800 bg-zinc-950 p-4 space-y-4 sticky top-0 overflow-y-auto"
+            style={{ maxHeight: 'calc(100vh - 112px)' }}>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Filters</p>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Customer</label>
+              <select name="customer" defaultValue={custId}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100">
+                <option value="">All</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+                ))}
+              </select>
             </div>
-            <Button asChild>
-              <Link href="/service/contracts/new">
-                <Plus className="w-4 h-4 mr-1" />
-                New Contract
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Status</label>
+              <select name="status" defaultValue={status}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100">
+                <option value="">All</option>
+                {['Draft','Signed','Cancelled','Expired'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Start Date From</label>
+              <input type="date" name="dateFrom" defaultValue={dateFrom}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-400">Start Date To</label>
+              <input type="date" name="dateTo" defaultValue={dateTo}
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100" />
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <button type="submit"
+                className="w-full h-7 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors">
+                Apply
+              </button>
+              <Link href="/service/contracts"
+                className="w-full h-7 rounded border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs font-medium flex items-center justify-center transition-colors">
+                Clear
               </Link>
-            </Button>
-          </div>
+            </div>
+          </form>
 
-          {contracts.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-20 text-zinc-500">
-                <FileCheck2 className="w-12 h-12 mb-4 opacity-30" />
-                <p className="text-base font-medium text-zinc-300 mb-2">No contracts yet</p>
-                <Button asChild variant="outline"><Link href="/service/contracts/new">Create First Contract</Link></Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+          {/* Table */}
+          <div className="flex-1 p-5 overflow-x-auto">
+            <div className="mb-3 flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-zinc-100">Service Contracts</h2>
+              <span className="text-xs text-zinc-500">{contracts.length} record{contracts.length !== 1 ? 's' : ''}</span>
+            </div>
+
+            {contracts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
+                <p className="text-sm">No service contracts found.</p>
+                <Button asChild variant="outline" className="mt-4">
+                  <Link href="/service/contracts/new"><Plus className="w-4 h-4 mr-1" />New Contract</Link>
+                </Button>
+              </div>
+            ) : (
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                    <th className="text-left pb-3 font-medium">Contract #</th>
-                    <th className="text-left pb-3 font-medium">Customer</th>
-                    <th className="text-center pb-3 font-medium">Status</th>
-                    <th className="text-left pb-3 font-medium">Start</th>
-                    <th className="text-left pb-3 font-medium">End</th>
-                    <th className="text-left pb-3 font-medium">Billing</th>
-                    <th className="text-right pb-3 font-medium">Value</th>
-                    <th className="text-center pb-3 font-medium">Items</th>
-                    <th className="text-center pb-3 font-medium">Cases</th>
-                    <th className="text-right pb-3 font-medium"></th>
+                  <tr className="border-b border-zinc-800 text-zinc-500 uppercase tracking-wide">
+                    <th className="text-left pb-2.5 font-medium pr-4">Contract No.</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Customer No.</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Customer Name</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Contract Type</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Starting Date</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Expiration Date</th>
+                    <th className="text-right pb-2.5 font-medium pr-4">Annual Amount</th>
+                    <th className="text-left pb-2.5 font-medium pr-4">Status</th>
+                    <th className="pb-2.5 w-6"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {contracts.map(c => {
-                    const daysUntilExpiry = c.endDate
-                      ? Math.ceil((c.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                      : null
-                    return (
-                      <tr key={c.id} className="hover:bg-zinc-900/50">
-                        <td className="py-3 pr-4 font-mono text-xs">
-                          <Link href={`/service/contracts/${c.id}`} className="text-blue-400 hover:underline">
-                            {c.contractNumber}
-                          </Link>
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-300">
-                          {c.customer ? `${c.customer.firstName} ${c.customer.lastName}` : '—'}
-                        </td>
-                        <td className="py-3 pr-4 text-center">
-                          <Badge variant={STATUS_VARIANT[c.status] ?? 'secondary'} className="capitalize">
-                            {c.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-400 text-xs whitespace-nowrap">
-                          {formatDate(c.startDate ?? new Date())}
-                        </td>
-                        <td className="py-3 pr-4 text-xs whitespace-nowrap">
-                          {c.endDate ? (
-                            <span className={daysUntilExpiry !== null && daysUntilExpiry <= 30 && c.status === 'active' ? 'text-amber-400' : 'text-zinc-400'}>
-                              {formatDate(c.endDate)}
-                              {daysUntilExpiry !== null && daysUntilExpiry <= 30 && c.status === 'active' && (
-                                <span className="ml-1 text-amber-600">({daysUntilExpiry}d)</span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="text-zinc-600">No end</span>
-                          )}
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-500 text-xs">
-                          {BILLING_LABEL[c.billingCycle] ?? c.billingCycle}
-                        </td>
-                        <td className="py-3 pr-4 text-right tabular-nums text-zinc-300">
-                          {formatCurrency(c.value)}
-                        </td>
-                        <td className="py-3 pr-4 text-center text-zinc-400">{c.serviceItems.length}</td>
-                        <td className="py-3 pr-4 text-center text-zinc-400">{c.serviceCases.length}</td>
-                        <td className="py-3 text-right">
-                          <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                            <Link href={`/service/contracts/${c.id}`}>View</Link>
-                          </Button>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                <tbody className="divide-y divide-zinc-800/60">
+                  {contracts.map(c => (
+                    <tr key={c.id} className="hover:bg-zinc-900/40 transition-colors group">
+                      <td className="py-2.5 pr-4">
+                        <Link href={`/service/contracts/${c.id}`}
+                          className="font-mono text-indigo-400 hover:text-indigo-300 font-medium">
+                          {c.contractNumber}
+                        </Link>
+                      </td>
+                      <td className="py-2.5 pr-4 font-mono text-zinc-500">
+                        {c.customer?.id.slice(0, 8).toUpperCase() ?? '—'}
+                      </td>
+                      <td className="py-2.5 pr-4 text-zinc-300">
+                        {c.customer ? `${c.customer.firstName} ${c.customer.lastName}` : <span className="text-zinc-600">—</span>}
+                      </td>
+                      <td className="py-2.5 pr-4 text-zinc-400 capitalize">{c.coverageType ?? c.billingCycle ?? 'Contract'}</td>
+                      <td className="py-2.5 pr-4 text-zinc-400">{fmtDate(c.startDate)}</td>
+                      <td className="py-2.5 pr-4 text-zinc-400">{fmtDate(c.endDate)}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-zinc-200">{fmtCurrency(c.value)}</td>
+                      <td className="py-2.5 pr-4">
+                        <Badge variant={STATUS_VARIANT[c.status] ?? 'secondary'} className="capitalize text-[10px]">{c.status}</Badge>
+                      </td>
+                      <td className="py-2.5">
+                        <Link href={`/service/contracts/${c.id}`}>
+                          <ChevronRight className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-400" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-            </div>
-          )}
-        </section>
+            )}
+          </div>
+        </div>
       </main>
     </>
   )

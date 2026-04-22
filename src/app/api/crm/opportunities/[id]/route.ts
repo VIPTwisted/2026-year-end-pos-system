@@ -1,65 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { initCrmTables } from '@/lib/crm-db'
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const opportunity = await prisma.opportunity.findUnique({
-      where: { id },
-      include: {
-        contact: true,
-        customer: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
-        salesCycle: { include: { stages: { orderBy: { stageOrder: 'asc' } } } },
-      },
-    })
-    if (!opportunity) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    return NextResponse.json(opportunity)
-  } catch (err) {
-    console.error(err)
-    return NextResponse.json({ error: 'Failed to fetch opportunity' }, { status: 500 })
-  }
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await initCrmTables()
+  const { id } = await params
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = await prisma.$queryRaw`
+    SELECT o.*, c.name AS contactName
+    FROM BCOpportunity o
+    LEFT JOIN BCContact c ON c.id = o.contactId
+    WHERE o.id = ${id}
+  `
+  if (!rows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json(rows[0])
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const body = await req.json()
-    const {
-      title, contactId, customerId, salesCycleId, currentStageId,
-      estimatedValue, probability, expectedCloseDate, status, assignedTo, notes,
-    } = body
-
-    const data: Record<string, unknown> = {}
-    if (title !== undefined) data.title = title
-    if (contactId !== undefined) data.contactId = contactId
-    if (customerId !== undefined) data.customerId = customerId
-    if (salesCycleId !== undefined) data.salesCycleId = salesCycleId
-    if (currentStageId !== undefined) data.currentStageId = currentStageId
-    if (estimatedValue !== undefined) data.estimatedValue = estimatedValue
-    if (probability !== undefined) data.probability = probability
-    if (expectedCloseDate !== undefined) data.expectedCloseDate = expectedCloseDate ? new Date(expectedCloseDate) : null
-    if (status !== undefined) data.status = status
-    if (assignedTo !== undefined) data.assignedTo = assignedTo
-    if (notes !== undefined) data.notes = notes
-
-    const updated = await prisma.opportunity.update({
-      where: { id },
-      data,
-      include: {
-        contact: true,
-        customer: { select: { id: true, firstName: true, lastName: true } },
-        salesCycle: { include: { stages: { orderBy: { stageOrder: 'asc' } } } },
-      },
-    })
-    return NextResponse.json(updated)
-  } catch (err) {
-    console.error(err)
-    return NextResponse.json({ error: 'Failed to update opportunity' }, { status: 500 })
-  }
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await initCrmTables()
+  const { id } = await params
+  const body = await req.json()
+  const { description, salesperson, status, stage, probability, estimatedValue, closeDate, campaignId } = body
+  await prisma.$executeRaw`
+    UPDATE BCOpportunity SET
+      description = COALESCE(${description ?? null}, description),
+      salesperson = COALESCE(${salesperson ?? null}, salesperson),
+      status = COALESCE(${status ?? null}, status),
+      stage = COALESCE(${stage ?? null}, stage),
+      probability = COALESCE(${probability ?? null}, probability),
+      estimatedValue = COALESCE(${estimatedValue ?? null}, estimatedValue),
+      closeDate = COALESCE(${closeDate ?? null}, closeDate),
+      campaignId = COALESCE(${campaignId ?? null}, campaignId)
+    WHERE id = ${id}
+  `
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = await prisma.$queryRaw`SELECT * FROM BCOpportunity WHERE id = ${id}`
+  return NextResponse.json(rows[0])
 }

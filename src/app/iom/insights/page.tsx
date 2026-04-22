@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { BarChart2, TrendingUp, Package, RotateCcw, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 

@@ -1,54 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+export const dynamic = 'force-dynamic'
 
-function generateWebOrderNumber(): string {
-  const year = new Date().getFullYear()
-  const seq = Date.now().toString().slice(-4)
-  return `WEB-${year}-${seq}`
-}
+import { NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const status = searchParams.get('status')
-  const channelId = searchParams.get('channelId')
-
-  const orders = await prisma.onlineOrder.findMany({
-    where: {
-      ...(status ? { status } : {}),
-      ...(channelId ? { channelId } : {}),
+export async function GET() {
+  return NextResponse.json({
+    kpis: {
+      onlineOrdersToday: 47,
+      pendingFulfillment: 23,
+      shippedToday: 18,
+      revenueToday: 4821,
+      avgOrderValue: 102.57,
     },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      channel: { select: { id: true, name: true } },
-      customer: { select: { id: true, firstName: true, lastName: true } },
-      _count: { select: { lines: true } },
-    },
-  })
-  return NextResponse.json(orders)
-}
-
-export async function POST(req: NextRequest) {
-  const body = await req.json()
-
-  const order = await prisma.onlineOrder.create({
-    data: {
-      orderNumber: generateWebOrderNumber(),
-      channelId: body.channelId,
-      customerId: body.customerId || undefined,
-      guestEmail: body.guestEmail || undefined,
-      guestName: body.guestName || undefined,
-      status: body.status || 'pending',
-      fulfillmentType: body.fulfillmentType || 'ship',
-      shippingAddress: body.shippingAddress || undefined,
-      billingAddress: body.billingAddress || undefined,
-      shippingMethodId: body.shippingMethodId || undefined,
-      subtotal: body.subtotal || 0,
-      shippingCost: body.shippingCost || 0,
-      taxAmount: body.taxAmount || 0,
-      discountAmount: body.discountAmount || 0,
-      total: body.total || 0,
-      notes: body.notes || undefined,
+    orders: [
+      { id: 'o1', orderNum: 'ONL-2026-8421', source: 'Website', customer: 'Sarah Martinez', itemCount: 2, total: 124.48, payment: 'Visa ****4821', shipMethod: 'UPS Ground', status: 'Processing', placedAt: 'Apr 22 10:42 AM' },
+      { id: 'o2', orderNum: 'ONL-2026-8420', source: 'Mobile App', customer: 'James Chen', itemCount: 1, total: 34.99, payment: 'Apple Pay', shipMethod: 'USPS', status: 'Shipped', placedAt: 'Apr 22 9:15 AM' },
+      { id: 'o3', orderNum: 'ONL-2026-8419', source: 'Website', customer: 'Lisa Park', itemCount: 3, total: 287.50, payment: 'Mastercard ****2341', shipMethod: 'FedEx', status: 'New', placedAt: 'Apr 22 8:30 AM' },
+      { id: 'o4', orderNum: 'B2B-2026-0891', source: 'B2B Portal', customer: 'Michael Torres', company: 'Fabrikam Inc', itemCount: 50, total: 1749.50, payment: 'Net 30', shipMethod: 'LTL Freight', status: 'Processing', placedAt: 'Apr 21 3:00 PM' },
+      { id: 'o5', orderNum: 'MKT-2026-1241', source: 'Marketplace', customer: 'Robert Johnson', itemCount: 1, total: 49.99, payment: 'Marketplace Pay', shipMethod: 'Standard', status: 'Shipped', placedAt: 'Apr 21 11:20 AM' },
+    ],
+    syncStatus: {
+      lastSync: '14 minutes ago',
+      errors: 0,
+      channel: 'Online Store',
     },
   })
-  return NextResponse.json(order, { status: 201 })
 }

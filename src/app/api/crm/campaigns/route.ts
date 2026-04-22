@@ -1,40 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { initCrmTables, cuid } from '@/lib/crm-db'
 
 export async function GET(req: NextRequest) {
+  await initCrmTables()
   const { searchParams } = new URL(req.url)
-  const status = searchParams.get('status')
-  const type = searchParams.get('type')
+  const search = searchParams.get('search') ?? ''
+  const statusCode = searchParams.get('statusCode') ?? ''
 
-  const where: Record<string, string> = {}
-  if (status && status !== 'all') where.status = status
-  if (type && type !== 'all') where.campaignType = type
-
-  const campaigns = await prisma.marketingCampaign.findMany({
-    where,
-    include: { segment: { select: { id: true, name: true, memberCount: true } } },
-    orderBy: { createdAt: 'desc' },
-  })
-  return NextResponse.json(campaigns)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = await prisma.$queryRaw`
+    SELECT c.*,
+      (SELECT COUNT(*) FROM BCOpportunity o WHERE o.campaignId = c.id) AS noOfContacts
+    FROM BCCampaign c
+    WHERE (${search} = '' OR c.description LIKE ${'%' + search + '%'} OR c.campaignNo LIKE ${'%' + search + '%'})
+      AND (${statusCode} = '' OR c.statusCode = ${statusCode})
+    ORDER BY c.createdAt DESC
+  `
+  return NextResponse.json(rows)
 }
 
 export async function POST(req: NextRequest) {
+  await initCrmTables()
   const body = await req.json()
-  const campaign = await prisma.marketingCampaign.create({
-    data: {
-      name: body.name,
-      campaignType: body.campaignType ?? 'email',
-      status: 'draft',
-      segmentId: body.segmentId ?? null,
-      subject: body.subject ?? null,
-      bodyTemplate: body.bodyTemplate ?? null,
-      scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
-      totalRecipients: body.totalRecipients ?? 0,
-      budget: body.budget ?? 0,
-      utmSource: body.utmSource ?? null,
-      utmMedium: body.utmMedium ?? null,
-      utmCampaign: body.utmCampaign ?? null,
-    } as Parameters<typeof prisma.marketingCampaign.create>[0]['data'],
-  })
-  return NextResponse.json(campaign, { status: 201 })
+  const { description, startingDate, endingDate, statusCode, salesperson } = body
+  if (!description) return NextResponse.json({ error: 'description required' }, { status: 400 })
+
+  const id = cuid()
+  const campaignNo = 'CP' + Date.now().toString().slice(-6)
+  await prisma.$executeRaw`
+    INSERT INTO BCCampaign (id, campaignNo, description, startingDate, endingDate, statusCode, salesperson)
+    VALUES (${id}, ${campaignNo}, ${description}, ${startingDate ?? null}, ${endingDate ?? null},
+            ${statusCode ?? 'Active'}, ${salesperson ?? null})
+  `
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = await prisma.$queryRaw`SELECT * FROM BCCampaign WHERE id = ${id}`
+  return NextResponse.json(rows[0], { status: 201 })
 }

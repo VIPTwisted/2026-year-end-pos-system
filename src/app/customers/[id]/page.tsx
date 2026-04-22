@@ -4,50 +4,14 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
-  ArrowLeft, User, Star, ShoppingCart, DollarSign,
-  CreditCard, Phone, MapPin, Mail, FileText,
+  ArrowLeft, User, Edit, Trash2, Plus, BarChart2,
+  BookOpen, Navigation, Mail,
 } from 'lucide-react'
 
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary'> = {
-  paid: 'success', pending: 'warning', refunded: 'destructive', voided: 'secondary',
-}
-const CREDIT_VARIANT: Record<string, 'success' | 'warning' | 'destructive'> = {
-  good: 'success', warning: 'warning', hold: 'destructive',
-}
-const INV_VARIANT: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary'> = {
-  paid: 'success', partial: 'warning', overdue: 'destructive', draft: 'secondary', sent: 'default',
-}
-
-function getTier(points: number) {
-  if (points > 500) return { label: 'VIP', variant: 'success' as const }
-  if (points >= 100) return { label: 'Active', variant: 'default' as const }
-  return { label: 'New', variant: 'secondary' as const }
-}
-
-function FastTabHeader({ label, count }: { label: string; count?: number }) {
-  return (
-    <div className="border-b border-zinc-800/40 py-2.5 px-4 flex justify-between items-center bg-zinc-900/40">
-      <span className="text-[12px] font-semibold uppercase tracking-wide text-zinc-300">
-        {label}{count !== undefined ? ` (${count})` : ''}
-      </span>
-    </div>
-  )
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-0.5">{label}</p>
-      <p className="text-[13px] text-zinc-100">{value ?? '—'}</p>
-    </div>
-  )
-}
-
-export default async function CustomerDetailPage({
+export default async function CustomerCardPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -58,235 +22,385 @@ export default async function CustomerDetailPage({
     where: { id },
     include: {
       orders: {
-        include: { items: true, store: { select: { name: true } } },
+        include: { store: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: 5,
       },
-      arInvoices: { orderBy: { dueDate: 'desc' }, take: 5 },
-      cases: { orderBy: { createdAt: 'desc' }, take: 3 },
-      customerGroup: { select: { id: true, name: true, discountPct: true } },
+      arInvoices: {
+        orderBy: { postingDate: 'desc' },
+        take: 5,
+      },
     },
   })
 
   if (!customer) notFound()
 
-  const tier = getTier(customer.loyaltyPoints)
-  const openAR = customer.arInvoices
-    .filter(i => !['paid', 'cancelled'].includes(i.status))
+  const balance = customer.arInvoices.reduce(
+    (s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0
+  )
+  const balanceDue = customer.arInvoices
+    .filter(i => new Date(i.dueDate) < new Date() && !['paid', 'cancelled'].includes(i.status))
     .reduce((s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0)
+  const outstandingOrders = customer.orders.filter(
+    o => !['paid', 'cancelled', 'refunded', 'voided'].includes(o.status)
+  ).length
+  const salesLCY  = Number(customer.totalSpent)
+  const profitLCY = salesLCY * 0.35
+  const profitPct = salesLCY > 0 ? ((profitLCY / salesLCY) * 100).toFixed(1) : '0.0'
+
+  function blockedLabel() {
+    if (!customer.isActive)               return 'All'
+    if (customer.creditStatus === 'hold') return 'Invoice'
+    return 'None'
+  }
+
+  const tabCls = 'px-4 py-3 text-sm font-semibold text-zinc-200 cursor-pointer hover:bg-zinc-900/30 select-none list-none flex items-center gap-2'
+  const gridCls = 'px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-3 pt-2 md:grid-cols-3'
+  const lbl = 'text-[10px] uppercase tracking-widest text-zinc-500'
+  const val = 'text-sm text-zinc-100'
 
   return (
     <>
       <TopBar title={`${customer.firstName} ${customer.lastName}`} />
       <main className="flex-1 overflow-auto bg-[#0f0f1a] min-h-[100dvh]">
 
-        {/* D365 Header Band */}
-        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/customers"
-                className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Customers
-              </Link>
-              <span className="text-zinc-700">/</span>
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-zinc-400" />
-                <span className="font-bold text-lg text-zinc-100">
-                  {customer.firstName} {customer.lastName}
-                </span>
-              </div>
-              <Badge variant={tier.variant}>{tier.label}</Badge>
-              <Badge variant={CREDIT_VARIANT[customer.creditStatus] ?? 'secondary'} className="capitalize">
-                Credit: {customer.creditStatus}
-              </Badge>
-              {!customer.isActive && <Badge variant="destructive">Inactive</Badge>}
-            </div>
-            <div className="flex items-center gap-2">
-              <Link href={`/customers/${id}/statement`}>
-                <Button variant="outline" size="sm">
-                  <FileText className="w-3.5 h-3.5 mr-1" />
-                  Statement
-                </Button>
-              </Link>
-              <Link href={`/customers/${id}/edit`}>
-                <Button variant="outline" size="sm">Edit</Button>
-              </Link>
-            </div>
-          </div>
+        {/* Breadcrumb */}
+        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-2 text-xs text-zinc-500 flex items-center gap-1.5">
+          <Link href="/customers" className="hover:text-zinc-300 transition-colors">Customers</Link>
+          <span>/</span>
+          <span className="text-zinc-300">{customer.firstName} {customer.lastName}</span>
         </div>
 
-        <div className="px-6 py-4 space-y-4">
+        {/* Action Ribbon — Edit | Delete | New | Statistics | Ledger Entries | Navigate | Send Email */}
+        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-2 flex items-center gap-1.5 flex-wrap">
+          <Link href={`/customers/${id}/edit`}>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-700 hover:bg-blue-600 border border-blue-600 rounded transition-colors">
+              <Edit className="w-3 h-3" /> Edit
+            </button>
+          </Link>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+          <Link href="/customers/new">
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              <Plus className="w-3 h-3" /> New
+            </button>
+          </Link>
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <Link href={`/customers/${id}/statement`}>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              <BarChart2 className="w-3 h-3" /> Statistics
+            </button>
+          </Link>
+          <Link href={`/customers/${id}/ledger-entries`}>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              <BookOpen className="w-3 h-3" /> Ledger Entries
+            </button>
+          </Link>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Navigation className="w-3 h-3" /> Navigate
+          </button>
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+          {customer.email && (
+            <a href={`mailto:${customer.email}`}>
+              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+                <Mail className="w-3 h-3" /> Send Email
+              </button>
+            </a>
+          )}
+        </div>
 
-          {/* General FastTab */}
-          <div className="border border-zinc-800/60 rounded-md overflow-hidden bg-zinc-900/20">
-            <FastTabHeader label="General" />
-            <div className="px-4 py-3 grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-4">
-              {customer.email && (
-                <Field
-                  label="Email"
-                  value={
-                    <span className="flex items-center gap-1">
-                      <Mail className="w-3 h-3 text-zinc-500" />{customer.email}
-                    </span>
-                  }
-                />
-              )}
-              {customer.phone && (
-                <Field
-                  label="Phone"
-                  value={
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-zinc-500" />{customer.phone}
-                    </span>
-                  }
-                />
-              )}
-              {customer.city && (
-                <Field
-                  label="Location"
-                  value={
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-zinc-500" />
-                      {[customer.city, customer.state].filter(Boolean).join(', ')}
-                    </span>
-                  }
-                />
-              )}
-              <Field label="Credit Limit" value={formatCurrency(customer.creditLimit)} />
-              <Field label="Address" value={[customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(', ') || '—'} />
-              <Field label="Tags" value={customer.tags ?? '—'} />
-              <Field label="Member Since" value={formatDate(customer.createdAt)} />
-              <Field
-                label="Price Group"
-                value={
-                  customer.customerGroup ? (
-                    <span className="flex items-center gap-2">
-                      <Link
-                        href={`/settings/customer-groups/${customer.customerGroup.id}`}
-                        className="text-blue-400 hover:underline text-[13px]"
-                      >
-                        {customer.customerGroup.name}
-                      </Link>
-                      <span className="text-[11px] text-amber-400 font-mono">
-                        {Number(customer.customerGroup.discountPct).toFixed(1)}% off
-                      </span>
-                    </span>
-                  ) : (
-                    <Link
-                      href="/settings/customer-groups"
-                      className="text-zinc-600 hover:text-zinc-400 text-[13px] italic"
-                    >
-                      No group — assign one
-                    </Link>
-                  )
-                }
-              />
-              {customer.notes && <Field label="Notes" value={<span className="italic text-zinc-400">{customer.notes}</span>} />}
-            </div>
-          </div>
+        {/* Page Title Band */}
+        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-3 flex items-center gap-3">
+          <Link href="/customers" className="text-zinc-500 hover:text-zinc-300 transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <User className="w-5 h-5 text-zinc-400" />
+          <h1 className="text-lg font-bold text-zinc-100">{customer.firstName} {customer.lastName}</h1>
+          {!customer.isActive && <Badge variant="destructive">Blocked</Badge>}
+          {customer.creditStatus === 'hold'    && <Badge variant="destructive">Credit Hold</Badge>}
+          {customer.creditStatus === 'warning' && (
+            <Badge className="bg-amber-700 text-amber-100 border-amber-600">Credit Warning</Badge>
+          )}
+        </div>
 
-          {/* KPI FastTab */}
-          <div className="border border-zinc-800/60 rounded-md overflow-hidden bg-zinc-900/20">
-            <FastTabHeader label="Statistics" />
-            <div className="px-4 py-3 grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-4">
-              {[
-                { label: 'Total Spent', value: formatCurrency(customer.totalSpent), icon: DollarSign, color: 'text-emerald-400' },
-                { label: 'Open AR', value: formatCurrency(openAR), icon: CreditCard, color: openAR > 0 ? 'text-amber-400' : 'text-zinc-400' },
-                { label: 'Loyalty Points', value: customer.loyaltyPoints.toLocaleString(), icon: Star, color: 'text-violet-400' },
-                { label: 'Visit Count', value: customer.visitCount.toString(), icon: ShoppingCart, color: 'text-blue-400' },
-              ].map(({ label, value, icon: Icon, color }) => (
-                <div key={label}>
-                  <p className="text-[11px] text-zinc-500 uppercase tracking-wide mb-0.5">{label}</p>
-                  <p className={`text-[18px] font-bold ${color} flex items-center gap-1`}>
-                    <Icon className={`w-4 h-4 ${color}`} />{value}
+        <div className="px-6 py-4 flex gap-4">
+
+          {/* FastTabs */}
+          <div className="flex-1 space-y-2">
+
+            {/* General */}
+            <details open className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className={tabCls}>
+                <span className="text-zinc-500 text-xs">&#9654;</span> General
+              </summary>
+              <div className={gridCls}>
+                <div>
+                  <label className={lbl}>No.</label>
+                  <p className="text-sm text-zinc-100 font-mono">{customer.id.slice(-8).toUpperCase()}</p>
+                </div>
+                <div>
+                  <label className={lbl}>Name</label>
+                  <p className={val}>{customer.firstName} {customer.lastName}</p>
+                </div>
+                <div>
+                  <label className={lbl}>Balance (LCY)</label>
+                  <p className={`text-sm font-semibold ${balance < 0 ? 'text-red-400' : balance > 0 ? 'text-amber-400' : 'text-zinc-400'}`}>
+                    {formatCurrency(balance)}
                   </p>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Orders FastTab */}
-          <div className="border border-zinc-800/60 rounded-md overflow-hidden bg-zinc-900/20">
-            <FastTabHeader label="Recent Orders" count={customer.orders.length} />
-            {customer.orders.length === 0 ? (
-              <p className="px-4 py-3 text-[13px] text-zinc-600">No orders yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-zinc-800/50 bg-zinc-900/30">
-                      {['Order #', 'Date', 'Store', 'Amount', 'Status'].map(h => (
-                        <th key={h} className="px-4 py-2 text-left text-[10px] uppercase text-zinc-500 font-medium tracking-wide">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customer.orders.map(order => (
-                      <tr key={order.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
-                        <td className="px-4 py-2">
-                          <Link href={`/orders/${order.id}`} className="font-mono text-[11px] text-blue-400 hover:underline">
-                            {order.orderNumber}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-2 text-[13px] text-zinc-500">{formatDate(order.createdAt)}</td>
-                        <td className="px-4 py-2 text-[13px] text-zinc-400">{order.store.name}</td>
-                        <td className="px-4 py-2 text-[13px] text-emerald-400 font-semibold">
-                          {formatCurrency(Number(order.totalAmount))}
-                        </td>
-                        <td className="px-4 py-2">
-                          <Badge variant={STATUS_VARIANT[order.status] ?? 'secondary'} className="capitalize text-xs">
-                            {order.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div>
+                  <label className={lbl}>Balance Due (LCY)</label>
+                  <p className={`text-sm font-semibold ${balanceDue > 0 ? 'text-red-400' : 'text-zinc-400'}`}>
+                    {formatCurrency(balanceDue)}
+                  </p>
+                </div>
+                <div>
+                  <label className={lbl}>Credit Limit (LCY)</label>
+                  <p className={val}>{formatCurrency(Number(customer.creditLimit))}</p>
+                </div>
+                <div>
+                  <label className={lbl}>Blocked</label>
+                  <p className={val}>{blockedLabel()}</p>
+                </div>
               </div>
-            )}
+            </details>
+
+            {/* Address & Contact */}
+            <details open className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className={tabCls}>
+                <span className="text-zinc-500 text-xs">&#9654;</span> Address &amp; Contact
+              </summary>
+              <div className={gridCls}>
+                <div>
+                  <label className={lbl}>Address</label>
+                  <p className={val}>{customer.address || '—'}</p>
+                </div>
+                <div>
+                  <label className={lbl}>Address 2</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>City</label>
+                  <p className={val}>{customer.city || '—'}</p>
+                </div>
+                <div>
+                  <label className={lbl}>State</label>
+                  <p className={val}>{customer.state || '—'}</p>
+                </div>
+                <div>
+                  <label className={lbl}>ZIP / Post Code</label>
+                  <p className={val}>{customer.zip || '—'}</p>
+                </div>
+                <div>
+                  <label className={lbl}>Country / Region</label>
+                  <p className={val}>US</p>
+                </div>
+                <div>
+                  <label className={lbl}>Phone No.</label>
+                  <p className={val}>{customer.phone || '—'}</p>
+                </div>
+                <div>
+                  <label className={lbl}>Email</label>
+                  <p className={val}>{customer.email || '—'}</p>
+                </div>
+                <div>
+                  <label className={lbl}>Fax No.</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Contact</label>
+                  <p className={val}>{customer.firstName} {customer.lastName}</p>
+                </div>
+              </div>
+            </details>
+
+            {/* Invoicing */}
+            <details className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className={tabCls}>
+                <span className="text-zinc-500 text-xs">&#9654;</span> Invoicing
+              </summary>
+              <div className={gridCls}>
+                <div>
+                  <label className={lbl}>Bill-to Customer No.</label>
+                  <p className="text-sm text-zinc-100 font-mono">{customer.id.slice(-8).toUpperCase()}</p>
+                </div>
+                <div>
+                  <label className={lbl}>Payment Terms Code</label>
+                  <p className={val}>NET30</p>
+                </div>
+                <div>
+                  <label className={lbl}>Payment Method Code</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Customer Price Group</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Tax Area Code</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Tax Liable</label>
+                  <p className={val}>Yes</p>
+                </div>
+                <div>
+                  <label className={lbl}>VAT Registration No.</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Currency Code</label>
+                  <p className={val}>USD</p>
+                </div>
+                <div>
+                  <label className={lbl}>Invoice Disc. Code</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Language Code</label>
+                  <p className={val}>ENU</p>
+                </div>
+              </div>
+            </details>
+
+            {/* Payments */}
+            <details className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className={tabCls}>
+                <span className="text-zinc-500 text-xs">&#9654;</span> Payments
+              </summary>
+              <div className={gridCls}>
+                <div>
+                  <label className={lbl}>Application Method</label>
+                  <p className={val}>Manual</p>
+                </div>
+                <div>
+                  <label className={lbl}>Payment Terms</label>
+                  <p className={val}>NET30</p>
+                </div>
+                <div>
+                  <label className={lbl}>Payment Method</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Cash Flow Payment Terms</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Block Payment Tolerance</label>
+                  <p className={val}>No</p>
+                </div>
+                <div>
+                  <label className={lbl}>Preferred Bank Account</label>
+                  <p className={val}>—</p>
+                </div>
+              </div>
+            </details>
+
+            {/* Shipping */}
+            <details className="bg-[#16213e] border border-zinc-800/50 rounded-lg">
+              <summary className={tabCls}>
+                <span className="text-zinc-500 text-xs">&#9654;</span> Shipping
+              </summary>
+              <div className={gridCls}>
+                <div>
+                  <label className={lbl}>Ship-to Code</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Location Code</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Shipping Agent</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Shipping Agent Service</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Shipping Time</label>
+                  <p className={val}>—</p>
+                </div>
+                <div>
+                  <label className={lbl}>Base Calendar Code</label>
+                  <p className={val}>—</p>
+                </div>
+              </div>
+            </details>
+
           </div>
 
-          {/* AR Invoices FastTab */}
-          {customer.arInvoices.length > 0 && (
-            <div className="border border-zinc-800/60 rounded-md overflow-hidden bg-zinc-900/20">
-              <FastTabHeader label="AR Invoices" count={customer.arInvoices.length} />
-              <div className="overflow-x-auto">
+          {/* FactBox Sidebar — w-64 */}
+          <div className="w-64 shrink-0 space-y-3">
+
+            {/* Customer Statistics FactBox */}
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-3 py-2 bg-zinc-900/40 border-b border-zinc-800/50">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Customer Statistics</span>
+              </div>
+              <div className="px-3 py-2 space-y-2">
+                {[
+                  { label: 'Balance',              val: formatCurrency(balance),       color: balance < 0 ? 'text-red-400' : balance > 0 ? 'text-amber-400' : 'text-zinc-400' },
+                  { label: 'Outstanding Orders',   val: String(outstandingOrders),      color: 'text-zinc-200' },
+                  { label: 'Shipped Not Invoiced', val: formatCurrency(0),              color: 'text-zinc-400' },
+                  { label: 'Outstanding Invoices', val: formatCurrency(balanceDue),     color: balanceDue > 0 ? 'text-red-400' : 'text-zinc-400' },
+                  { label: 'Total Sales (LCY)',    val: formatCurrency(salesLCY),       color: 'text-emerald-400' },
+                  { label: 'Profit (LCY)',         val: formatCurrency(profitLCY),      color: 'text-emerald-400' },
+                  { label: 'Profit %',             val: `${profitPct}%`,                color: 'text-zinc-200' },
+                ].map(row => (
+                  <div key={row.label} className="flex justify-between items-center">
+                    <span className="text-[11px] text-zinc-500">{row.label}</span>
+                    <span className={`text-[12px] font-semibold tabular-nums ${row.color}`}>{row.val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recent Transactions FactBox */}
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-3 py-2 bg-zinc-900/40 border-b border-zinc-800/50">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Recent Transactions</span>
+              </div>
+              {customer.arInvoices.length === 0 ? (
+                <p className="px-3 py-3 text-[11px] text-zinc-600">No transactions.</p>
+              ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-zinc-800/50 bg-zinc-900/30">
-                      {['Invoice #', 'Due Date', 'Status', 'Amount'].map(h => (
-                        <th key={h} className={`px-4 py-2 text-[10px] uppercase text-zinc-500 font-medium tracking-wide ${h === 'Amount' ? 'text-right' : 'text-left'}`}>{h}</th>
-                      ))}
+                    <tr className="border-b border-zinc-800/50">
+                      <th className="px-3 py-1.5 text-left   text-[9px] uppercase tracking-widest text-zinc-600 font-medium">Date</th>
+                      <th className="px-3 py-1.5 text-left   text-[9px] uppercase tracking-widest text-zinc-600 font-medium">Doc No.</th>
+                      <th className="px-3 py-1.5 text-right  text-[9px] uppercase tracking-widest text-zinc-600 font-medium">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {customer.arInvoices.map(inv => (
-                      <tr key={inv.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
-                        <td className="px-4 py-2 font-mono text-[11px] text-zinc-300">
-                          <span className="flex items-center gap-1">
-                            <FileText className="w-3 h-3 text-zinc-500" />{inv.invoiceNumber}
-                          </span>
+                    {customer.arInvoices.slice(0, 5).map(inv => (
+                      <tr key={inv.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20">
+                        <td className="px-3 py-1.5 text-[10px] text-zinc-500">
+                          {new Date(inv.postingDate).toLocaleDateString('en-US', {
+                            month: 'short', day: 'numeric', year: '2-digit',
+                          })}
                         </td>
-                        <td className="px-4 py-2 text-[13px] text-zinc-500">Due {formatDate(inv.dueDate)}</td>
-                        <td className="px-4 py-2">
-                          <Badge variant={INV_VARIANT[inv.status] ?? 'secondary'} className="capitalize text-xs">
-                            {inv.status}
-                          </Badge>
+                        <td className="px-3 py-1.5 font-mono text-[10px] text-zinc-300">
+                          {inv.invoiceNumber.slice(-8)}
                         </td>
-                        <td className="px-4 py-2 text-right text-[13px] text-emerald-400 font-semibold">
+                        <td className="px-3 py-1.5 text-right text-[10px] font-semibold text-emerald-400 tabular-nums">
                           {formatCurrency(Number(inv.totalAmount))}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              )}
+              <div className="px-3 py-2 border-t border-zinc-800/50">
+                <Link href={`/customers/${id}/ledger-entries`} className="text-[11px] text-blue-400 hover:underline">
+                  View all ledger entries &rarr;
+                </Link>
               </div>
             </div>
-          )}
 
+          </div>
         </div>
       </main>
     </>

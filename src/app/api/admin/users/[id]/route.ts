@@ -14,6 +14,16 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json()
-  const user = await prisma.systemUser.update({ where: { id }, data: body })
+  const user = await prisma.systemUser.update({
+    where: { id },
+    data: body,
+    include: { permissions: true },
+  })
   return NextResponse.json(user)
+}
+
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  await prisma.systemUser.delete({ where: { id } })
+  return new NextResponse(null, { status: 204 })
 }

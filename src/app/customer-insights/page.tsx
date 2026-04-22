@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { Database, Users, PieChart, BarChart3, Brain, Zap, Download, ShieldCheck, Bot, ArrowRight, TrendingUp, Activity } from 'lucide-react'
 

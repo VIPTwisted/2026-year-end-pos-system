@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'

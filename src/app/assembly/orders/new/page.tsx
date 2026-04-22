@@ -1,270 +1,207 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import Link from 'next/link'
-import { ArrowLeft, Layers, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft } from 'lucide-react'
 
-interface Store { id: string; name: string }
-interface Product { id: string; name: string; sku: string }
-
-interface BOMLine {
-  componentId: string
-  component: { name: string; sku: string }
-  quantity: number
+interface LineDraft {
+  type: string
+  componentNo: string
+  description: string
+  qtyPer: number
   unitOfMeasure: string
 }
 
-interface LineItem {
-  componentId: string
-  quantity: string
-  unitOfMeasure: string
-}
+const inputCls = 'w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-blue-500 transition-colors'
+const labelCls = 'block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1'
 
 export default function NewAssemblyOrderPage() {
   const router = useRouter()
+  const [itemNo, setItemNo] = useState('')
+  const [description, setDescription] = useState('')
+  const [qtyToAssemble, setQtyToAssemble] = useState(1)
+  const [unitOfMeasure, setUnitOfMeasure] = useState('EACH')
+  const [dueDate, setDueDate] = useState('')
+  const [locationCode, setLocationCode] = useState('')
+  const [bomVersionCode, setBomVersionCode] = useState('1')
+  const [notes, setNotes] = useState('')
+  const [lines, setLines] = useState<LineDraft[]>([
+    { type: 'Item', componentNo: '', description: '', qtyPer: 1, unitOfMeasure: 'EACH' }
+  ])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [stores, setStores] = useState<Store[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [bomLoading, setBomLoading] = useState(false)
-  const [bomFound, setBomFound] = useState(false)
 
-  const [form, setForm] = useState({
-    productId: '',
-    quantity: '1',
-    dueDate: '',
-    storeId: '',
-    notes: '',
-  })
-  const [lines, setLines] = useState<LineItem[]>([])
-  const [manualLines, setManualLines] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/stores').then(r => r.json()).then(setStores).catch(() => setStores([]))
-    fetch('/api/products').then(r => r.json()).then((d) => setProducts(Array.isArray(d) ? d : d.products ?? [])).catch(() => setProducts([]))
-  }, [])
-
-  const fetchBOM = useCallback(async (productId: string, qty: number) => {
-    if (!productId) { setLines([]); setBomFound(false); return }
-    setBomLoading(true)
-    try {
-      const res = await fetch(`/api/products/${productId}/variants`)
-      // We actually want the BOM — check assembly BOM via a simple GET
-      // Since we don't have a dedicated BOM GET, we check via assembly orders auto-populate
-      // Use a workaround: POST a "dry-run" isn't possible, so we store BOM state from the assembly order creation
-      // Instead, show a note that lines will be auto-populated from BOM on submit
-      setBomFound(false)
-      setBomLoading(false)
-    } catch {
-      setBomLoading(false)
-    }
-  }, [])
-
-  const set = (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      const val = e.target.value
-      setForm(prev => ({ ...prev, [k]: val }))
-      if (k === 'productId') fetchBOM(val, parseFloat(form.quantity) || 1)
-    }
-
-  const setLine = (i: number, k: keyof LineItem, v: string) =>
-    setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [k]: v } : l))
-
-  const addLine = () => setLines(prev => [...prev, { componentId: '', quantity: '1', unitOfMeasure: 'EACH' }])
+  const addLine = () => setLines(prev => [...prev, { type: 'Item', componentNo: '', description: '', qtyPer: 1, unitOfMeasure: 'EACH' }])
   const removeLine = (i: number) => setLines(prev => prev.filter((_, idx) => idx !== i))
+  const updateLine = (i: number, key: keyof LineDraft, value: string | number) =>
+    setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [key]: value } : l))
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.productId) { setError('Product is required'); return }
-    if (!form.storeId) { setError('Store is required'); return }
-    if (parseFloat(form.quantity) <= 0) { setError('Quantity must be greater than 0'); return }
-
+  const submit = async () => {
+    if (!itemNo.trim()) { setError('Item No. is required'); return }
     setLoading(true)
     setError('')
     try {
-      const body: Record<string, unknown> = {
-        productId: form.productId,
-        quantity: parseFloat(form.quantity),
-        dueDate: form.dueDate || null,
-        storeId: form.storeId,
-        notes: form.notes || null,
-      }
-
-      if (manualLines && lines.length > 0) {
-        const validLines = lines.filter(l => l.componentId && parseFloat(l.quantity) > 0)
-        if (validLines.length > 0) {
-          body.lines = validLines.map(l => ({
-            componentId: l.componentId,
-            quantity: parseFloat(l.quantity),
-            unitOfMeasure: l.unitOfMeasure,
-          }))
-        }
-      }
-
       const res = await fetch('/api/assembly/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          itemNo: itemNo.trim(),
+          description: description.trim() || undefined,
+          qtyToAssemble,
+          unitOfMeasure,
+          dueDate: dueDate || undefined,
+          locationCode: locationCode.trim() || undefined,
+          bomVersionCode,
+          notes: notes.trim() || undefined,
+          lines: lines.filter(l => l.componentNo.trim()).map((l, idx) => ({
+            lineNo: idx + 1,
+            type: l.type,
+            componentNo: l.componentNo.trim(),
+            description: l.description.trim() || undefined,
+            qtyPer: l.qtyPer,
+            quantity: l.qtyPer * qtyToAssemble,
+            unitOfMeasure: l.unitOfMeasure,
+          })),
+        }),
       })
-      const data = await res.json()
+      const data: { id?: string; error?: string } = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Create failed')
       router.push(`/assembly/orders/${data.id}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
       setLoading(false)
     }
   }
 
-  const inputCls = 'w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors'
-  const labelCls = 'block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide'
-
   return (
     <>
       <TopBar title="New Assembly Order" />
-      <main className="flex-1 p-6 overflow-auto">
-        <div className="max-w-3xl mx-auto">
-          <Link
-            href="/assembly"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-5"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Assembly Orders
-          </Link>
+      <main className="flex-1 overflow-auto bg-[#0f0f1a] min-h-[100dvh]">
+        <div className="max-w-5xl mx-auto p-6 space-y-6">
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-zinc-400" />
-                  Assembly Order Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div>
-                  <label className={labelCls}>Assembled Product <span className="text-red-400">*</span></label>
-                  <select value={form.productId} onChange={set('productId')} className={inputCls} required>
-                    <option value="">— Select Product —</option>
-                    {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
-                  </select>
-                  {form.productId && (
-                    <p className="text-xs text-zinc-600 mt-1">
-                      {bomLoading ? 'Checking for BOM…' : 'Component lines will be auto-populated from BOM if one exists for this product.'}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className={labelCls}>Quantity <span className="text-red-400">*</span></label>
-                    <input type="number" min="0.01" step="0.01" value={form.quantity} onChange={set('quantity')} className={inputCls} required />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Due Date</label>
-                    <input type="date" value={form.dueDate} onChange={set('dueDate')} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Store <span className="text-red-400">*</span></label>
-                    <select value={form.storeId} onChange={set('storeId')} className={inputCls} required>
-                      <option value="">— Select Store —</option>
-                      {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className={labelCls}>Notes</label>
-                  <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="Internal notes…" className={inputCls + ' resize-none'} />
-                </div>
-
-                <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={manualLines}
-                    onChange={e => {
-                      setManualLines(e.target.checked)
-                      if (e.target.checked && lines.length === 0) {
-                        setLines([{ componentId: '', quantity: '1', unitOfMeasure: 'EACH' }])
-                      }
-                    }}
-                    className="accent-blue-500 w-4 h-4"
-                  />
-                  Manually specify component lines (overrides BOM auto-populate)
-                </label>
-              </CardContent>
-            </Card>
-
-            {/* Manual component lines */}
-            {manualLines && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    Component Lines
-                    <Button type="button" variant="outline" size="sm" className="ml-auto text-xs" onClick={addLine}>
-                      <Plus className="w-3 h-3 mr-1" />Add Row
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-800">
-                        {['Component', 'Qty', 'UOM', ''].map(h => (
-                          <th key={h} className="text-left px-4 pb-2 text-xs font-medium text-zinc-500 uppercase tracking-wide">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lines.map((line, i) => (
-                        <tr key={i} className="border-b border-zinc-800/50 last:border-0">
-                          <td className="px-4 py-2.5">
-                            <select value={line.componentId} onChange={e => setLine(i, 'componentId', e.target.value)} className={inputCls}>
-                              <option value="">— Select Component —</option>
-                              {products.filter(p => p.id !== form.productId).map(p => (
-                                <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-2.5 w-28">
-                            <input type="number" min="0.01" step="0.01" value={line.quantity} onChange={e => setLine(i, 'quantity', e.target.value)} className={inputCls} />
-                          </td>
-                          <td className="px-4 py-2.5 w-28">
-                            <select value={line.unitOfMeasure} onChange={e => setLine(i, 'unitOfMeasure', e.target.value)} className={inputCls}>
-                              {['EACH', 'CASE', 'BOX', 'PACK', 'LB', 'KG'].map(u => <option key={u} value={u}>{u}</option>)}
-                            </select>
-                          </td>
-                          <td className="px-4 py-2.5 w-10">
-                            {lines.length > 1 && (
-                              <button type="button" onClick={() => removeLine(i)} className="text-zinc-600 hover:text-red-400 transition-colors">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
-            )}
-
-            {error && (
-              <div className="text-xs text-red-400 bg-red-950/30 border border-red-900/50 rounded px-3 py-2">{error}</div>
-            )}
-
-            <div className="flex items-center justify-end gap-3">
-              <Link href="/assembly">
-                <Button type="button" variant="outline" size="sm">Cancel</Button>
-              </Link>
-              <Button type="submit" size="sm" disabled={loading}>
-                {loading ? 'Creating…' : 'Create Assembly Order'}
-              </Button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.back()} className="h-8 w-8 flex items-center justify-center rounded border border-zinc-700/60 bg-zinc-800/40 text-zinc-400 hover:text-zinc-200 transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" />
+            </button>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Assembly Orders</p>
+              <h2 className="text-xl font-bold text-zinc-100">New Assembly Order</h2>
             </div>
-          </form>
+          </div>
+
+          {/* General FastTab */}
+          <details open className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="px-5 py-3.5 border-b border-zinc-800/50 cursor-pointer text-[12px] font-semibold uppercase tracking-widest text-zinc-400 hover:text-zinc-200 transition-colors select-none">
+              General
+            </summary>
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className={labelCls}>Item No. <span className="text-red-400">*</span></label>
+                <input type="text" value={itemNo} onChange={e => setItemNo(e.target.value)} placeholder="e.g. ITEM-001" className={inputCls} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Description</label>
+                <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Item description" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Qty to Assemble <span className="text-red-400">*</span></label>
+                <input type="number" min={0.01} step={0.01} value={qtyToAssemble} onChange={e => setQtyToAssemble(parseFloat(e.target.value) || 1)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Unit of Measure</label>
+                <select value={unitOfMeasure} onChange={e => setUnitOfMeasure(e.target.value)} className={inputCls}>
+                  <option>EACH</option><option>BOX</option><option>CASE</option><option>KG</option><option>LB</option><option>SET</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Due Date</label>
+                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Location Code</label>
+                <input type="text" value={locationCode} onChange={e => setLocationCode(e.target.value)} placeholder="e.g. MAIN" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>BOM Version</label>
+                <input type="text" value={bomVersionCode} onChange={e => setBomVersionCode(e.target.value)} placeholder="1" className={inputCls} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Notes</label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="Internal notes…" />
+              </div>
+            </div>
+          </details>
+
+          {/* Lines FastTab */}
+          <details open className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <summary className="px-5 py-3.5 border-b border-zinc-800/50 cursor-pointer text-[12px] font-semibold uppercase tracking-widest text-zinc-400 hover:text-zinc-200 transition-colors select-none">
+              Component Lines
+            </summary>
+            <div className="p-5 space-y-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-zinc-800/60">
+                    <tr>
+                      {['Type', 'Component No.', 'Description', 'Qty per', 'Unit of Measure', ''].map(h => (
+                        <th key={h} className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500 text-left whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/40">
+                    {lines.map((line, i) => (
+                      <tr key={i}>
+                        <td className="px-2 py-2">
+                          <select value={line.type} onChange={e => updateLine(i, 'type', e.target.value)} className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-blue-500 w-24">
+                            <option>Item</option><option>Resource</option>
+                          </select>
+                        </td>
+                        <td className="px-2 py-2">
+                          <input type="text" value={line.componentNo} onChange={e => updateLine(i, 'componentNo', e.target.value)} placeholder="Item No." className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-blue-500 w-28" />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input type="text" value={line.description} onChange={e => updateLine(i, 'description', e.target.value)} placeholder="Description" className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-blue-500 w-36" />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input type="number" min={0} step={0.01} value={line.qtyPer} onChange={e => updateLine(i, 'qtyPer', parseFloat(e.target.value) || 0)} className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-blue-500 w-20 text-right tabular-nums" />
+                        </td>
+                        <td className="px-2 py-2">
+                          <select value={line.unitOfMeasure} onChange={e => updateLine(i, 'unitOfMeasure', e.target.value)} className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-blue-500 w-20">
+                            <option>EACH</option><option>BOX</option><option>KG</option><option>LB</option>
+                          </select>
+                        </td>
+                        <td className="px-2 py-2">
+                          {lines.length > 1 && (
+                            <button onClick={() => removeLine(i)} className="text-zinc-600 hover:text-red-400 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button onClick={addLine} className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 transition-colors">
+                <Plus className="w-3 h-3" />Add Line
+              </button>
+            </div>
+          </details>
+
+          {error && (
+            <div className="text-xs text-red-400 bg-red-950/30 border border-red-900/50 rounded px-3 py-2">{error}</div>
+          )}
+
+          <div className="flex items-center justify-end gap-3">
+            <button onClick={() => router.back()} className="h-9 px-5 rounded text-[12px] text-zinc-400 hover:text-zinc-200 border border-zinc-700/60 hover:bg-zinc-800/60 transition-colors">
+              Cancel
+            </button>
+            <button onClick={submit} disabled={loading} className="h-9 px-6 rounded text-[12px] font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-60">
+              {loading ? 'Creating…' : 'Create Assembly Order'}
+            </button>
+          </div>
         </div>
       </main>
     </>

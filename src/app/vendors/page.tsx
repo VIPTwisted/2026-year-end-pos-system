@@ -1,206 +1,285 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Building2, Plus, AlertTriangle, DollarSign, Users, XCircle, ChevronRight } from 'lucide-react'
+import { Plus, Edit, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 
-export default async function VendorsPage() {
-  const now = new Date()
+export default async function VendorsListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string; balance?: string; status?: string; paymentTerms?: string; currency?: string; page?: string }>
+}) {
+  const sp = await searchParams
+  const search = sp.search ?? ''
+  const balanceFilter = sp.balance ?? 'any'
+  const statusFilter = sp.status ?? ''
+  const payTermsFilter = sp.paymentTerms ?? ''
+  const currencyFilter = sp.currency ?? ''
+  const page = Math.max(1, parseInt(sp.page ?? '1'))
+  const pageSize = 25
 
-  const vendors = await prisma.vendor.findMany({
-    include: {
-      vendorGroup: true,
-      invoices: {
-        where: { status: { notIn: ['paid', 'cancelled'] } },
+  const where: Record<string, unknown> = {}
+  if (search) {
+    where.OR = [
+      { name: { contains: search } },
+      { vendorCode: { contains: search } },
+      { email: { contains: search } },
+      { phone: { contains: search } },
+    ]
+  }
+  if (statusFilter === 'active') where.isActive = true
+  if (statusFilter === 'inactive') where.isActive = false
+  if (payTermsFilter) where.paymentTerms = payTermsFilter
+  if (currencyFilter) where.currency = currencyFilter
+
+  const [vendors, total] = await Promise.all([
+    prisma.vendor.findMany({
+      where,
+      include: {
+        vendorGroup: true,
+        invoices: { where: { status: { notIn: ['paid', 'cancelled'] } } },
       },
-    },
-    orderBy: { name: 'asc' },
+      orderBy: { name: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.vendor.count({ where }),
+  ])
+
+  const totalPages = Math.ceil(total / pageSize)
+
+  const filtered = vendors.filter(v => {
+    const bal = v.invoices.reduce((s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0)
+    if (balanceFilter === 'gt0') return bal > 0
+    if (balanceFilter === 'lt0') return bal < 0
+    return true
   })
 
-  const vendorGroups = await prisma.vendorGroup.findMany({
-    include: { vendors: true },
-    orderBy: { name: 'asc' },
-  })
-
-  // Summary stats
-  const activeVendors = vendors.filter(v => v.isActive)
-  const onHold = vendors.filter(v => !v.isActive)
-
-  const totalAPBalance = vendors.reduce((sum, v) => {
-    const openBalance = v.invoices.reduce((s, inv) => {
-      return s + (inv.totalAmount - inv.paidAmount)
-    }, 0)
-    return sum + openBalance
-  }, 0)
-
-  const overdueInvoices = vendors.reduce((count, v) => {
-    return count + v.invoices.filter(inv => inv.dueDate < now).length
-  }, 0)
+  function buildHref(overrides: Record<string, string>) {
+    const base: Record<string, string> = {}
+    if (search) base.search = search
+    if (balanceFilter !== 'any') base.balance = balanceFilter
+    if (statusFilter) base.status = statusFilter
+    if (payTermsFilter) base.paymentTerms = payTermsFilter
+    if (currencyFilter) base.currency = currencyFilter
+    const merged = { ...base, ...overrides }
+    const qs = new URLSearchParams(merged).toString()
+    return `/vendors${qs ? '?' + qs : ''}`
+  }
 
   return (
     <>
       <TopBar title="Vendors" />
-      <main className="flex-1 p-6 overflow-auto space-y-8">
+      <main className="flex-1 overflow-auto bg-[#0f0f1a] min-h-[100dvh]">
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-100">Vendor Management</h2>
-            <p className="text-sm text-zinc-500">{vendors.length} vendors total</p>
-          </div>
+        {/* Action Ribbon */}
+        <div className="bg-[#16213e] border-b border-zinc-800/50 px-6 py-2 flex items-center gap-2">
           <Link href="/vendors/new">
-            <Button><Plus className="w-4 h-4 mr-1" />New Vendor</Button>
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-700 hover:bg-blue-600 border border-blue-600 rounded transition-colors">
+              <Plus className="w-3 h-3" /> New
+            </button>
+          </Link>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Edit className="w-3 h-3" /> Edit
+          </button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+            <Trash2 className="w-3 h-3" /> Delete
+          </button>
+          <div className="w-px h-5 bg-zinc-700 mx-1" />
+          <Link href="/vendors/apply-entries">
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors">
+              Apply Entries
+            </button>
           </Link>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-4 h-4 text-blue-400" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">Active Vendors</p>
-              </div>
-              <p className="text-2xl font-bold text-blue-400">{activeVendors.length}</p>
-              <p className="text-xs text-zinc-600 mt-1">of {vendors.length} total</p>
-            </CardContent>
-          </Card>
+        <div className="flex">
 
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-amber-400" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">AP Balance</p>
-              </div>
-              <p className="text-2xl font-bold text-amber-400">{formatCurrency(totalAPBalance)}</p>
-              <p className="text-xs text-zinc-600 mt-1">open invoices</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">Overdue</p>
-              </div>
-              <p className="text-2xl font-bold text-red-400">{overdueInvoices}</p>
-              <p className="text-xs text-zinc-600 mt-1">invoices past due</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-5 pb-5">
-              <div className="flex items-center gap-2 mb-2">
-                <XCircle className="w-4 h-4 text-zinc-500" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">On Hold</p>
-              </div>
-              <p className="text-2xl font-bold text-zinc-300">{onHold.length}</p>
-              <p className="text-xs text-zinc-600 mt-1">inactive vendors</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Vendor Groups */}
-        {vendorGroups.length > 0 && (
-          <section>
-            <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-3">Vendor Groups</h3>
-            <div className="grid grid-cols-3 gap-3">
-              {vendorGroups.map(group => (
-                <Card key={group.id}>
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-zinc-100">{group.name}</span>
-                      <Badge variant="secondary">{group.code}</Badge>
-                    </div>
-                    <p className="text-xs text-zinc-500 mb-2">{group.description || 'No description'}</p>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-zinc-600">Terms: {group.defaultPayTerms || 'N/A'}</span>
-                      <span className="text-zinc-400">{group.vendors.length} vendor{group.vendors.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          {/* Filter Pane */}
+          <div className="w-56 shrink-0 bg-[#16213e] border-r border-zinc-800/50 min-h-[calc(100dvh-88px)] p-4 space-y-5">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2 font-semibold">Filter</p>
             </div>
-          </section>
-        )}
 
-        {/* Vendors Table */}
-        <section>
-          <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-3">All Vendors</h3>
+            {/* Search */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 block">Search</label>
+              <form method="GET">
+                <input
+                  name="search"
+                  defaultValue={search}
+                  placeholder="Name, code, email…"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600"
+                />
+                {balanceFilter !== 'any' && <input type="hidden" name="balance" value={balanceFilter} />}
+                {statusFilter && <input type="hidden" name="status" value={statusFilter} />}
+                {payTermsFilter && <input type="hidden" name="paymentTerms" value={payTermsFilter} />}
+                {currencyFilter && <input type="hidden" name="currency" value={currencyFilter} />}
+              </form>
+            </div>
 
-          {vendors.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-zinc-500">
-                <Building2 className="w-12 h-12 mb-4 opacity-30" />
-                <p className="text-sm">No vendors yet. Add your first vendor to get started.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            {/* Balance Filter */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2 block">Balance (LCY)</label>
+              <div className="space-y-1">
+                {[
+                  { value: 'any', label: 'Any' },
+                  { value: 'gt0', label: '> 0 (Owed)' },
+                  { value: 'lt0', label: '< 0 (Credit)' },
+                ].map(opt => (
+                  <Link
+                    key={opt.value}
+                    href={buildHref({ balance: opt.value })}
+                    className={`block text-xs px-2 py-1 rounded transition-colors ${balanceFilter === opt.value ? 'bg-blue-700/30 text-blue-300 border border-blue-700/50' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}
+                  >
+                    {opt.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2 block">Status</label>
+              <div className="space-y-1">
+                {[
+                  { value: '', label: 'All' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'On Hold' },
+                ].map(opt => (
+                  <Link
+                    key={opt.value}
+                    href={buildHref({ status: opt.value })}
+                    className={`block text-xs px-2 py-1 rounded transition-colors ${statusFilter === opt.value ? 'bg-blue-700/30 text-blue-300 border border-blue-700/50' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}
+                  >
+                    {opt.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Payment Terms Filter */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2 block">Payment Terms</label>
+              <div className="space-y-1">
+                {['NET30', 'NET60', 'NET15', 'COD'].map(term => (
+                  <Link
+                    key={term}
+                    href={buildHref({ paymentTerms: payTermsFilter === term ? '' : term })}
+                    className={`block text-xs px-2 py-1 rounded transition-colors ${payTermsFilter === term ? 'bg-blue-700/30 text-blue-300 border border-blue-700/50' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}
+                  >
+                    {term}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Currency Filter */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2 block">Currency</label>
+              <div className="space-y-1">
+                {['USD', 'EUR', 'GBP', 'CAD'].map(cur => (
+                  <Link
+                    key={cur}
+                    href={buildHref({ currency: currencyFilter === cur ? '' : cur })}
+                    className={`block text-xs px-2 py-1 rounded transition-colors ${currencyFilter === cur ? 'bg-blue-700/30 text-blue-300 border border-blue-700/50' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}
+                  >
+                    {cur}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {(search || balanceFilter !== 'any' || statusFilter || payTermsFilter || currencyFilter) && (
+              <Link href="/vendors" className="block text-xs text-zinc-500 hover:text-zinc-300 underline mt-2">
+                Clear filters
+              </Link>
+            )}
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 overflow-x-auto">
+            <div className="px-6 py-3 flex items-center justify-between border-b border-zinc-800/50">
+              <p className="text-xs text-zinc-500">{total} vendor{total !== 1 ? 's' : ''}{search ? ` matching "${search}"` : ''}</p>
+              <div className="flex items-center gap-2 text-xs text-zinc-500">
+                <span>Page {page} of {totalPages || 1}</span>
+                {page > 1 && (
+                  <Link href={buildHref({ page: String(page - 1) })} className="text-blue-400 hover:underline">← Prev</Link>
+                )}
+                {page < totalPages && (
+                  <Link href={buildHref({ page: String(page + 1) })} className="text-blue-400 hover:underline">Next →</Link>
+                )}
+              </div>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
+                <p className="text-sm">No vendors found.</p>
+                <Link href="/vendors/new" className="text-xs text-blue-400 hover:underline mt-2">Create a new vendor</Link>
+              </div>
+            ) : (
+              <table className="w-full">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                    <th className="text-left pb-3 font-medium">Code</th>
-                    <th className="text-left pb-3 font-medium">Vendor</th>
-                    <th className="text-left pb-3 font-medium">Group</th>
-                    <th className="text-left pb-3 font-medium">Terms</th>
-                    <th className="text-left pb-3 font-medium">Email</th>
-                    <th className="text-left pb-3 font-medium">Phone</th>
-                    <th className="text-right pb-3 font-medium">Open Inv.</th>
-                    <th className="text-right pb-3 font-medium">Open Balance</th>
-                    <th className="text-center pb-3 font-medium">Status</th>
-                    <th className="pb-3" />
+                  <tr className="border-b border-zinc-800/60 bg-zinc-900/30">
+                    {[
+                      { key: 'code', label: 'No.' },
+                      { key: 'name', label: 'Name' },
+                      { key: 'group', label: 'Vendor Group' },
+                      { key: 'terms', label: 'Payment Terms' },
+                      { key: 'currency', label: 'Currency' },
+                      { key: 'phone', label: 'Phone' },
+                      { key: 'balance', label: 'Balance (LCY)', right: true },
+                      { key: 'openInv', label: 'Open Inv.', right: true },
+                      { key: 'status', label: 'Status' },
+                    ].map(col => (
+                      <th key={col.key} className={`px-3 py-2 text-[10px] uppercase tracking-widest text-zinc-500 font-medium ${col.right ? 'text-right' : 'text-left'}`}>
+                        <span className="inline-flex items-center gap-1">
+                          {col.label}
+                          <span className="flex flex-col">
+                            <ChevronUp className="w-2.5 h-2.5 text-zinc-700" />
+                            <ChevronDown className="w-2.5 h-2.5 text-zinc-700 -mt-1" />
+                          </span>
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {vendors.map(v => {
-                    const openBalance = v.invoices.reduce(
-                      (s, inv) => s + (inv.totalAmount - inv.paidAmount),
-                      0
-                    )
+                <tbody>
+                  {filtered.map(v => {
+                    const bal = v.invoices.reduce((s, i) => s + (Number(i.totalAmount) - Number(i.paidAmount)), 0)
                     return (
-                      <tr key={v.id} className="hover:bg-zinc-900/50 transition-colors group">
-                        <td className="py-3 pr-4 font-mono text-xs text-zinc-500">{v.vendorCode}</td>
-                        <td className="py-3 pr-4">
-                          <Link href={`/vendors/${v.id}`} className="font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
+                      <tr key={v.id} className="border-b border-zinc-800/30 hover:bg-[#16213e]/60 transition-colors group">
+                        <td className="px-3 py-2 font-mono text-[11px] text-zinc-500">{v.vendorCode}</td>
+                        <td className="px-3 py-2">
+                          <Link href={`/vendors/${v.id}`} className="text-sm font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
                             {v.name}
                           </Link>
-                          {v.city && (
-                            <div className="text-xs text-zinc-500">{v.city}{v.state ? `, ${v.state}` : ''}</div>
-                          )}
+                          {v.city && <div className="text-[11px] text-zinc-500">{v.city}{v.state ? `, ${v.state}` : ''}</div>}
                         </td>
-                        <td className="py-3 pr-4 text-zinc-400">{v.vendorGroup?.name ?? <span className="text-zinc-600">—</span>}</td>
-                        <td className="py-3 pr-4 text-zinc-400">{v.paymentTerms || '—'}</td>
-                        <td className="py-3 pr-4 text-zinc-400">{v.email || '—'}</td>
-                        <td className="py-3 pr-4 text-zinc-400">{v.phone || '—'}</td>
-                        <td className="py-3 pr-4 text-right text-zinc-300">{v.invoices.length}</td>
-                        <td className="py-3 pr-4 text-right font-semibold">
-                          <span className={openBalance > 0 ? 'text-amber-400' : 'text-zinc-500'}>
-                            {formatCurrency(openBalance)}
-                          </span>
+                        <td className="px-3 py-2 text-sm text-zinc-400">{v.vendorGroup?.name || '—'}</td>
+                        <td className="px-3 py-2 text-sm text-zinc-400">{v.paymentTerms || '—'}</td>
+                        <td className="px-3 py-2 text-sm text-zinc-400">{v.currency || 'USD'}</td>
+                        <td className="px-3 py-2 text-sm text-zinc-400">{v.phone || '—'}</td>
+                        <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums">
+                          <span className={bal > 0 ? 'text-amber-400' : 'text-zinc-500'}>{formatCurrency(bal)}</span>
                         </td>
-                        <td className="py-3 text-center">
-                          <Badge variant={v.isActive ? 'success' : 'destructive'}>
+                        <td className="px-3 py-2 text-right text-sm text-zinc-300 tabular-nums">{v.invoices.length}</td>
+                        <td className="px-3 py-2">
+                          <Badge variant={v.isActive ? 'success' : 'destructive'} className="text-[10px]">
                             {v.isActive ? 'Active' : 'On Hold'}
                           </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Link href={`/vendors/${v.id}`}>
-                            <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
-                          </Link>
                         </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
-            </div>
-          )}
-        </section>
-
+            )}
+          </div>
+        </div>
       </main>
     </>
   )

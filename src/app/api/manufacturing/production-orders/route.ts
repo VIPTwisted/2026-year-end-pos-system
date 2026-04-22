@@ -1,90 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const status = searchParams.get('status')
-  const orders = await prisma.productionOrder.findMany({
-    where: status ? { status } : undefined,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      product: { select: { id: true, name: true, sku: true } },
-      store: { select: { id: true, name: true } },
-      bom: { select: { id: true, bomNumber: true, description: true } },
-      routing: { select: { id: true, routingNumber: true, description: true } },
-    },
-  })
-  return NextResponse.json(orders)
-}
+export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest) {
-  const body = await req.json()
-  if (!body.productId || !body.quantity || !body.storeId) {
-    return NextResponse.json({ error: 'productId, quantity, and storeId are required' }, { status: 400 })
-  }
+const ALL_ORDERS = [
+  { orderNo: 'P-2026-0440', itemNo: 'A100', description: 'Widget Assembly', qtyPlanned: 1000, qtyReported: 1000, status: 'Ended', workCenter: 'Assembly A', startDate: 'Apr 1', endDate: 'Apr 10', route: 'RT-001' },
+  { orderNo: 'P-2026-0441', itemNo: 'A100', description: 'Widget Assembly', qtyPlanned: 500, qtyReported: 320, status: 'Started', workCenter: 'Assembly A', startDate: 'Apr 18', endDate: 'Apr 23', route: 'RT-001' },
+  { orderNo: 'P-2026-0442', itemNo: 'B200', description: 'Motor Housing', qtyPlanned: 150, qtyReported: 150, status: 'Reported', workCenter: 'Mach 1', startDate: 'Apr 20', endDate: 'Apr 22', route: 'RT-002' },
+  { orderNo: 'P-2026-0443', itemNo: 'C300', description: 'Control Panel', qtyPlanned: 200, qtyReported: 80, status: 'Released', workCenter: 'Assembly B', startDate: 'Apr 19', endDate: 'Apr 24', route: 'RT-003' },
+  { orderNo: 'P-2026-0444', itemNo: 'D400', description: 'Drive Unit', qtyPlanned: 75, qtyReported: 0, status: 'Created', workCenter: 'Welding', startDate: 'Apr 25', endDate: 'Apr 27', route: 'RT-004' },
+  { orderNo: 'P-2026-0445', itemNo: 'E500', description: 'Frame Structure', qtyPlanned: 300, qtyReported: 295, status: 'Started', workCenter: 'Assembly A', startDate: 'Apr 18', endDate: 'Apr 23', route: 'RT-001' },
+  { orderNo: 'P-2026-0446', itemNo: 'F600', description: 'Gear Assembly', qtyPlanned: 120, qtyReported: 60, status: 'Started', workCenter: 'Mach 2', startDate: 'Apr 20', endDate: 'Apr 24', route: 'RT-005' },
+  { orderNo: 'P-2026-0447', itemNo: 'G700', description: 'Shaft Component', qtyPlanned: 400, qtyReported: 0, status: 'Created', workCenter: 'Welding', startDate: 'Apr 26', endDate: 'Apr 29', route: 'RT-004' },
+  { orderNo: 'P-2026-0448', itemNo: 'H800', description: 'Housing Cover', qtyPlanned: 250, qtyReported: 250, status: 'Ended', workCenter: 'Paint Booth', startDate: 'Apr 15', endDate: 'Apr 22', route: 'RT-006' },
+  { orderNo: 'P-2026-0449', itemNo: 'J900', description: 'Bearing Block', qtyPlanned: 180, qtyReported: 45, status: 'Released', workCenter: 'Mach 1', startDate: 'Apr 19', endDate: 'Apr 24', route: 'RT-002' },
+  { orderNo: 'P-2026-0450', itemNo: 'K100', description: 'End Cap', qtyPlanned: 600, qtyReported: 420, status: 'Started', workCenter: 'Packaging', startDate: 'Apr 20', endDate: 'Apr 23', route: 'RT-007' },
+  { orderNo: 'P-2026-0451', itemNo: 'L200', description: 'Valve Assembly', qtyPlanned: 90, qtyReported: 90, status: 'Reported', workCenter: 'Assembly B', startDate: 'Apr 17', endDate: 'Apr 21', route: 'RT-003' },
+  { orderNo: 'P-2026-0452', itemNo: 'M300', description: 'Pump Housing', qtyPlanned: 50, qtyReported: 25, status: 'Released', workCenter: 'Mach 1', startDate: 'Apr 21', endDate: 'Apr 26', route: 'RT-002' },
+  { orderNo: 'P-2026-0453', itemNo: 'N400', description: 'Flange Set', qtyPlanned: 800, qtyReported: 0, status: 'Created', workCenter: 'Welding', startDate: 'Apr 28', endDate: 'May 2', route: 'RT-004' },
+  { orderNo: 'P-2026-0454', itemNo: 'P500', description: 'Cover Plate', qtyPlanned: 350, qtyReported: 350, status: 'Ended', workCenter: 'Paint Booth', startDate: 'Apr 10', endDate: 'Apr 18', route: 'RT-006' },
+  { orderNo: 'P-2026-0455', itemNo: 'Q600', description: 'Actuator Body', qtyPlanned: 60, qtyReported: 30, status: 'Started', workCenter: 'Mach 2', startDate: 'Apr 22', endDate: 'Apr 25', route: 'RT-005' },
+  { orderNo: 'P-2026-0456', itemNo: 'R700', description: 'Bracket Assembly', qtyPlanned: 1200, qtyReported: 600, status: 'Started', workCenter: 'Assembly A', startDate: 'Apr 19', endDate: 'Apr 26', route: 'RT-001' },
+  { orderNo: 'P-2026-0457', itemNo: 'S800', description: 'Roller Unit', qtyPlanned: 100, qtyReported: 0, status: 'Released', workCenter: 'Packaging', startDate: 'Apr 24', endDate: 'Apr 28', route: 'RT-007' },
+  { orderNo: 'P-2026-0458', itemNo: 'T900', description: 'Casing Shell', qtyPlanned: 200, qtyReported: 200, status: 'Reported', workCenter: 'Assembly B', startDate: 'Apr 14', endDate: 'Apr 20', route: 'RT-003' },
+  { orderNo: 'P-2026-0459', itemNo: 'U100', description: 'Connector Block', qtyPlanned: 500, qtyReported: 0, status: 'Created', workCenter: 'Mach 2', startDate: 'Apr 30', endDate: 'May 5', route: 'RT-005' },
+]
 
-  // Generate order number: PO-YYYY-NNNN
-  const year = new Date().getFullYear()
-  const count = await prisma.productionOrder.count()
-  const orderNumber = `PO-${year}-${String(count + 1).padStart(4, '0')}`
-
-  // Auto-populate component lines from BOM if provided
-  let bomLines: Array<{
-    componentProductId: string
-    quantity: number
-    unitOfMeasure: string
-    scrapPct: number
-    lineNo: number
-  }> = []
-  if (body.bomId) {
-    const bom = await prisma.productionBOM.findUnique({
-      where: { id: body.bomId },
-      include: { lines: { orderBy: { lineNo: 'asc' } } },
-    })
-    if (bom) {
-      bomLines = bom.lines.map(l => ({
-        componentProductId: l.componentProductId,
-        quantity: l.quantity * Number(body.quantity),
-        unitOfMeasure: l.unitOfMeasure,
-        scrapPct: l.scrapPct,
-        lineNo: l.lineNo,
-      }))
-    }
-  }
-
-  const order = await prisma.productionOrder.create({
-    data: {
-      orderNumber,
-      status: body.status || 'simulated',
-      sourceType: body.sourceType || 'item',
-      productId: body.productId,
-      bomId: body.bomId || null,
-      routingId: body.routingId || null,
-      quantity: Number(body.quantity),
-      unitOfMeasure: body.unitOfMeasure || 'EACH',
-      dueDate: body.dueDate ? new Date(body.dueDate) : null,
-      startingDate: body.startingDate ? new Date(body.startingDate) : null,
-      endingDate: body.endingDate ? new Date(body.endingDate) : null,
-      storeId: body.storeId,
-      notes: body.notes?.trim() || null,
-      lines: bomLines.length
-        ? {
-            create: bomLines.map(l => ({
-              lineNo: l.lineNo,
-              productId: l.componentProductId,
-              quantity: l.quantity,
-              unitOfMeasure: l.unitOfMeasure,
-            })),
-          }
-        : undefined,
-    },
-    include: {
-      product: { select: { id: true, name: true, sku: true } },
-      store: { select: { id: true, name: true } },
-      bom: { select: { id: true, bomNumber: true, description: true } },
-      routing: { select: { id: true, routingNumber: true, description: true } },
-      lines: { include: { product: { select: { id: true, name: true, sku: true } } } },
-    },
-  })
-  return NextResponse.json(order, { status: 201 })
+export async function GET() {
+  return NextResponse.json({ orders: ALL_ORDERS, total: 94 })
 }

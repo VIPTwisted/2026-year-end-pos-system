@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
 import { Plus, Tag, Layers, ShieldOff, Trash2, X, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
 
 interface FinDimension {
   id: string
@@ -13,15 +14,6 @@ interface FinDimension {
   _count: { values: number }
 }
 
-interface FinDimensionValue {
-  id: string
-  dimensionId: string
-  code: string
-  name: string
-  isBlocked: boolean
-  createdAt: string
-}
-
 interface Toast {
   msg: string
   type: 'ok' | 'err'
@@ -29,27 +21,15 @@ interface Toast {
 
 export default function DimensionsPage() {
   const [dimensions, setDimensions] = useState<FinDimension[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [values, setValues] = useState<FinDimensionValue[]>([])
   const [loading, setLoading] = useState(true)
-  const [valuesLoading, setValuesLoading] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
 
-  // Create dimension form
-  const [showCreateDim, setShowCreateDim] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
   const [dimCode, setDimCode] = useState('')
   const [dimName, setDimName] = useState('')
   const [dimDesc, setDimDesc] = useState('')
   const [dimSaving, setDimSaving] = useState(false)
-
-  // Create value form
-  const [showCreateVal, setShowCreateVal] = useState(false)
-  const [valCode, setValCode] = useState('')
-  const [valName, setValName] = useState('')
-  const [valSaving, setValSaving] = useState(false)
-
-  // Delete confirmation
-  const [deletingDimId, setDeletingDimId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const notify = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type })
@@ -60,8 +40,7 @@ export default function DimensionsPage() {
     try {
       const res = await fetch('/api/finance/dimensions')
       if (!res.ok) throw new Error()
-      const data = await res.json()
-      setDimensions(data)
+      setDimensions(await res.json())
     } catch {
       notify('Failed to load dimensions', 'err')
     } finally {
@@ -69,37 +48,9 @@ export default function DimensionsPage() {
     }
   }, [])
 
-  const fetchValues = useCallback(async (dimId: string) => {
-    setValuesLoading(true)
-    try {
-      const res = await fetch(`/api/finance/dimensions/${dimId}/values`)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      setValues(data)
-    } catch {
-      notify('Failed to load values', 'err')
-    } finally {
-      setValuesLoading(false)
-    }
-  }, [])
+  useEffect(() => { fetchDimensions() }, [fetchDimensions])
 
-  useEffect(() => {
-    fetchDimensions()
-  }, [fetchDimensions])
-
-  useEffect(() => {
-    if (selectedId) fetchValues(selectedId)
-    else setValues([])
-  }, [selectedId, fetchValues])
-
-  const handleSelectDimension = (id: string) => {
-    setSelectedId(prev => (prev === id ? null : id))
-    setShowCreateVal(false)
-    setValCode('')
-    setValName('')
-  }
-
-  const handleCreateDimension = async () => {
+  const handleCreate = async () => {
     if (!dimCode.trim() || !dimName.trim()) return
     setDimSaving(true)
     try {
@@ -114,10 +65,8 @@ export default function DimensionsPage() {
         return
       }
       notify('Dimension created')
-      setShowCreateDim(false)
-      setDimCode('')
-      setDimName('')
-      setDimDesc('')
+      setShowCreate(false)
+      setDimCode(''); setDimName(''); setDimDesc('')
       fetchDimensions()
     } catch {
       notify('Failed to create dimension', 'err')
@@ -126,7 +75,7 @@ export default function DimensionsPage() {
     }
   }
 
-  const handleToggleBlockDimension = async (dim: FinDimension) => {
+  const handleToggleBlock = async (dim: FinDimension) => {
     try {
       const res = await fetch(`/api/finance/dimensions/${dim.id}`, {
         method: 'PATCH',
@@ -141,7 +90,7 @@ export default function DimensionsPage() {
     }
   }
 
-  const handleDeleteDimension = async (id: string) => {
+  const handleDelete = async (id: string) => {
     try {
       const res = await fetch(`/api/finance/dimensions/${id}`, { method: 'DELETE' })
       if (!res.ok) {
@@ -150,155 +99,106 @@ export default function DimensionsPage() {
         return
       }
       notify('Dimension deleted')
-      if (selectedId === id) setSelectedId(null)
-      setDeletingDimId(null)
+      setDeletingId(null)
       fetchDimensions()
     } catch {
       notify('Failed to delete', 'err')
     }
   }
 
-  const handleCreateValue = async () => {
-    if (!selectedId || !valCode.trim() || !valName.trim()) return
-    setValSaving(true)
-    try {
-      const res = await fetch(`/api/finance/dimensions/${selectedId}/values`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: valCode, name: valName }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        notify(d.error ?? 'Failed to create value', 'err')
-        return
-      }
-      notify('Value added')
-      setShowCreateVal(false)
-      setValCode('')
-      setValName('')
-      fetchValues(selectedId)
-      fetchDimensions()
-    } catch {
-      notify('Failed to create value', 'err')
-    } finally {
-      setValSaving(false)
-    }
-  }
-
-  const handleToggleBlockValue = async (val: FinDimensionValue) => {
-    try {
-      const res = await fetch(`/api/finance/dimensions/${val.dimensionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isBlocked: !val.isBlocked }),
-      })
-      if (!res.ok) throw new Error()
-      notify(val.isBlocked ? 'Value unblocked' : 'Value blocked')
-      if (selectedId) fetchValues(selectedId)
-    } catch {
-      notify('Failed to update value', 'err')
-    }
-  }
-
-  const handleDeleteValue = async (val: FinDimensionValue) => {
-    if (!selectedId) return
-    try {
-      const res = await fetch(`/api/finance/dimensions/${selectedId}/values`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ valueId: val.id }),
-      })
-      if (!res.ok) throw new Error()
-      notify('Value removed')
-      fetchValues(selectedId)
-      fetchDimensions()
-    } catch {
-      notify('Failed to delete value', 'err')
-    }
-  }
-
-  const selectedDim = dimensions.find(d => d.id === selectedId)
+  const actions = (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={() => setShowCreate(v => !v)}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-medium rounded transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" /> New
+      </button>
+      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+        Edit
+      </button>
+      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[12px] font-medium rounded transition-colors">
+        Delete
+      </button>
+      <div className="w-px h-5 bg-zinc-700 mx-1" />
+      <span className="px-3 py-1.5 text-zinc-500 text-[12px]">
+        <Tag className="w-3.5 h-3.5 inline mr-1" />
+        Dimension Values ▼
+      </span>
+    </div>
+  )
 
   return (
-    <div className="min-h-[100dvh] bg-[#0f0f1a] flex flex-col">
-      <TopBar title="Financial Dimensions" />
+    <div className="flex flex-col min-h-[100dvh] bg-[#0f0f1a]">
+      <TopBar
+        title="Dimensions"
+        breadcrumb={[{ label: 'Finance', href: '/finance' }]}
+        actions={actions}
+      />
 
       {toast && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-sm font-medium shadow-lg transition-all
-            ${toast.type === 'ok' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}
-        >
+        <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg text-[13px] font-medium shadow-lg
+          ${toast.type === 'ok' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>
           {toast.msg}
         </div>
       )}
 
-      <main className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-zinc-100">Financial Dimensions</h2>
-              <p className="text-sm text-zinc-500 mt-0.5">D365 BC-style dimensions for cost centers, departments, and projects</p>
-            </div>
-            <button
-              onClick={() => { setShowCreateDim(v => !v); setShowCreateVal(false) }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              New Dimension
-            </button>
-          </div>
+      <main className="flex-1 p-6 overflow-auto">
+        <div className="max-w-5xl mx-auto space-y-4">
 
-          {/* Create Dimension Form */}
-          {showCreateDim && (
-            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">New Dimension</span>
-                <button onClick={() => setShowCreateDim(false)} className="text-zinc-500 hover:text-zinc-300">
+          {/* Create form */}
+          {showCreate && (
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-400" />
+                  <span className="text-[13px] font-semibold text-zinc-100">New Dimension</span>
+                </div>
+                <button onClick={() => setShowCreate(false)} className="text-zinc-500 hover:text-zinc-300">
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 block mb-1">Code *</label>
+                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Code *</label>
                   <input
                     value={dimCode}
                     onChange={e => setDimCode(e.target.value.toUpperCase())}
                     placeholder="DEPT"
                     maxLength={20}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none font-mono"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[13px] text-zinc-100 focus:border-indigo-500 focus:outline-none font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 block mb-1">Name *</label>
+                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Name *</label>
                   <input
                     value={dimName}
                     onChange={e => setDimName(e.target.value)}
                     placeholder="Department"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[13px] text-zinc-100 focus:border-indigo-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 block mb-1">Description</label>
+                  <label className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1.5">Description</label>
                   <input
                     value={dimDesc}
                     onChange={e => setDimDesc(e.target.value)}
                     placeholder="Optional description"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-[13px] text-zinc-100 focus:border-indigo-500 focus:outline-none"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 mt-3">
+              <div className="flex justify-end gap-2 mt-4">
                 <button
-                  onClick={() => setShowCreateDim(false)}
-                  className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+                  onClick={() => setShowCreate(false)}
+                  className="px-3 py-1.5 text-[12px] text-zinc-400 hover:text-zinc-200 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleCreateDimension}
+                  onClick={handleCreate}
                   disabled={dimSaving || !dimCode.trim() || !dimName.trim()}
-                  className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded transition-colors"
+                  className="px-4 py-1.5 text-[12px] font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded transition-colors"
                 >
                   {dimSaving ? 'Creating…' : 'Create'}
                 </button>
@@ -306,225 +206,109 @@ export default function DimensionsPage() {
             </div>
           )}
 
-          {/* Two-panel layout */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Left: Dimensions table */}
-            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
-                <Layers className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-semibold text-zinc-100">Dimensions</span>
-                <span className="ml-auto text-[11px] text-zinc-500">{dimensions.length} total</span>
-              </div>
-
-              {loading ? (
-                <div className="p-8 text-center text-zinc-500 text-sm">Loading…</div>
-              ) : dimensions.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Layers className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-                  <p className="text-sm text-zinc-500">No dimensions yet</p>
-                  <p className="text-xs text-zinc-600 mt-1">Click "New Dimension" to create one</p>
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Code</th>
-                      <th className="text-left py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Name</th>
-                      <th className="text-center py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Values</th>
-                      <th className="text-center py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Status</th>
-                      <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800">
-                    {dimensions.map(dim => (
-                      <tr
-                        key={dim.id}
-                        onClick={() => handleSelectDimension(dim.id)}
-                        className={`cursor-pointer transition-colors ${selectedId === dim.id ? 'bg-blue-600/10 border-l-2 border-l-blue-500' : 'hover:bg-zinc-800/40'}`}
-                      >
-                        <td className="px-4 py-2.5 font-mono text-xs text-zinc-400">{dim.code}</td>
-                        <td className="py-2.5 pr-3">
-                          <span className="text-sm text-zinc-200">{dim.name}</span>
-                          {dim.description && (
-                            <span className="block text-xs text-zinc-600 truncate max-w-[120px]">{dim.description}</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 text-center">
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-zinc-800 text-xs font-medium text-zinc-300">
-                            {dim._count.values}
-                          </span>
-                        </td>
-                        <td className="py-2.5 text-center">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium
-                            ${dim.isBlocked ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                            {dim.isBlocked ? 'Blocked' : 'Active'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                            <button
-                              onClick={() => handleToggleBlockDimension(dim)}
-                              title={dim.isBlocked ? 'Unblock' : 'Block'}
-                              className="p-1 text-zinc-500 hover:text-amber-400 transition-colors"
-                            >
-                              <ShieldOff className="w-3.5 h-3.5" />
-                            </button>
-                            {deletingDimId === dim.id ? (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleDeleteDimension(dim.id)}
-                                  className="px-1.5 py-0.5 text-[10px] bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded transition-colors"
-                                >
-                                  Confirm
-                                </button>
-                                <button
-                                  onClick={() => setDeletingDimId(null)}
-                                  className="text-zinc-500 hover:text-zinc-300"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
+          {/* Main table */}
+          <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-zinc-800/80 bg-zinc-900/40">
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Code</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Name</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Filter Code Caption</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Consolidation Code</th>
+                  <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Map-to IC Dimension Code</th>
+                  <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Values</th>
+                  <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Blocked</th>
+                  <th className="px-4 py-2.5 w-24"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-12 text-zinc-500 text-[13px]">Loading…</td>
+                  </tr>
+                ) : dimensions.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-16">
+                      <Layers className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                      <p className="text-[13px] text-zinc-500">No dimensions defined.</p>
+                      <p className="text-[12px] text-zinc-600 mt-1">Click &ldquo;New&rdquo; to create the first dimension.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  dimensions.map((dim, idx) => (
+                    <tr
+                      key={dim.id}
+                      className={`hover:bg-[rgba(99,102,241,0.05)] transition-colors ${
+                        idx !== dimensions.length - 1 ? 'border-b border-zinc-800/40' : ''
+                      }`}
+                    >
+                      <td className="px-4 py-2.5 font-mono text-[12px] text-indigo-400">{dim.code}</td>
+                      <td className="px-4 py-2.5 text-zinc-200">{dim.name}</td>
+                      <td className="px-4 py-2.5 text-zinc-500 text-[12px]">
+                        {dim.description ?? dim.code}
+                      </td>
+                      <td className="px-4 py-2.5 text-zinc-500 text-[12px]">—</td>
+                      <td className="px-4 py-2.5 text-zinc-500 text-[12px]">—</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <Link
+                          href={`/finance/dimensions/${dim.id}`}
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-zinc-800 hover:bg-indigo-500/20 text-[12px] font-semibold text-zinc-300 hover:text-indigo-300 transition-colors"
+                        >
+                          {dim._count.values}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium
+                          ${dim.isBlocked ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                          {dim.isBlocked ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1">
+                          <Link
+                            href={`/finance/dimensions/${dim.id}`}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-400 hover:text-indigo-300 hover:bg-[rgba(99,102,241,0.1)] rounded transition-colors"
+                          >
+                            <Tag className="w-3 h-3" /> Values <ChevronRight className="w-3 h-3" />
+                          </Link>
+                          <button
+                            onClick={() => handleToggleBlock(dim)}
+                            title={dim.isBlocked ? 'Unblock' : 'Block'}
+                            className="p-1 text-zinc-500 hover:text-amber-400 transition-colors"
+                          >
+                            <ShieldOff className="w-3.5 h-3.5" />
+                          </button>
+                          {deletingId === dim.id ? (
+                            <div className="flex items-center gap-1">
                               <button
-                                onClick={() => setDeletingDimId(dim.id)}
-                                className="p-1 text-zinc-500 hover:text-red-400 transition-colors"
+                                onClick={() => handleDelete(dim.id)}
+                                className="px-1.5 py-0.5 text-[10px] bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded transition-colors"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                Confirm
                               </button>
-                            )}
-                            <ChevronRight className={`w-3.5 h-3.5 transition-transform text-zinc-600 ${selectedId === dim.id ? 'rotate-90 text-blue-400' : ''}`} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            {/* Right: Values panel */}
-            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
-                <Tag className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm font-semibold text-zinc-100">
-                  {selectedDim ? `${selectedDim.code} — Values` : 'Dimension Values'}
-                </span>
-                {selectedId && (
-                  <button
-                    onClick={() => setShowCreateVal(v => !v)}
-                    className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded transition-colors"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Add Value
-                  </button>
+                              <button onClick={() => setDeletingId(null)} className="text-zinc-500 hover:text-zinc-300">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeletingId(dim.id)}
+                              className="p-1 text-zinc-500 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </div>
-
-              {!selectedId ? (
-                <div className="p-8 text-center">
-                  <Tag className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
-                  <p className="text-sm text-zinc-500">Select a dimension</p>
-                  <p className="text-xs text-zinc-600 mt-1">Click a dimension on the left to view its values</p>
-                </div>
-              ) : (
-                <>
-                  {/* Add Value Form */}
-                  {showCreateVal && (
-                    <div className="px-4 py-3 bg-zinc-900/50 border-b border-zinc-800">
-                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        <div>
-                          <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 block mb-1">Code *</label>
-                          <input
-                            value={valCode}
-                            onChange={e => setValCode(e.target.value.toUpperCase())}
-                            placeholder="SALES"
-                            maxLength={20}
-                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none font-mono"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 block mb-1">Name *</label>
-                          <input
-                            value={valName}
-                            onChange={e => setValName(e.target.value)}
-                            placeholder="Sales Department"
-                            className="w-full bg-zinc-800 border border-zinc-700 rounded px-2.5 py-1.5 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => { setShowCreateVal(false); setValCode(''); setValName('') }}
-                          className="px-3 py-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleCreateValue}
-                          disabled={valSaving || !valCode.trim() || !valName.trim()}
-                          className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded transition-colors"
-                        >
-                          {valSaving ? 'Adding…' : 'Add'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {valuesLoading ? (
-                    <div className="p-8 text-center text-zinc-500 text-sm">Loading values…</div>
-                  ) : values.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <Tag className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
-                      <p className="text-sm text-zinc-500">No values yet</p>
-                      <p className="text-xs text-zinc-600 mt-1">Click "Add Value" to create dimension values</p>
-                    </div>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-zinc-800">
-                          <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Code</th>
-                          <th className="text-left py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Name</th>
-                          <th className="text-center py-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Status</th>
-                          <th className="px-4 py-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-800">
-                        {values.map(val => (
-                          <tr key={val.id} className="hover:bg-zinc-800/40 transition-colors">
-                            <td className="px-4 py-2.5 font-mono text-xs text-zinc-400">{val.code}</td>
-                            <td className="py-2.5 pr-3 text-sm text-zinc-200">{val.name}</td>
-                            <td className="py-2.5 text-center">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium
-                                ${val.isBlocked ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                                {val.isBlocked ? 'Blocked' : 'Active'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleToggleBlockValue(val)}
-                                  title={val.isBlocked ? 'Unblock' : 'Block'}
-                                  className="p-1 text-zinc-500 hover:text-amber-400 transition-colors"
-                                >
-                                  <ShieldOff className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteValue(val)}
-                                  className="p-1 text-zinc-500 hover:text-red-400 transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </>
-              )}
-            </div>
+              </tbody>
+            </table>
           </div>
+          {!loading && (
+            <div className="text-[12px] text-zinc-500">{dimensions.length} records</div>
+          )}
         </div>
       </main>
     </div>

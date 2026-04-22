@@ -2,7 +2,7 @@
 import { usePathname } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 
-const NO_SHELL_PATHS = ['/login', '/pos']
+const NO_SHELL_PREFIXES = ['/login', '/pos']
 const NO_SIDEBAR_ROLES = ['cashier']
 
 export function AppShell({
@@ -15,7 +15,7 @@ export function AppShell({
   children: React.ReactNode
 }) {
   const path = usePathname()
-  const isPublicPath = NO_SHELL_PATHS.includes(path)
+  const isPublicPath = NO_SHELL_PREFIXES.some(p => path === p || path.startsWith(p + '/'))
   const isCashier = role === 'cashier'
   const showSidebar = !isPublicPath && !!role && !isCashier
 

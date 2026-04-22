@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 /**
  * Serial Number List
  * Route: /inventory/serial-numbers/

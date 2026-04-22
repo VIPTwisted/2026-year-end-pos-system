@@ -16,14 +16,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data.status = 'processed'
     data.processedAt = new Date()
     data.processedBy = body.processedBy ?? 'System'
+  } else if (body.action === 'approve') {
+    data.status = 'approved'
+    data.processedAt = new Date()
+    data.processedBy = body.processedBy ?? 'System'
+  } else if (body.action === 'expire') {
+    data.status = 'expired'
+    data.processedAt = new Date()
+    data.processedBy = body.processedBy ?? 'System'
   } else if (body.action === 'deny') {
     data.status = 'denied'
     data.processedAt = new Date()
     data.processedBy = body.processedBy ?? 'System'
-    data.notes = body.notes ?? null
   } else {
     if (body.status) data.status = body.status
-    if (body.notes) data.notes = body.notes
+    if (body.changesJson !== undefined) data.changesJson = body.changesJson
+    if (body.processedBy) data.processedBy = body.processedBy
   }
   const event = await prisma.lifeEvent.update({ where: { id }, data })
   return NextResponse.json(event)

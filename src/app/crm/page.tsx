@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { Building2, Users, CheckSquare, FileText, AlertTriangle, ArrowRight, Phone, Mail, Calendar } from 'lucide-react'

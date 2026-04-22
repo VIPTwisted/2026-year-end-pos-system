@@ -2,20 +2,17 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { formatCurrency, formatDate } from '@/lib/utils'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, User, Calendar } from 'lucide-react'
-import { EmployeeActions } from './EmployeeActions'
+import { formatDate } from '@/lib/utils'
+import { ArrowLeft, User, ChevronDown } from 'lucide-react'
 
-const SHIFT_VARIANT: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary'> = {
-  scheduled: 'default',
-  in_progress: 'warning',
-  completed: 'success',
-  cancelled: 'destructive',
+export const dynamic = 'force-dynamic'
+
+const STATUS_COLOR: Record<string, string> = {
+  Active:   'bg-emerald-500/20 text-emerald-400',
+  Inactive: 'bg-zinc-700/40 text-zinc-400',
 }
 
-export default async function EmployeeDetailPage({
+export default async function EmployeeCardPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -27,169 +24,189 @@ export default async function EmployeeDetailPage({
     include: {
       user: true,
       store: true,
-      shifts: {
-        include: { store: true },
-        orderBy: { startTime: 'desc' },
-        take: 10,
-      },
+      shifts: { orderBy: { startTime: 'desc' }, take: 5 },
     },
   })
 
   if (!employee) notFound()
 
+  // Fetch absences via raw query (table may not be in generated Prisma client for some builds)
+  let absences: Array<{ causeOfAbsence: string; fromDate: string; toDate: string; qty: number; unitOfMeasure: string }> = []
+  try {
+    absences = await (prisma as any).employeeAbsence.findMany({
+      where: { employeeId: id },
+      orderBy: { fromDate: 'desc' },
+      take: 10,
+    })
+  } catch { /* table may not exist yet */ }
+
   const now = new Date()
   const msPerYear = 365.25 * 24 * 60 * 60 * 1000
-  const tenureYears = Math.floor(
-    (now.getTime() - new Date(employee.hireDate).getTime()) / msPerYear
+  const tenureYears = Math.floor((now.getTime() - new Date(employee.hireDate).getTime()) / msPerYear)
+  const tenureLabel = tenureYears < 1 ? '< 1 yr' : `${tenureYears} yr${tenureYears !== 1 ? 's' : ''}`
+
+  const totalAbsenceDays = absences.reduce((s, a) => s + (a.qty ?? 0), 0)
+  const vacationDays = absences.filter(a => a.causeOfAbsence === 'Vacation').reduce((s, a) => s + (a.qty ?? 0), 0)
+  const eStatus = employee.isActive ? 'Active' : 'Inactive'
+
+  const Field = ({ label, value }: { label: string; value: string }) => (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-zinc-500 mb-0.5">{label}</p>
+      <p className="text-[13px] text-zinc-200">{value}</p>
+    </div>
   )
-  const tenureLabel =
-    tenureYears < 1 ? '< 1 yr' : `${tenureYears} yr${tenureYears !== 1 ? 's' : ''}`
 
   return (
     <>
       <TopBar title={`${employee.firstName} ${employee.lastName}`} />
-      <main className="flex-1 p-6 overflow-auto space-y-8">
+      <main className="flex-1 overflow-auto bg-[#0f0f1a] min-h-0">
+        <div className="px-6 py-4 flex gap-5">
 
-        {/* Back link */}
-        <div>
-          <Link
-            href="/hr/employees"
-            className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Employees
-          </Link>
-        </div>
+          {/* Main content */}
+          <div className="flex-1 space-y-4 min-w-0">
 
-        {/* Employee header card */}
-        <Card>
-          <CardContent className="pt-6 pb-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center shrink-0">
-                <User className="w-6 h-6 text-zinc-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant={employee.isActive ? 'success' : 'destructive'}>
-                    {employee.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
+            <div className="flex items-center gap-3">
+              <Link href="/hr/employees" className="inline-flex items-center gap-1.5 text-[12px] text-zinc-500 hover:text-zinc-300 transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" /> Employees
+              </Link>
+              <span className="text-zinc-700">/</span>
+              <span className="text-[12px] text-zinc-400">{employee.lastName}, {employee.firstName}</span>
+            </div>
+
+            {/* Header */}
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg p-5">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="w-12 h-12 bg-zinc-800/60 border border-zinc-700/50 rounded-xl flex items-center justify-center shrink-0">
+                  <User className="w-6 h-6 text-zinc-400" />
                 </div>
-                <h1 className="text-2xl font-bold text-zinc-100">
-                  {employee.firstName} {employee.lastName}
-                </h1>
-                <p className="text-sm text-zinc-500 mt-0.5">{employee.user.email}</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLOR[eStatus]}`}>
+                      {eStatus}
+                    </span>
+                  </div>
+                  <h1 className="text-[20px] font-bold text-zinc-100">{employee.firstName} {employee.lastName}</h1>
+                  <p className="text-[12px] text-zinc-500 mt-0.5">{employee.user?.email ?? '—'}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Link href={`/hr/employees/${id}/edit`}>
+                    <button className="px-3 py-1.5 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md font-medium transition-colors">Edit</button>
+                  </Link>
+                  <button className="flex items-center gap-1 px-3 py-1.5 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md font-medium transition-colors">
+                    Navigate <ChevronDown className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-zinc-800/50">
+                <Field label="Job Title"        value={employee.position} />
+                <Field label="Department"       value={employee.department ?? '—'} />
+                <Field label="Store"            value={employee.store?.name ?? '—'} />
+                <Field label="Employment Date"  value={formatDate(employee.hireDate)} />
+                <Field label="Tenure"           value={tenureLabel} />
               </div>
             </div>
 
-            {/* Info grid */}
-            <div className="mt-6 pt-6 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Position</p>
-                <p className="text-sm text-zinc-200">{employee.position}</p>
+            {/* FastTabs: General */}
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-800/50">
+                <h3 className="text-[13px] font-semibold text-zinc-200">General</h3>
               </div>
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Department</p>
-                <p className="text-sm text-zinc-200">{employee.department ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Store</p>
-                <p className="text-sm text-zinc-200">{employee.store.name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Hire Date</p>
-                <p className="text-sm text-zinc-200">{formatDate(employee.hireDate)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Tenure</p>
-                <p className="text-sm text-zinc-200">{tenureLabel}</p>
+              <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Field label="First Name"       value={employee.firstName} />
+                <Field label="Last Name"        value={employee.lastName} />
+                <Field label="Employment Type"  value="Full-Time" />
+                <Field label="Department"       value={employee.department ?? '—'} />
+                <Field label="Hourly Rate"      value={employee.hourlyRate != null ? `$${employee.hourlyRate.toFixed(2)}/hr` : '—'} />
+                <Field label="Est. Annual Cost" value={employee.hourlyRate != null ? `$${(employee.hourlyRate * 40 * 52).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'} />
               </div>
             </div>
 
-            {/* Rate row */}
-            {employee.hourlyRate != null && (
-              <div className="mt-4 pt-4 border-t border-zinc-800 flex items-center gap-8">
-                <div>
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Hourly Rate</p>
-                  <p className="text-xl font-bold text-emerald-400">
-                    {formatCurrency(employee.hourlyRate)}/hr
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Est. Annual Cost</p>
-                  <p className="text-xl font-bold text-zinc-200">
-                    {formatCurrency(employee.hourlyRate * 40 * 52)}
-                  </p>
-                </div>
+            {/* FastTabs: Communication */}
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-800/50">
+                <h3 className="text-[13px] font-semibold text-zinc-200">Communication</h3>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Field label="Email"  value={employee.user?.email ?? '—'} />
+                <Field label="Phone"  value="—" />
+                <Field label="Mobile" value="—" />
+              </div>
+            </div>
 
-        {/* Edit actions */}
-        <EmployeeActions
-          employee={{
-            id: employee.id,
-            position: employee.position,
-            department: employee.department,
-            hourlyRate: employee.hourlyRate,
-            isActive: employee.isActive,
-          }}
-        />
-
-        {/* Recent shifts */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="w-4 h-4 text-zinc-500" />
-            <h2 className="text-lg font-semibold text-zinc-100">Recent Shifts</h2>
-            <span className="text-sm text-zinc-500">({employee.shifts.length})</span>
+            {/* Employee Ledger Entries placeholder */}
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-zinc-800/50 flex items-center justify-between">
+                <h3 className="text-[13px] font-semibold text-zinc-200">Employee Ledger Entries</h3>
+                <Link href={`/hr/absences?employeeId=${id}`} className="text-[11px] text-indigo-400 hover:text-indigo-300">View All</Link>
+              </div>
+              <div className="overflow-x-auto">
+                {absences.length === 0 ? (
+                  <p className="px-5 py-6 text-[12px] text-zinc-500">No absence entries recorded.</p>
+                ) : (
+                  <table className="w-full">
+                    <thead className="border-b border-zinc-800/60">
+                      <tr>
+                        {['Cause of Absence', 'From Date', 'To Date', 'Qty', 'Unit'].map(h => (
+                          <th key={h} className="px-4 py-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium text-left">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/40">
+                      {absences.map((a, i) => (
+                        <tr key={i} className="hover:bg-[rgba(99,102,241,0.05)] transition-colors">
+                          <td className="px-4 py-3 text-[12px] text-zinc-200">{a.causeOfAbsence}</td>
+                          <td className="px-4 py-3 text-[11px] text-zinc-400 whitespace-nowrap">{a.fromDate ? formatDate(new Date(a.fromDate)) : '—'}</td>
+                          <td className="px-4 py-3 text-[11px] text-zinc-400 whitespace-nowrap">{a.toDate ? formatDate(new Date(a.toDate)) : '—'}</td>
+                          <td className="px-4 py-3 text-[12px] text-zinc-100 tabular-nums font-semibold text-right">{(a.qty ?? 0).toFixed(1)}</td>
+                          <td className="px-4 py-3 text-[11px] text-zinc-400">{a.unitOfMeasure ?? 'Days'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           </div>
 
-          {employee.shifts.length === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center py-10 text-zinc-500">
-                <p className="text-sm">No shifts on record</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                    <th className="text-left pb-3 font-medium">Date</th>
-                    <th className="text-left pb-3 font-medium">Start</th>
-                    <th className="text-left pb-3 font-medium">End</th>
-                    <th className="text-left pb-3 font-medium">Store</th>
-                    <th className="text-left pb-3 font-medium">Notes</th>
-                    <th className="text-center pb-3 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {employee.shifts.map(s => (
-                    <tr key={s.id} className="hover:bg-zinc-900/50">
-                      <td className="py-3 pr-4 text-zinc-300 text-xs">
-                        {new Date(s.startTime).toLocaleDateString('en-US', { dateStyle: 'medium' })}
-                      </td>
-                      <td className="py-3 pr-4 text-zinc-400 text-xs">
-                        {new Date(s.startTime).toLocaleTimeString('en-US', { timeStyle: 'short' })}
-                      </td>
-                      <td className="py-3 pr-4 text-zinc-400 text-xs">
-                        {new Date(s.endTime).toLocaleTimeString('en-US', { timeStyle: 'short' })}
-                      </td>
-                      <td className="py-3 pr-4 text-zinc-400">{s.store.name}</td>
-                      <td className="py-3 pr-4 text-zinc-500 text-xs">{s.notes ?? '—'}</td>
-                      <td className="py-3 text-center">
-                        <Badge variant={SHIFT_VARIANT[s.status] ?? 'secondary'}>
-                          {s.status.replace('_', ' ')}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* FactBox panel */}
+          <div className="w-64 shrink-0 space-y-3">
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-800/50">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Employee Statistics</h4>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                {[
+                  { label: 'Vacation Days Used', value: vacationDays.toFixed(1), color: 'text-emerald-400' },
+                  { label: 'Total Absence Days',  value: totalAbsenceDays.toFixed(1), color: 'text-amber-400' },
+                  { label: 'Absence Records',     value: String(absences.length), color: 'text-zinc-100' },
+                  { label: 'Tenure',              value: tenureLabel, color: 'text-indigo-300' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <p className="text-[11px] text-zinc-500">{label}</p>
+                    <p className={`text-[13px] font-bold tabular-nums ${color}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
 
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-800/50">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Navigate</h4>
+              </div>
+              <div className="px-4 py-2 space-y-0.5">
+                {[
+                  { label: 'Absences',       href: `/hr/absences?employeeId=${id}` },
+                  { label: 'Qualifications', href: `/hr/qualifications?employeeId=${id}` },
+                  { label: 'Ledger Entries', href: `/hr/absences?employeeId=${id}` },
+                ].map(({ label, href }) => (
+                  <Link key={label} href={href} className="block px-2 py-2 text-[12px] text-zinc-400 hover:text-indigo-300 hover:bg-[rgba(99,102,241,0.05)] rounded-md transition-colors">
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
     </>
   )

@@ -4,8 +4,19 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
+  const search = searchParams.get('search')
+
+  const where: Record<string, unknown> = {}
+  if (status) where.status = status
+  if (search) {
+    where.OR = [
+      { bomNumber: { contains: search } },
+      { description: { contains: search } },
+    ]
+  }
+
   const boms = await prisma.productionBOM.findMany({
-    where: status ? { status } : undefined,
+    where,
     orderBy: { createdAt: 'desc' },
     include: {
       outputProduct: { select: { id: true, name: true, sku: true } },
@@ -20,7 +31,7 @@ export async function POST(req: NextRequest) {
   if (!body.description?.trim()) {
     return NextResponse.json({ error: 'description is required' }, { status: 400 })
   }
-  // Generate BOM number
+
   const count = await prisma.productionBOM.count()
   const bomNumber = `BOM-${String(count + 1).padStart(4, '0')}`
 
@@ -53,7 +64,10 @@ export async function POST(req: NextRequest) {
     },
     include: {
       outputProduct: { select: { id: true, name: true, sku: true } },
-      lines: { include: { component: { select: { id: true, name: true, sku: true } } } },
+      lines: {
+        include: { component: { select: { id: true, name: true, sku: true } } },
+        orderBy: { lineNo: 'asc' },
+      },
     },
   })
   return NextResponse.json(bom, { status: 201 })

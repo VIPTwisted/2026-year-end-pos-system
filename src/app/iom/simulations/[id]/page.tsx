@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { FlaskConical, CheckCircle2 } from 'lucide-react'
