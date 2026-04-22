@@ -27,8 +27,6 @@ model Store {
   shifts         Shift[]
   purchaseOrders PurchaseOrder[]
   workOrders     WorkOrder[]
-  storeTasks     StoreTask[]
-  taskLists      TaskList[]
 }
 
 model User {
@@ -58,8 +56,8 @@ model Employee {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user           User          @relation(fields: [userId], references: [id])
-  store          Store         @relation(fields: [storeId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+  store          Store          @relation(fields: [storeId], references: [id])
   shifts         Shift[]
   payrollEntries PayrollEntry[]
 }
@@ -114,35 +112,121 @@ model Product {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  category           ProductCategory?    @relation(fields: [categoryId], references: [id])
-  supplier           Supplier?           @relation(fields: [supplierId], references: [id])
+  category           ProductCategory?        @relation(fields: [categoryId], references: [id])
+  supplier           Supplier?               @relation(fields: [supplierId], references: [id])
   inventory          Inventory[]
   orderItems         OrderItem[]
   purchaseOrderItems PurchaseOrderItem[]
   wmsBinContents     WmsBinContent[]
   wmsEntries         WmsEntry[]
+  attributes         ProductAttributeValue[]
+  variantGroup       ProductVariantGroup?
+}
+
+model ProductAttribute {
+  id         String                  @id @default(cuid())
+  name       String                  @unique
+  attrType   String                  @default("text")
+  isRequired Boolean                 @default(false)
+  sortOrder  Int                     @default(0)
+  createdAt  DateTime                @default(now())
+  values     ProductAttributeValue[]
+}
+
+model ProductAttributeValue {
+  id          String           @id @default(cuid())
+  productId   String
+  attributeId String
+  value       String
+  product     Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute   ProductAttribute @relation(fields: [attributeId], references: [id])
+
+  @@unique([productId, attributeId])
+}
+
+model ProductVariantGroup {
+  id         String             @id @default(cuid())
+  productId  String             @unique
+  createdAt  DateTime           @default(now())
+  dimensions VariantDimension[]
+  variants   ProductVariant[]
+  product    Product            @relation(fields: [productId], references: [id])
+}
+
+model VariantDimension {
+  id        String              @id @default(cuid())
+  groupId   String
+  name      String
+  values    String
+  sortOrder Int                 @default(0)
+  group     ProductVariantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model ProductVariant {
+  id         String              @id @default(cuid())
+  groupId    String
+  sku        String              @unique
+  barcode    String?
+  dimensions String
+  costPrice  Float               @default(0)
+  salePrice  Float               @default(0)
+  stockQty   Float               @default(0)
+  isActive   Boolean             @default(true)
+  createdAt  DateTime            @default(now())
+  group      ProductVariantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model Assortment {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+  status      String              @default("draft")
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  lines       AssortmentLine[]
+  channels    AssortmentChannel[]
+}
+
+model AssortmentLine {
+  id           String     @id @default(cuid())
+  assortmentId String
+  productId    String?
+  categoryId   String?
+  lineType     String     @default("product")
+  assortment   Assortment @relation(fields: [assortmentId], references: [id], onDelete: Cascade)
+}
+
+model AssortmentChannel {
+  id           String     @id @default(cuid())
+  assortmentId String
+  channelId    String
+  assortment   Assortment @relation(fields: [assortmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assortmentId, channelId])
 }
 
 model Customer {
-  id             String   @id @default(cuid())
-  firstName      String
-  lastName       String
-  email          String?  @unique
-  phone          String?
-  address        String?
-  city           String?
-  state          String?
-  zip            String?
-  loyaltyPoints  Int      @default(0)
-  totalSpent     Float    @default(0)
-  visitCount     Int      @default(0)
-  notes          String?
-  tags           String?
-  creditLimit    Float    @default(0)
-  creditStatus   String   @default("good")  // good | warning | hold
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String?  @unique
+  phone         String?
+  address       String?
+  city          String?
+  state         String?
+  zip           String?
+  loyaltyPoints Int      @default(0)
+  totalSpent    Float    @default(0)
+  visitCount    Int      @default(0)
+  notes         String?
+  tags          String?
+  creditLimit   Float    @default(0)
+  creditStatus  String   @default("good") // good | warning | hold
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   orders             Order[]
   cases              ServiceCase[]
@@ -151,9 +235,7 @@ model Customer {
   paymentSettlements CustomerPaymentSettlement[]
   campaignContacts   CampaignContact[]
   workOrders         WorkOrder[]
-  contacts           Contact[]
-  opportunities      Opportunity[]
-  giftCards          GiftCard[]
+  loyaltyCard        LoyaltyCard?
 }
 
 model Order {
@@ -173,22 +255,22 @@ model Order {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  store    Store     @relation(fields: [storeId], references: [id])
-  customer Customer? @relation(fields: [customerId], references: [id])
+  store    Store       @relation(fields: [storeId], references: [id])
+  customer Customer?   @relation(fields: [customerId], references: [id])
   items    OrderItem[]
   payments Payment[]
 }
 
 model OrderItem {
-  id          String  @id @default(cuid())
+  id          String @id @default(cuid())
   orderId     String
   productId   String
   productName String
   sku         String
   quantity    Float
   unitPrice   Float
-  discount    Float   @default(0)
-  taxAmount   Float   @default(0)
+  discount    Float  @default(0)
+  taxAmount   Float  @default(0)
   lineTotal   Float
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -273,24 +355,24 @@ model PurchaseOrder {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  supplier  Supplier            @relation(fields: [supplierId], references: [id])
-  store     Store                @relation(fields: [storeId], references: [id])
-  items     PurchaseOrderItem[]
-  receipts  PurchaseReceipt[]
+  supplier Supplier            @relation(fields: [supplierId], references: [id])
+  store    Store               @relation(fields: [storeId], references: [id])
+  items    PurchaseOrderItem[]
+  receipts PurchaseReceipt[]
 }
 
 model PurchaseOrderItem {
-  id          String  @id @default(cuid())
+  id          String @id @default(cuid())
   poId        String
   productId   String
   productName String
   sku         String
   orderedQty  Float
-  receivedQty Float   @default(0)
+  receivedQty Float  @default(0)
   unitCost    Float
   lineTotal   Float
 
-  purchaseOrder PurchaseOrder        @relation(fields: [poId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder         @relation(fields: [poId], references: [id], onDelete: Cascade)
   product       Product               @relation(fields: [productId], references: [id])
   receiptLines  PurchaseReceiptLine[]
 }
@@ -384,23 +466,23 @@ model WorkOrder {
 // ─── General Ledger ───────────────────────────────────────────────────────────
 
 model Account {
-  id                String   @id @default(cuid())
-  code              String   @unique
-  name              String
-  type              String   // asset | liability | equity | revenue | expense
-  subtype           String?
-  mainAccountType   String?  // BC: balance_sheet | profit_loss (drives year-end behavior)
-  openingAccountId  String?  // BC: where balance transfers to on year-end close
-  balance           Float    @default(0)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  type             String // asset | liability | equity | revenue | expense
+  subtype          String?
+  mainAccountType  String? // BC: balance_sheet | profit_loss (drives year-end behavior)
+  openingAccountId String? // BC: where balance transfers to on year-end close
+  balance          Float    @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
 
-  journalLines    JournalLine[]
-  bankAccounts    BankAccount[]
-  postingDebits   PostingRule[]  @relation("PostingRuleDebit")
-  postingCredits  PostingRule[]  @relation("PostingRuleCredit")
-  budgetEntries   BudgetEntry[]
-  taxCodes        TaxCode[]
+  journalLines   JournalLine[]
+  bankAccounts   BankAccount[]
+  postingDebits  PostingRule[] @relation("PostingRuleDebit")
+  postingCredits PostingRule[] @relation("PostingRuleCredit")
+  budgetEntries  BudgetEntry[]
+  taxCodes       TaxCode[]
 }
 
 model JournalEntry {
@@ -408,7 +490,7 @@ model JournalEntry {
   reference   String
   description String?
   date        DateTime @default(now())
-  status      String   @default("posted")  // posted | reversed
+  status      String   @default("posted") // posted | reversed
   createdBy   String?
   createdAt   DateTime @default(now())
 
@@ -433,7 +515,7 @@ model VendorGroup {
   id              String   @id @default(cuid())
   code            String   @unique
   name            String
-  defaultPayTerms String?  // Net30 | Net60 | COD
+  defaultPayTerms String? // Net30 | Net60 | COD
   description     String?
   createdAt       DateTime @default(now())
 
@@ -441,49 +523,49 @@ model VendorGroup {
 }
 
 model Vendor {
-  id             String   @id @default(cuid())
-  vendorCode     String   @unique
-  name           String
-  vendorGroupId  String?
-  email          String?
-  phone          String?
-  address        String?
-  city           String?
-  state          String?
-  zip            String?
-  taxId          String?
-  paymentTerms   String?  // Net30 | Net60 | Net15 | COD | Immediate
-  paymentMethod  String?  // Check | ACH | Wire | Cash
-  currency       String   @default("USD")
-  creditLimit    Float?
-  isActive       Boolean  @default(true)
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(cuid())
+  vendorCode    String   @unique
+  name          String
+  vendorGroupId String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  state         String?
+  zip           String?
+  taxId         String?
+  paymentTerms  String? // Net30 | Net60 | Net15 | COD | Immediate
+  paymentMethod String? // Check | ACH | Wire | Cash
+  currency      String   @default("USD")
+  creditLimit   Float?
+  isActive      Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  vendorGroup     VendorGroup?           @relation(fields: [vendorGroupId], references: [id])
-  invoices        VendorInvoice[]
-  payments        VendorPayment[]
+  vendorGroup VendorGroup?    @relation(fields: [vendorGroupId], references: [id])
+  invoices    VendorInvoice[]
+  payments    VendorPayment[]
 }
 
 model VendorInvoice {
-  id              String   @id @default(cuid())
-  invoiceNumber   String   @unique
-  vendorId        String
-  invoiceDate     DateTime
-  dueDate         DateTime
-  postingDate     DateTime @default(now())
-  subtotal        Float
-  taxAmount       Float    @default(0)
-  totalAmount     Float
-  paidAmount      Float    @default(0)
-  status          String   @default("draft")   // draft | posted | matched | paid | partial | cancelled
-  matchingStatus  String   @default("none")    // none | two_way | three_way
-  poId            String?
-  journalEntryId  String?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  invoiceNumber  String   @unique
+  vendorId       String
+  invoiceDate    DateTime
+  dueDate        DateTime
+  postingDate    DateTime @default(now())
+  subtotal       Float
+  taxAmount      Float    @default(0)
+  totalAmount    Float
+  paidAmount     Float    @default(0)
+  status         String   @default("draft") // draft | posted | matched | paid | partial | cancelled
+  matchingStatus String   @default("none") // none | two_way | three_way
+  poId           String?
+  journalEntryId String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   vendor      Vendor                    @relation(fields: [vendorId], references: [id])
   lines       VendorInvoiceLine[]
@@ -510,10 +592,10 @@ model VendorPayment {
   vendorId       String
   paymentDate    DateTime
   amount         Float
-  paymentMethod  String   @default("Check")  // Check | ACH | Wire | Cash
+  paymentMethod  String   @default("Check") // Check | ACH | Wire | Cash
   bankAccountId  String?
   checkNumber    String?
-  status         String   @default("draft")  // draft | posted | cleared | voided
+  status         String   @default("draft") // draft | posted | cleared | voided
   journalEntryId String?
   notes          String?
   createdAt      DateTime @default(now())
@@ -549,8 +631,8 @@ model CustomerInvoice {
   taxAmount      Float    @default(0)
   totalAmount    Float
   paidAmount     Float    @default(0)
-  status         String   @default("draft")  // draft | posted | paid | partial | cancelled
-  invoiceType    String   @default("sales")  // sales | free_text
+  status         String   @default("draft") // draft | posted | paid | partial | cancelled
+  invoiceType    String   @default("sales") // sales | free_text
   journalEntryId String?
   notes          String?
   createdAt      DateTime @default(now())
@@ -595,7 +677,7 @@ model BankAccount {
   accountCode    String   @unique
   bankName       String
   accountNumber  String
-  accountType    String   @default("checking")  // checking | savings
+  accountType    String   @default("checking") // checking | savings
   currency       String   @default("USD")
   currentBalance Float    @default(0)
   glAccountId    String?
@@ -604,19 +686,19 @@ model BankAccount {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  glAccount      Account?          @relation(fields: [glAccountId], references: [id])
+  glAccount      Account?        @relation(fields: [glAccountId], references: [id])
   statements     BankStatement[]
   vendorPayments VendorPayment[]
 }
 
 model BankStatement {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   bankAccountId  String
   statementDate  DateTime
   openingBalance Float
   closingBalance Float
-  status         String   @default("pending")  // pending | in_progress | reconciled
-  importedAt     DateTime @default(now())
+  status         String    @default("pending") // pending | in_progress | reconciled
+  importedAt     DateTime  @default(now())
   reconciledAt   DateTime?
 
   bankAccount BankAccount         @relation(fields: [bankAccountId], references: [id])
@@ -629,9 +711,9 @@ model BankStatementLine {
   transactionDate DateTime
   description     String
   amount          Float
-  transactionType String   @default("deposit")  // deposit | withdrawal | fee | interest
+  transactionType String   @default("deposit") // deposit | withdrawal | fee | interest
   reference       String?
-  matchingStatus  String   @default("unmatched")  // unmatched | matched | manual
+  matchingStatus  String   @default("unmatched") // unmatched | matched | manual
   matchedToId     String?
   createdAt       DateTime @default(now())
 
@@ -641,27 +723,27 @@ model BankStatementLine {
 // ─── Business Central: Fiscal Calendar & Year-End Close ──────────────────────
 
 model FiscalYear {
-  id         String   @id @default(cuid())
-  name       String   @unique  // e.g., FY2026
-  startDate  DateTime
-  endDate    DateTime
-  status     String   @default("open")  // open | closing | closed | archived
-  closedAt   DateTime?
-  closedBy   String?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(cuid())
+  name      String    @unique // e.g., FY2026
+  startDate DateTime
+  endDate   DateTime
+  status    String    @default("open") // open | closing | closed | archived
+  closedAt  DateTime?
+  closedBy  String?
+  createdAt DateTime  @default(now())
 
   periods      FiscalPeriod[]
   yearEndClose YearEndClose?
 }
 
 model FiscalPeriod {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   fiscalYearId String
   periodNumber Int
   name         String
   startDate    DateTime
   endDate      DateTime
-  status       String   @default("open")  // open | closed | on_hold
+  status       String    @default("open") // open | closed | on_hold
   closedAt     DateTime?
 
   fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id])
@@ -670,20 +752,20 @@ model FiscalPeriod {
 }
 
 model YearEndClose {
-  id                        String   @id @default(cuid())
-  fiscalYearId              String   @unique
+  id                        String    @id @default(cuid())
+  fiscalYearId              String    @unique
   closingDate               DateTime
-  status                    String   @default("pending")  // pending | in_progress | completed | reversed
+  status                    String    @default("pending") // pending | in_progress | completed | reversed
   retainedEarningsAccountId String?
   openingVoucherId          String?
   closingVoucherId          String?
-  totalRevenue              Float    @default(0)
-  totalExpenses             Float    @default(0)
-  netIncome                 Float    @default(0)
+  totalRevenue              Float     @default(0)
+  totalExpenses             Float     @default(0)
+  netIncome                 Float     @default(0)
   completedAt               DateTime?
   completedBy               String?
   notes                     String?
-  createdAt                 DateTime @default(now())
+  createdAt                 DateTime  @default(now())
 
   fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id])
 }
@@ -694,7 +776,7 @@ model PostingProfile {
   id          String   @id @default(cuid())
   code        String   @unique
   name        String
-  module      String   // AP | AR | INVENTORY | BANK | PAYROLL
+  module      String // AP | AR | INVENTORY | BANK | PAYROLL
   description String?
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
@@ -705,7 +787,7 @@ model PostingProfile {
 model PostingRule {
   id              String  @id @default(cuid())
   profileId       String
-  transactionType String  // VendorInvoice | CustomerInvoice | VendorPayment | CustomerPayment | Inventory | etc.
+  transactionType String // VendorInvoice | CustomerInvoice | VendorPayment | CustomerPayment | Inventory | etc.
   debitAccountId  String?
   creditAccountId String?
   applicableTo    String? // ALL | group code
@@ -773,7 +855,7 @@ model WmsRack {
   digitCount   Int      @default(2)
   createdAt    DateTime @default(now())
 
-  zone WmsZone @relation(fields: [locationCode, zoneCode], references: [locationCode, zoneCode])
+  zone WmsZone  @relation(fields: [locationCode, zoneCode], references: [locationCode, zoneCode])
   bins WmsBin[]
 
   @@unique([locationCode, zoneCode, rackCode])
@@ -878,41 +960,41 @@ model FixedAssetGroup {
 }
 
 model FixedAsset {
-  id                 String   @id @default(cuid())
-  assetNumber        String   @unique
+  id                 String    @id @default(cuid())
+  assetNumber        String    @unique
   name               String
   description        String?
   groupId            String
   acquisitionDate    DateTime
   acquisitionCost    Float
-  salvageValue       Float    @default(0)
+  salvageValue       Float     @default(0)
   usefulLifeYears    Int
-  depreciationMethod String   @default("straight_line")
+  depreciationMethod String    @default("straight_line")
   currentBookValue   Float
-  accumulatedDeprec  Float    @default(0)
-  status             String   @default("active") // active | disposed | fully_depreciated
+  accumulatedDeprec  Float     @default(0)
+  status             String    @default("active") // active | disposed | fully_depreciated
   location           String?
   serialNumber       String?
   notes              String?
   disposedAt         DateTime?
   disposalAmount     Float?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  group              FixedAssetGroup       @relation(fields: [groupId], references: [id])
-  depreciationLines  AssetDepreciation[]
+  group             FixedAssetGroup     @relation(fields: [groupId], references: [id])
+  depreciationLines AssetDepreciation[]
 }
 
 model AssetDepreciation {
-  id                     String   @id @default(cuid())
-  assetId                String
-  fiscalYear             String
-  periodNumber           Int
-  depreciationAmount     Float
+  id                      String   @id @default(cuid())
+  assetId                 String
+  fiscalYear              String
+  periodNumber            Int
+  depreciationAmount      Float
   accumulatedDepreciation Float
-  bookValueAfter         Float
-  journalEntryId         String?
-  postedAt               DateTime @default(now())
+  bookValueAfter          Float
+  journalEntryId          String?
+  postedAt                DateTime @default(now())
 
   asset FixedAsset @relation(fields: [assetId], references: [id])
 
@@ -922,14 +1004,14 @@ model AssetDepreciation {
 // ─── Budget ───────────────────────────────────────────────────────────────────
 
 model BudgetPlan {
-  id           String   @id @default(cuid())
-  code         String   @unique
-  name         String
-  fiscalYear   String   // e.g., FY2026
-  status       String   @default("draft") // draft | active | closed
-  description  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  fiscalYear  String // e.g., FY2026
+  status      String   @default("draft") // draft | active | closed
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   entries BudgetEntry[]
 }
@@ -938,7 +1020,7 @@ model BudgetEntry {
   id           String   @id @default(cuid())
   budgetPlanId String
   accountId    String
-  periodNumber Int?     // null = annual budget
+  periodNumber Int? // null = annual budget
   budgetAmount Float    @default(0)
   notes        String?
   createdAt    DateTime @default(now())
@@ -952,30 +1034,30 @@ model BudgetEntry {
 // ─── Tax Management ───────────────────────────────────────────────────────────
 
 model TaxCode {
-  id            String   @id @default(cuid())
-  code          String   @unique
-  name          String
-  rate          Float    // percentage e.g. 8.25
-  taxType       String   @default("sales") // sales | use | vat | exempt | withholding
-  glAccountId   String?
-  isActive      Boolean  @default(true)
-  description   String?
-  createdAt     DateTime @default(now())
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  rate        Float // percentage e.g. 8.25
+  taxType     String   @default("sales") // sales | use | vat | exempt | withholding
+  glAccountId String?
+  isActive    Boolean  @default(true)
+  description String?
+  createdAt   DateTime @default(now())
 
   glAccount    Account?         @relation(fields: [glAccountId], references: [id])
   transactions TaxTransaction[]
 }
 
 model TaxTransaction {
-  id             String   @id @default(cuid())
-  taxCodeId      String
-  sourceType     String   // order | vendor_invoice | customer_invoice | manual
-  sourceId       String
-  taxableAmount  Float
-  taxAmount      Float
-  taxDate        DateTime @default(now())
-  fiscalYear     String?
-  periodNumber   Int?
+  id            String   @id @default(cuid())
+  taxCodeId     String
+  sourceType    String // order | vendor_invoice | customer_invoice | manual
+  sourceId      String
+  taxableAmount Float
+  taxAmount     Float
+  taxDate       DateTime @default(now())
+  fiscalYear    String?
+  periodNumber  Int?
 
   taxCode TaxCode @relation(fields: [taxCodeId], references: [id])
 }
@@ -983,14 +1065,14 @@ model TaxTransaction {
 // ─── Payroll ──────────────────────────────────────────────────────────────────
 
 model PayrollPeriod {
-  id          String   @id @default(cuid())
-  name        String
-  startDate   DateTime
-  endDate     DateTime
-  payDate     DateTime
-  status      String   @default("open") // open | processing | posted | closed
-  fiscalYear  String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  name       String
+  startDate  DateTime
+  endDate    DateTime
+  payDate    DateTime
+  status     String   @default("open") // open | processing | posted | closed
+  fiscalYear String?
+  createdAt  DateTime @default(now())
 
   entries PayrollEntry[]
 }
@@ -1044,17 +1126,17 @@ model CostCategory {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  entries     CostLedgerEntry[]
-  budgets     CostBudget[]
+  entries CostLedgerEntry[]
+  budgets CostBudget[]
 }
 
 model CostAllocation {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   costCenterId String
   accountId    String?
   percentage   Float
   description  String?
-  isActive     Boolean @default(true)
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
   costCenter CostCenter @relation(fields: [costCenterId], references: [id])
@@ -1078,7 +1160,7 @@ model CostLedgerEntry {
 }
 
 model CostBudget {
-  id             String  @id @default(cuid())
+  id             String @id @default(cuid())
   costCenterId   String
   costCategoryId String
   fiscalYear     String
@@ -1094,13 +1176,13 @@ model CostBudget {
 // ─── Field Service Extensions ─────────────────────────────────────────────────
 
 model WorkOrderLine {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   workOrderId String
-  lineType    String  @default("labor") // labor | part | expense
+  lineType    String   @default("labor") // labor | part | expense
   description String
-  quantity    Float   @default(1)
-  unitCost    Float   @default(0)
-  totalCost   Float   @default(0)
+  quantity    Float    @default(1)
+  unitCost    Float    @default(0)
+  totalCost   Float    @default(0)
   createdAt   DateTime @default(now())
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
@@ -1121,25 +1203,164 @@ model PurchaseReceipt {
 }
 
 model PurchaseReceiptLine {
-  id              String @id @default(cuid())
-  receiptId       String
-  poItemId        String
+  id               String @id @default(cuid())
+  receiptId        String
+  poItemId         String
   quantityReceived Float
 
-  receipt PurchaseReceipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receipt PurchaseReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   poItem  PurchaseOrderItem @relation(fields: [poItemId], references: [id])
+}
+
+// ─── Price & Discount Management ─────────────────────────────────────────────
+
+model PriceGroup {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  discounts Discount[]
+}
+
+model Discount {
+  id             String    @id @default(cuid())
+  name           String
+  discountCode   String    @unique
+  discountType   String // simple | quantity | mix_match | threshold
+  status         String    @default("active") // active | inactive | expired
+  priceGroupId   String?
+  couponRequired Boolean   @default(false)
+  couponCode     String?
+  discountMethod String    @default("percent") // percent | amount
+  discountValue  Float     @default(0)
+  startDate      DateTime?
+  endDate        DateTime?
+  maxUsageCount  Int?
+  usageCount     Int       @default(0)
+  minPurchaseAmt Float?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  priceGroup PriceGroup?     @relation(fields: [priceGroupId], references: [id])
+  lines      DiscountLine[]
+  usages     DiscountUsage[]
+}
+
+model DiscountLine {
+  id          String  @id @default(cuid())
+  discountId  String
+  lineType    String // product | category | all
+  productId   String?
+  categoryId  String?
+  minQty      Float?
+  maxQty      Float?
+  discountPct Float?
+  discountAmt Float?
+
+  discount Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+}
+
+model DiscountUsage {
+  id          String   @id @default(cuid())
+  discountId  String
+  orderId     String
+  discountAmt Float
+  usedAt      DateTime @default(now())
+
+  discount Discount @relation(fields: [discountId], references: [id])
+}
+
+model PriceAdjustment {
+  id           String    @id @default(cuid())
+  name         String
+  productId    String?
+  categoryId   String?
+  priceGroupId String?
+  adjustType   String    @default("percent") // percent | fixed | new_price
+  adjustValue  Float
+  startDate    DateTime?
+  endDate      DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+}
+
+// ─── Loyalty Program ──────────────────────────────────────────────────────────
+
+model LoyaltyProgram {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  status      String    @default("active") // active | inactive
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tiers LoyaltyTier[]
+  cards LoyaltyCard[]
+}
+
+model LoyaltyTier {
+  id            String  @id @default(cuid())
+  programId     String
+  name          String
+  minimumPoints Int     @default(0)
+  earningRate   Float   @default(1.0)
+  rewardRate    Float   @default(0.01)
+  description   String?
+  color         String?
+  sortOrder     Int     @default(0)
+
+  program LoyaltyProgram @relation(fields: [programId], references: [id])
+  cards   LoyaltyCard[]
+}
+
+model LoyaltyCard {
+  id              String    @id @default(cuid())
+  cardNumber      String    @unique
+  programId       String
+  tierId          String?
+  customerId      String    @unique
+  totalPoints     Int       @default(0)
+  availablePoints Int       @default(0)
+  lifetimePoints  Int       @default(0)
+  status          String    @default("active") // active | blocked | expired
+  enrolledAt      DateTime  @default(now())
+  lastActivity    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  program      LoyaltyProgram       @relation(fields: [programId], references: [id])
+  tier         LoyaltyTier?         @relation(fields: [tierId], references: [id])
+  customer     Customer             @relation(fields: [customerId], references: [id])
+  transactions LoyaltyTransaction[]
+}
+
+model LoyaltyTransaction {
+  id          String   @id @default(cuid())
+  cardId      String
+  type        String // earn | redeem | adjust | expire | enroll
+  points      Int
+  description String?
+  orderId     String?
+  createdAt   DateTime @default(now())
+
+  card LoyaltyCard @relation(fields: [cardId], references: [id])
 }
 
 // ─── Marketing Extensions ─────────────────────────────────────────────────────
 
 model CampaignContact {
-  id           String    @id @default(cuid())
-  campaignId   String
-  customerId   String
-  status       String    @default("pending") // pending | sent | opened | clicked | unsubscribed
-  sentAt       DateTime?
-  openedAt     DateTime?
-  createdAt    DateTime  @default(now())
+  id         String    @id @default(cuid())
+  campaignId String
+  customerId String
+  status     String    @default("pending") // pending | sent | opened | clicked | unsubscribed
+  sentAt     DateTime?
+  openedAt   DateTime?
+  createdAt  DateTime  @default(now())
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id])
@@ -1147,297 +1368,437 @@ model CampaignContact {
   @@unique([campaignId, customerId])
 }
 
-// ─── Approval Workflows ───────────────────────────────────────────────────────
-
-model ApprovalWorkflow {
-  id          String   @id @default(cuid())
-  name        String
-  entityType  String   // PURCHASE_ORDER | VENDOR_INVOICE | SALES_ORDER | JOURNAL_ENTRY | BUDGET | CUSTOMER
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-
-  steps    ApprovalStep[]
-  requests ApprovalRequest[]
-}
-
-model ApprovalStep {
-  id           String  @id @default(cuid())
-  workflowId   String
-  stepOrder    Int
-  approverRole String  // admin | manager | accountant
-  approverName String?
-  isRequired   Boolean @default(true)
-
-  workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-}
-
-model ApprovalRequest {
-  id          String   @id @default(cuid())
-  workflowId  String
-  entityType  String
-  entityId    String
-  entityRef   String
-  requestedBy String
-  currentStep Int      @default(1)
-  status      String   @default("pending") // pending | approved | rejected | cancelled
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id])
-  actions  ApprovalAction[]
-}
-
-model ApprovalAction {
-  id        String   @id @default(cuid())
-  requestId String
-  stepOrder Int
-  action    String   // approve | reject | comment
-  actorName String
-  actorRole String
-  comment   String?
-  createdAt DateTime @default(now())
-
-  request ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-}
-
-// ─── CRM / Sales Opportunities ────────────────────────────────────────────────
-
-model Contact {
-  id         String   @id @default(cuid())
-  firstName  String
-  lastName   String
-  email      String?
-  phone      String?
-  company    String?
-  title      String?
-  customerId String?
-  notes      String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  customer      Customer?     @relation(fields: [customerId], references: [id])
-  opportunities Opportunity[]
-}
-
-model SalesCycle {
-  id   String @id @default(cuid())
-  name String
-
-  stages        SalesCycleStage[]
-  opportunities Opportunity[]
-}
-
-model SalesCycleStage {
-  id          String  @id @default(cuid())
-  cycleId     String
-  name        String
-  stageOrder  Int
-  probability Float   @default(0)
-
-  cycle SalesCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-}
-
-model Opportunity {
-  id                String    @id @default(cuid())
-  title             String
-  contactId         String?
-  customerId        String?
-  salesCycleId      String?
-  currentStageId    String?
-  estimatedValue    Float     @default(0)
-  probability       Float     @default(0)
-  expectedCloseDate DateTime?
-  status            String    @default("open") // open | won | lost | cancelled
-  assignedTo        String?
-  notes             String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  contact    Contact?    @relation(fields: [contactId], references: [id])
-  customer   Customer?   @relation(fields: [customerId], references: [id])
-  salesCycle SalesCycle? @relation(fields: [salesCycleId], references: [id])
-}
-
-// ─── Deferrals ────────────────────────────────────────────────────────────────
-
-model DeferralTemplate {
-  id                String    @id @default(cuid())
-  name              String
-  deferralType      String    // REVENUE | EXPENSE
-  method            String    // STRAIGHT_LINE | EQUAL_PER_PERIOD | USER_DEFINED
-  periodsCount      Int       @default(12)
-  startDate         DateTime?
-  glAccountId       String?
-  deferralAccountId String?
-  isActive          Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-
-  schedules DeferralSchedule[]
-}
-
-model DeferralSchedule {
-  id            String   @id @default(cuid())
-  templateId    String
-  entityType    String   // INVOICE | JOURNAL
-  entityId      String
-  entityRef     String
-  totalAmount   Float
-  deferredAmt   Float
-  recognizedAmt Float    @default(0)
-  status        String   @default("active") // active | completed | cancelled
-  startDate     DateTime
-  endDate       DateTime
-  createdAt     DateTime @default(now())
-
-  template DeferralTemplate @relation(fields: [templateId], references: [id])
-  lines    DeferralLine[]
-}
-
-model DeferralLine {
-  id         String    @id @default(cuid())
-  scheduleId String
-  periodDate DateTime
-  amount     Float
-  isPosted   Boolean   @default(false)
-  postedAt   DateTime?
-
-  schedule DeferralSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-}
-
-// ─── Multi-Currency ───────────────────────────────────────────────────────────
-
-model Currency {
-  id            String   @id @default(cuid())
-  code          String   @unique
-  name          String
-  symbol        String
-  isBase        Boolean  @default(false)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-
-  exchangeRates CurrencyRate[]
-}
-
-model CurrencyRate {
-  id         String   @id @default(cuid())
-  currencyId String
-  rate       Float
-  rateDate   DateTime @default(now())
-  source     String   @default("manual") // manual | auto
-
-  currency Currency @relation(fields: [currencyId], references: [id])
-
-  @@index([currencyId, rateDate])
-}
-
 // ─── Gift Cards ───────────────────────────────────────────────────────────────
 
 model GiftCard {
-  id             String   @id @default(cuid())
-  cardNumber     String   @unique
-  initialValue   Float
+  id             String    @id @default(cuid())
+  cardNumber     String    @unique
+  initialBalance Float
   currentBalance Float
-  isActive       Boolean  @default(true)
-  customerId     String?
-  issuedAt       DateTime @default(now())
+  currency       String    @default("USD")
+  status         String    @default("active")
+  issuedAt       DateTime  @default(now())
   expiresAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  issuedBy       String?
+  customerId     String?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  customer     Customer?            @relation(fields: [customerId], references: [id])
   transactions GiftCardTransaction[]
 }
 
 model GiftCardTransaction {
   id            String   @id @default(cuid())
   giftCardId    String
-  type          String   // ISSUE | REDEEM | RELOAD | VOID | CASHOUT
+  type          String
   amount        Float
   balanceBefore Float
   balanceAfter  Float
+  orderId       String?
   reference     String?
+  notes         String?
+  createdBy     String?
   createdAt     DateTime @default(now())
 
   giftCard GiftCard @relation(fields: [giftCardId], references: [id])
 }
 
-// ─── Shipping Methods ─────────────────────────────────────────────────────────
+// ─── Commerce HQ / Channel Management ────────────────────────────────────────
 
-model ShippingMethod {
+model Channel {
+  id               String   @id @default(cuid())
+  channelCode      String   @unique
+  name             String
+  channelType      String // retail | online | call_center
+  storeId          String?
+  defaultWarehouse String?
+  currency         String   @default("USD")
+  timeZone         String   @default("America/New_York")
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  registers Register[]
+}
+
+model Register {
+  id                String   @id @default(cuid())
+  registerId        String   @unique
+  name              String
+  channelId         String
+  hardwareProfileId String?
+  screenLayoutId    String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  channel Channel     @relation(fields: [channelId], references: [id])
+  shifts  CashShift[]
+}
+
+model HardwareProfile {
+  id               String   @id @default(cuid())
+  profileId        String   @unique
+  name             String
+  printerType      String   @default("none") // none | network | usb | opos
+  printerIp        String?
+  drawerPort       String?
+  scannerType      String   @default("none") // none | usb | keyboard_wedge
+  paymentTerminal  String   @default("none") // none | adyen | verifone | ingenico
+  paymentIp        String?
+  displayType      String   @default("none")
+  signatureCapture Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ReceiptProfile {
+  id           String   @id @default(cuid())
+  profileId    String   @unique
+  name         String
+  receiptType  String // sales | return | quote | credit_card | gift_card | layaway
+  header       String?
+  footer       String?
+  showLogo     Boolean  @default(true)
+  showBarcode  Boolean  @default(true)
+  emailReceipt Boolean  @default(false)
+  printReceipt Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+model CashShift {
+  id            String    @id @default(cuid())
+  shiftNumber   String    @unique
+  registerId    String
+  employeeId    String?
+  status        String    @default("open") // open | suspended | closed | blind_closed
+  openingFloat  Float     @default(0)
+  cashSales     Float     @default(0)
+  cardSales     Float     @default(0)
+  giftCardSales Float     @default(0)
+  returns       Float     @default(0)
+  safeDrops     Float     @default(0)
+  bankDrops     Float     @default(0)
+  expectedCash  Float     @default(0)
+  countedCash   Float?
+  variance      Float?
+  openedAt      DateTime  @default(now())
+  closedAt      DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  register        Register      @relation(fields: [registerId], references: [id])
+  tenders         ShiftTender[]
+  safeDropEntries SafeDrop[]
+}
+
+model ShiftTender {
+  id      String @id @default(cuid())
+  shiftId String
+  method  String
+  amount  Float
+  count   Int    @default(0)
+
+  shift CashShift @relation(fields: [shiftId], references: [id])
+}
+
+model SafeDrop {
+  id        String   @id @default(cuid())
+  shiftId   String
+  type      String // safe_drop | bank_drop | float_entry
+  amount    Float
+  notes     String?
+  createdAt DateTime @default(now())
+
+  shift CashShift @relation(fields: [shiftId], references: [id])
+}
+
+// ─── SEO Management ───────────────────────────────────────────────────────────
+
+model SiteSeoConfig {
   id              String   @id @default(cuid())
-  name            String
-  code            String   @unique
-  carrier         String?  // UPS | FEDEX | USPS | LOCAL
-  serviceType     String?
-  baseRate        Float    @default(0)
-  perLbRate       Float    @default(0)
-  freeThreshold   Float?
-  estimatedDays   Int?
-  isActive        Boolean  @default(true)
+  pageId          String?  @unique
+  entityType      String? // product, category, page
+  entityId        String?
+  metaTitle       String?
+  metaDesc        String?
+  ogTitle         String?
+  ogDesc          String?
+  ogImageUrl      String?
+  canonicalUrl    String?
+  robotsDirective String   @default("index,follow")
+  keywords        String?
+  structuredData  String? // JSON-LD blob
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 
-// ─── Fraud Protection ─────────────────────────────────────────────────────────
-
-model FraudRule {
-  id        String   @id @default(cuid())
-  name      String
-  ruleType  String   // ORDER_AMOUNT | VELOCITY | IP_BLOCK | PAYMENT_METHOD
-  threshold Float?
-  action    String   @default("flag") // flag | block | review
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  alerts FraudAlert[]
+model SiteMap {
+  id                String    @id @default(cuid())
+  name              String
+  type              String    @default("auto") // auto, manual
+  url               String? // for manual uploaded sitemaps
+  includeProducts   Boolean   @default(true)
+  includeCategories Boolean   @default(true)
+  includePages      Boolean   @default(true)
+  lastGenerated     DateTime?
+  generatedXml      String? // stored XML blob
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
-model FraudAlert {
-  id         String   @id @default(cuid())
-  ruleId     String?
-  entityType String   // ORDER | CUSTOMER | PAYMENT
-  entityId   String
-  reason     String
-  severity   String   @default("medium") // low | medium | high | critical
-  status     String   @default("open")   // open | reviewed | dismissed | confirmed
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  rule FraudRule? @relation(fields: [ruleId], references: [id])
-}
-
-// ─── Store Task Management ────────────────────────────────────────────────────
+// ─── Task Management ──────────────────────────────────────────────────────────
 
 model TaskList {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
-  storeId     String?
+  status      String    @default("active") // active | completed | archived
   dueDate     DateTime?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  store Store?      @relation(fields: [storeId], references: [id])
-  tasks StoreTask[]
-}
-
-model StoreTask {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
   storeId     String?
   assignedTo  String?
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tasks       Task[]
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  taskListId  String
+  title       String
+  description String?
+  status      String    @default("not_started") // not_started | in_progress | completed | skipped
+  priority    String    @default("normal") // low | normal | high | critical
+  assignedTo  String?
   dueDate     DateTime?
-  priority    String   @default("medium") // low | medium | high | critical
-  status      String   @default("pending") // pending | in_progress | completed | cancelled
-  taskListId  String?
+  completedAt DateTime?
+  completedBy String?
+  notes       String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  taskList    TaskList  @relation(fields: [taskListId], references: [id], onDelete: Cascade)
+}
+
+// ─── Commerce Statements ──────────────────────────────────────────────────────
+
+model CommerceStatement {
+  id               String    @id @default(cuid())
+  statementNumber  String    @unique
+  storeId          String?
+  channelId        String?
+  fiscalPeriod     String?
+  startDate        DateTime
+  endDate          DateTime
+  status           String    @default("open") // open | calculated | posted | voided
+  totalSales       Float     @default(0)
+  totalReturns     Float     @default(0)
+  totalDiscounts   Float     @default(0)
+  totalTax         Float     @default(0)
+  totalCash        Float     @default(0)
+  totalCard        Float     @default(0)
+  totalGiftCard    Float     @default(0)
+  transactionCount Int       @default(0)
+  variance         Float     @default(0)
+  calculatedAt     DateTime?
+  postedAt         DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// ─── Customer Orders / Fulfillment / Returns ──────────────────────────────────
+
+model CustomerOrder {
+  id              String   @id @default(cuid())
+  orderNumber     String   @unique
+  customerId      String
+  status          String   @default("created")  // created | confirmed | picking | packed | shipped | delivered | cancelled | return_in_progress
+  orderType       String   @default("pickup")   // pickup | ship | carry_out
+  channelId       String?
+  shippingAddress String?
+  shippingCity    String?
+  shippingState   String?
+  shippingZip     String?
+  deliveryMode    String?
+  requestedDate   DateTime?
+  subtotal        Float    @default(0)
+  taxAmount       Float    @default(0)
+  shippingCost    Float    @default(0)
+  totalAmount     Float    @default(0)
+  depositPaid     Float    @default(0)
+  balanceDue      Float    @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lines           CustomerOrderLine[]
+  fulfillments    OrderFulfillment[]
+}
+
+model CustomerOrderLine {
+  id            String  @id @default(cuid())
+  orderId       String
+  productId     String
+  productName   String
+  sku           String
+  quantity      Float
+  unitPrice     Float
+  discount      Float   @default(0)
+  taxAmount     Float   @default(0)
+  lineTotal     Float
+  qtyFulfilled  Float   @default(0)
+  status        String  @default("open")  // open | picking | packed | fulfilled | cancelled
+  order         CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model OrderFulfillment {
+  id            String   @id @default(cuid())
+  orderId       String
+  fulfillmentNo String   @unique
+  status        String   @default("pending")  // pending | picking | packing | packed | shipped | delivered
+  storeId       String?
+  assignedTo    String?
+  trackingNo    String?
+  carrier       String?
+  packedAt      DateTime?
+  shippedAt     DateTime?
+  deliveredAt   DateTime?
+  notes         String?
+  createdAt     DateTime @default(now())
+  order         CustomerOrder @relation(fields: [orderId], references: [id])
+  lines         FulfillmentLine[]
+}
+
+model FulfillmentLine {
+  id              String  @id @default(cuid())
+  fulfillmentId   String
+  orderLineId     String
+  quantity        Float
+  fulfillment     OrderFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+}
+
+model ReturnOrder {
+  id              String   @id @default(cuid())
+  returnNumber    String   @unique
+  originalOrderId String?
+  customerId      String?
+  status          String   @default("open")  // open | approved | received | refunded | closed
+  returnReason    String?
+  refundMethod    String   @default("original")  // original | cash | store_credit | gift_card | exchange
+  totalRefund     Float    @default(0)
+  restockFee      Float    @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lines           ReturnLine[]
+}
+
+model ReturnLine {
+  id          String  @id @default(cuid())
+  returnId    String
+  productId   String
+  productName String
+  sku         String
+  quantity    Float
+  unitPrice   Float
+  lineRefund  Float
+  condition   String  @default("good")  // good | damaged | opened
+  restock     Boolean @default(true)
+  return      ReturnOrder @relation(fields: [returnId], references: [id], onDelete: Cascade)
+}
+
+// ─── Commerce Site Builder ─────────────────────────────────────────────────────
+
+model SitePage {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  title         String
+  description   String?
+  status        String    @default("draft")    // draft, checked-out, checked-in, published
+  checkedOutBy  String?
+  checkedOutAt  DateTime?
+  publishedAt   DateTime?
+  pageType      String    @default("content")  // content, category, product, home, search, cart, checkout
+  template      String    @default("default")
+  metaTitle     String?
+  metaDesc      String?
+  robotsIndex   Boolean   @default(true)
+  modules       SitePageModule[]
+  fragments     SiteFragment[]
+  versions      SitePageVersion[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model SitePageModule {
+  id         String   @id @default(cuid())
+  pageId     String
+  page       SitePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  moduleType String   // hero, text-block, product-grid, image-gallery, call-to-action, video, carousel, promo-banner, nav-menu, footer, breadcrumb, buy-box, ratings-reviews, related-products, recommended, search-result, cart-icon, sign-in, iframe, form, spacer
+  name       String
+  position   Int
+  parentId   String?
+  config     String   @default("{}")  // JSON config for module props
+  hidden     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model SiteFragment {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  moduleType  String
+  config      String   @default("{}")
+  usageCount  Int      @default(0)
+  pages       SitePage[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
 
-  store    Store?    @relation(fields: [storeId], references: [id])
-  taskList TaskList? @relation(fields: [taskListId], references: [id])
+model SitePageVersion {
+  id          String   @id @default(cuid())
+  pageId      String
+  page        SitePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version     Int
+  snapshot    String   // JSON snapshot of page + modules
+  publishedBy String?
+  publishedAt DateTime @default(now())
+}
+
+model SiteTheme {
+  id           String   @id @default(cuid())
+  name         String
+  isActive     Boolean  @default(false)
+  primaryColor String   @default("#0078d4")
+  fontFamily   String   @default("Segoe UI")
+  logoUrl      String?
+  faviconUrl   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SiteNavMenu {
+  id        String        @id @default(cuid())
+  name      String
+  location  String        // header, footer, sidebar
+  isActive  Boolean       @default(true)
+  items     SiteNavItem[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model SiteNavItem {
+  id       String      @id @default(cuid())
+  menuId   String
+  menu     SiteNavMenu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  label    String
+  url      String
+  position Int
+  parentId String?
+  openNew  Boolean     @default(false)
 }
