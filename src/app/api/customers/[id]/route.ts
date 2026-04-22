@@ -22,7 +22,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json()
-  const allowed = ['firstName','lastName','email','phone','address','city','state','zip','notes','tags','creditLimit','creditStatus','isActive']
+  const allowed = ['firstName','lastName','email','phone','address','city','state','zip','notes','tags','creditLimit','creditStatus','isActive','customerGroupId']
   const data = Object.fromEntries(Object.entries(body).filter(([k]) => allowed.includes(k)))
   const customer = await prisma.customer.update({ where: { id }, data })
   return NextResponse.json(customer)

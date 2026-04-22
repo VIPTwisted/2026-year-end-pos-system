@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -66,21 +66,22 @@ export default function NewShippingMethodPage() {
   return (
     <>
       <TopBar title="Add Shipping Method" />
-      <main className="flex-1 p-6 overflow-auto">
-        <div className="max-w-xl mx-auto">
-          <Link
-            href="/settings/shipping"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-5"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Shipping Methods
-          </Link>
+      <main className="flex-1 overflow-auto bg-[#0f0f1a] min-h-0">
+        <div className="px-6 py-4">
+          <div className="max-w-xl">
+            <Link
+              href="/settings/shipping"
+              className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors mb-5"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back to Shipping Methods
+            </Link>
 
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base">New Shipping Method</CardTitle>
-            </CardHeader>
-            <CardContent>
+            <div className="bg-[#16213e] border border-zinc-800/50 rounded-lg overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-zinc-800/40">
+                <h2 className="text-[14px] font-semibold text-zinc-100">New Shipping Method</h2>
+              </div>
+              <div className="p-5">
               <form onSubmit={handleSubmit} className="space-y-5">
 
                 {/* Name + Code */}
@@ -203,8 +204,9 @@ export default function NewShippingMethodPage() {
                   </Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+          </div>
         </div>
       </main>
     </>

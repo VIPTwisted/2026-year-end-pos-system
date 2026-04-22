@@ -1,149 +1,221 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { TopBar } from '@/components/layout/TopBar'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, Pencil, Trash2, CheckCircle } from 'lucide-react'
 
-type SiteTheme = {
+import { useEffect, useState } from 'react'
+import { TopBar } from '@/components/layout/TopBar'
+import { Card, CardContent } from '@/components/ui/card'
+import { Plus, Palette, CheckCircle2, Loader2 } from 'lucide-react'
+
+interface SiteTheme {
   id: string
   name: string
-  primaryColor: string
-  accentColor: string
-  fontFamily: string
-  logoUrl: string | null
   isActive: boolean
+  primaryColor: string
+  fontFamily: string
+  logoUrl?: string | null
+  faviconUrl?: string | null
   createdAt: string
 }
 
-const BLANK: Partial<SiteTheme> = {
-  name: '', primaryColor: '#2563eb', accentColor: '#7c3aed', fontFamily: 'Inter', logoUrl: '', isActive: false,
-}
+const FONT_FAMILIES = [
+  'Segoe UI', 'Inter', 'Roboto', 'Open Sans', 'Lato', 'Poppins', 'Montserrat', 'Georgia', 'Times New Roman',
+]
 
-export default function SiteThemesPage() {
+export default function ThemesPage() {
   const [themes, setThemes] = useState<SiteTheme[]>([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState<Partial<SiteTheme>>(BLANK)
-  const [editing, setEditing] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [activating, setActivating] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    name: '',
+    primaryColor: '#0078d4',
+    fontFamily: 'Segoe UI',
+    logoUrl: '',
+    faviconUrl: '',
+  })
+  const [error, setError] = useState('')
 
-  async function load() {
-    setLoading(true)
-    const res = await fetch('/api/site/themes')
-    setThemes(await res.json())
-    setLoading(false)
-  }
+  useEffect(() => {
+    fetch('/api/site/themes').then(r => r.json()).then(data => {
+      setThemes(Array.isArray(data) ? data : [])
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
 
-  useEffect(() => { load() }, [])
-
-  async function save() {
-    setSaving(true)
-    if (editing) {
-      await fetch(`/api/site/themes/${editing}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    } else {
-      await fetch('/api/site/themes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+  async function handleActivate(id: string) {
+    setActivating(id)
+    const res = await fetch(`/api/site/themes/${id}/activate`, { method: 'POST' })
+    if (res.ok) {
+      setThemes(prev => prev.map(t => ({ ...t, isActive: t.id === id })))
     }
-    setSaving(false); setShowForm(false); setEditing(null); setForm(BLANK); load()
+    setActivating(null)
   }
 
-  async function activate(id: string) {
-    // Deactivate all, then activate selected
-    for (const t of themes) {
-      if (t.isActive) await fetch(`/api/site/themes/${t.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: false }) })
-    }
-    await fetch(`/api/site/themes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: true }) })
-    load()
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (!form.name.trim()) { setError('Name required'); return }
+    setCreating(true)
+    const res = await fetch('/api/site/themes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name,
+        primaryColor: form.primaryColor,
+        fontFamily: form.fontFamily,
+        logoUrl: form.logoUrl || undefined,
+        faviconUrl: form.faviconUrl || undefined,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error || 'Failed'); setCreating(false); return }
+    setThemes(prev => [data, ...prev])
+    setForm({ name: '', primaryColor: '#0078d4', fontFamily: 'Segoe UI', logoUrl: '', faviconUrl: '' })
+    setShowForm(false)
+    setCreating(false)
   }
 
-  async function remove(id: string) {
-    if (!confirm('Delete this theme?')) return
-    await fetch(`/api/site/themes/${id}`, { method: 'DELETE' })
-    load()
+  function set(key: string, value: string) {
+    setForm(prev => ({ ...prev, [key]: value }))
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <TopBar title="Themes" />
-      <div className="flex-1 overflow-auto p-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-zinc-400">{themes.length} theme{themes.length !== 1 ? 's' : ''}</div>
-          <Button size="sm" className="gap-1 bg-blue-600 hover:bg-blue-700" onClick={() => { setForm(BLANK); setEditing(null); setShowForm(true) }}>
-            <Plus className="w-3 h-3" /> New Theme
-          </Button>
+    <>
+      <TopBar title="Theme Settings" />
+      <main className="flex-1 p-6 overflow-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-100">Site Themes</h2>
+            <p className="text-sm text-zinc-500">Manage your store&apos;s visual themes</p>
+          </div>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" /> New Theme
+          </button>
         </div>
 
+        {/* Create form */}
         {showForm && (
-          <Card className="bg-zinc-900 border-blue-600/50">
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-zinc-100">{editing ? 'Edit Theme' : 'New Theme'}</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Name</label>
-                  <input className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
-                    value={form.name ?? ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          <Card>
+            <CardContent className="pt-5">
+              <h3 className="text-sm font-semibold text-zinc-100 mb-4">Create Theme</h3>
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Theme Name <span className="text-red-400">*</span></label>
+                    <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Summer 2026" className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Font Family</label>
+                    <select value={form.fontFamily} onChange={e => set('fontFamily', e.target.value)} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                      {FONT_FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Primary Color</label>
+                    <div className="flex items-center gap-2">
+                      <input type="color" value={form.primaryColor} onChange={e => set('primaryColor', e.target.value)} className="w-10 h-9 rounded border border-zinc-700 bg-zinc-900 cursor-pointer" />
+                      <input value={form.primaryColor} onChange={e => set('primaryColor', e.target.value)} className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Logo URL</label>
+                    <input value={form.logoUrl} onChange={e => set('logoUrl', e.target.value)} placeholder="https://..." className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Favicon URL</label>
+                    <input value={form.faviconUrl} onChange={e => set('faviconUrl', e.target.value)} placeholder="https://..." className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Primary Color</label>
-                  <input type="color" className="w-full h-9 bg-zinc-800 border border-zinc-700 rounded px-1 cursor-pointer"
-                    value={form.primaryColor ?? '#2563eb'} onChange={e => setForm(f => ({ ...f, primaryColor: e.target.value }))} />
+                {error && <p className="text-sm text-red-400">{error}</p>}
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 border border-zinc-700 text-zinc-400 rounded-lg text-sm">Cancel</button>
+                  <button type="submit" disabled={creating} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                    {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Create Theme
+                  </button>
                 </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Accent Color</label>
-                  <input type="color" className="w-full h-9 bg-zinc-800 border border-zinc-700 rounded px-1 cursor-pointer"
-                    value={form.accentColor ?? '#7c3aed'} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Font Family</label>
-                  <input className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
-                    value={form.fontFamily ?? ''} onChange={e => setForm(f => ({ ...f, fontFamily: e.target.value }))} />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs text-zinc-400 mb-1 block">Logo URL</label>
-                  <input className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
-                    value={form.logoUrl ?? ''} onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))} />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
-                <Button size="sm" variant="outline" className="border-zinc-700 text-zinc-300" onClick={() => { setShowForm(false); setEditing(null); setForm(BLANK) }}>Cancel</Button>
-              </div>
+              </form>
             </CardContent>
           </Card>
         )}
 
-        <div className="grid grid-cols-3 gap-4">
-          {loading ? (
-            <div className="col-span-3 text-sm text-zinc-500 py-8 text-center">Loading…</div>
-          ) : themes.length === 0 ? (
-            <div className="col-span-3 text-sm text-zinc-500 py-8 text-center">No themes yet.</div>
-          ) : themes.map(t => (
-            <Card key={t.id} className={`bg-zinc-900 border ${t.isActive ? 'border-emerald-600' : 'border-zinc-800'}`}>
-              <CardContent className="pt-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-zinc-100 text-sm">{t.name}</span>
-                  {t.isActive && <Badge variant="success" className="text-xs">Active</Badge>}
+        {/* Themes grid */}
+        {loading && <p className="text-zinc-500 text-sm">Loading...</p>}
+        {!loading && themes.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 text-zinc-600">
+              <Palette className="w-10 h-10 mb-3 opacity-30" />
+              <p className="text-sm">No themes created yet.</p>
+              <button onClick={() => setShowForm(true)} className="mt-2 text-sm text-blue-400 hover:text-blue-300">Create your first theme</button>
+            </CardContent>
+          </Card>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {themes.map(theme => (
+            <Card
+              key={theme.id}
+              className={`border transition-all ${theme.isActive ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-zinc-800'}`}
+            >
+              <CardContent className="pt-5">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-lg shadow"
+                      style={{ backgroundColor: theme.primaryColor }}
+                    />
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+                        {theme.name}
+                        {theme.isActive && (
+                          <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Active
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-xs text-zinc-500">{theme.fontFamily}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <div className="w-6 h-6 rounded-full border border-zinc-700" style={{ backgroundColor: t.primaryColor }} title={`Primary: ${t.primaryColor}`} />
-                  <div className="w-6 h-6 rounded-full border border-zinc-700" style={{ backgroundColor: t.accentColor }} title={`Accent: ${t.accentColor}`} />
-                  <span className="text-xs text-zinc-500 self-center">{t.fontFamily}</span>
-                </div>
-                <div className="flex gap-2 pt-1">
-                  {!t.isActive && (
-                    <Button size="sm" variant="outline" className="border-emerald-700 text-emerald-400 hover:bg-emerald-900/30 gap-1 text-xs" onClick={() => activate(t.id)}>
-                      <CheckCircle className="w-3 h-3" /> Activate
-                    </Button>
+
+                <div className="space-y-1.5 mb-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-500 w-20">Primary:</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: theme.primaryColor }} />
+                      <span className="font-mono text-zinc-300">{theme.primaryColor}</span>
+                    </span>
+                  </div>
+                  {theme.logoUrl && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-500 w-20">Logo:</span>
+                      <span className="text-zinc-400 truncate">{theme.logoUrl}</span>
+                    </div>
                   )}
-                  <Button size="sm" variant="ghost" className="text-zinc-400 hover:text-zinc-100" onClick={() => { setForm(t); setEditing(t.id); setShowForm(true) }}><Pencil className="w-3 h-3" /></Button>
-                  <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300" onClick={() => remove(t.id)}><Trash2 className="w-3 h-3" /></Button>
                 </div>
+
+                {!theme.isActive && (
+                  <button
+                    onClick={() => handleActivate(theme.id)}
+                    disabled={activating === theme.id}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-zinc-700 hover:border-emerald-500 text-zinc-400 hover:text-emerald-300 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    {activating === theme.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    Activate
+                  </button>
+                )}
+                {theme.isActive && (
+                  <div className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Currently Active
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
-      </div>
-    </div>
+      </main>
+    </>
   )
 }

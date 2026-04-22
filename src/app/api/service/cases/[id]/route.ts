@@ -6,20 +6,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-
-  const serviceCase = await prisma.serviceCase.findUnique({
+  const c = await prisma.serviceCase2.findUnique({
     where: { id },
     include: {
-      customer: true,
-      notes: { orderBy: { createdAt: 'asc' } },
+      notes:        { orderBy: { createdAt: 'asc' } },
+      satisfaction: true,
+      queue:        true,
+      sla:          true,
     },
   })
-
-  if (!serviceCase) {
-    return NextResponse.json({ error: 'Case not found' }, { status: 404 })
-  }
-
-  return NextResponse.json(serviceCase)
+  if (!c) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json(c)
 }
 
 export async function PATCH(
@@ -28,32 +25,28 @@ export async function PATCH(
 ) {
   const { id } = await params
   const body = await req.json()
-  const { status, assignedTo } = body
+  const {
+    status, priority, assignedTo, queueId,
+    tags, subject, description, customerName,
+    customerEmail, channel, orderId,
+  } = body
 
-  const existing = await prisma.serviceCase.findUnique({ where: { id } })
-  if (!existing) {
-    return NextResponse.json({ error: 'Case not found' }, { status: 404 })
-  }
-
-  const resolvedAt =
-    status === 'resolved' && existing.status !== 'resolved'
-      ? new Date()
-      : status && status !== 'resolved'
-      ? null
-      : undefined
-
-  const serviceCase = await prisma.serviceCase.update({
+  const updated = await prisma.serviceCase2.update({
     where: { id },
     data: {
-      ...(status !== undefined ? { status } : {}),
-      ...(assignedTo !== undefined ? { assignedTo } : {}),
-      ...(resolvedAt !== undefined ? { resolvedAt } : {}),
+      ...(status !== undefined        && { status }),
+      ...(priority !== undefined      && { priority }),
+      ...(assignedTo !== undefined    && { assignedTo }),
+      ...(queueId !== undefined       && { queueId }),
+      ...(tags !== undefined          && { tags }),
+      ...(subject !== undefined       && { subject }),
+      ...(description !== undefined   && { description }),
+      ...(customerName !== undefined  && { customerName }),
+      ...(customerEmail !== undefined && { customerEmail }),
+      ...(channel !== undefined       && { channel }),
+      ...(orderId !== undefined       && { orderId }),
     },
-    include: {
-      customer: true,
-      notes: { orderBy: { createdAt: 'asc' } },
-    },
+    include: { queue: true, sla: true, notes: true, satisfaction: true },
   })
-
-  return NextResponse.json(serviceCase)
+  return NextResponse.json(updated)
 }

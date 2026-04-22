@@ -1,193 +1,197 @@
+'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
-import { prisma } from '@/lib/prisma'
-import { formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CheckSquare, Plus, Clock } from 'lucide-react'
+import {
+  CheckSquare, Clock, AlertTriangle, Plus, ChevronRight,
+  ListChecks, CalendarDays, User,
+} from 'lucide-react'
 
-const PRIORITY_VARIANT: Record<string, 'destructive' | 'warning' | 'default' | 'secondary'> = {
-  critical: 'destructive',
-  high: 'warning',
-  medium: 'default',
-  low: 'secondary',
+interface TaskList {
+  id: string
+  name: string
+  description: string | null
+  status: string
+  dueDate: string | null
+  storeId: string | null
+  assignedTo: string | null
+  tasks: { id: string; status: string }[]
+  createdAt: string
 }
 
-const STATUS_VARIANT: Record<string, 'secondary' | 'default' | 'success' | 'destructive'> = {
-  pending: 'secondary',
-  in_progress: 'default',
-  completed: 'success',
-  cancelled: 'destructive',
+function statusBadge(status: string) {
+  const map: Record<string, string> = {
+    active: 'bg-blue-400/10 text-blue-400 border-blue-400/20',
+    completed: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
+    archived: 'bg-zinc-700 text-zinc-400 border-zinc-600',
+  }
+  return map[status] ?? 'bg-zinc-700 text-zinc-400'
 }
 
-type PageProps = {
-  searchParams: Promise<{ status?: string }>
+function isOverdue(dueDate: string | null) {
+  if (!dueDate) return false
+  return new Date(dueDate) < new Date()
 }
 
-export default async function TasksPage({ searchParams }: PageProps) {
-  const { status } = await searchParams
+function isDueToday(dueDate: string | null) {
+  if (!dueDate) return false
+  const d = new Date(dueDate)
   const now = new Date()
+  return d.toDateString() === now.toDateString()
+}
 
-  const [allTasks, filteredTasks] = await Promise.all([
-    prisma.storeTask.findMany({ select: { status: true, dueDate: true } }),
-    prisma.storeTask.findMany({
-      where: status && status !== 'all' ? { status } : undefined,
-      include: { store: true, taskList: true },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    }),
-  ])
+export default function TasksPage() {
+  const [lists, setLists] = useState<TaskList[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const totalTasks = allTasks.length
-  const pendingCount = allTasks.filter(t => t.status === 'pending').length
-  const inProgressCount = allTasks.filter(t => t.status === 'in_progress').length
-  const overdueCount = allTasks.filter(t =>
-    t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed' && t.status !== 'cancelled'
-  ).length
+  useEffect(() => {
+    fetch('/api/tasks/lists')
+      .then(r => r.json())
+      .then(data => {
+        setLists(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
 
-  const TABS = [
-    { label: 'All', value: 'all' },
-    { label: 'Pending', value: 'pending' },
-    { label: 'In Progress', value: 'in_progress' },
-    { label: 'Completed', value: 'completed' },
+  const openLists = lists.filter(l => l.status === 'active')
+  const dueToday = lists.filter(l => l.tasks.some(() => isDueToday(l.dueDate))).length
+  const overdue = lists.filter(l => l.status === 'active' && isOverdue(l.dueDate)).length
+  const completedToday = lists.filter(l => {
+    const d = new Date(l.createdAt)
+    return l.status === 'completed' && d.toDateString() === new Date().toDateString()
+  }).length
+
+  const kpis = [
+    { label: 'Open Lists', value: openLists.length, icon: ListChecks, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+    { label: 'Due Today', value: dueToday, icon: CalendarDays, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+    { label: 'Overdue', value: overdue, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-400/10' },
+    { label: 'Completed Today', value: completedToday, icon: CheckSquare, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
   ]
-
-  const activeTab = status ?? 'all'
 
   return (
     <>
       <TopBar title="Task Management" />
-      <main className="flex-1 p-6 overflow-auto">
-
-        {/* KPI Row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Total Tasks</p>
-              <p className="text-2xl font-bold text-zinc-100">{totalTasks}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Pending</p>
-              <p className="text-2xl font-bold text-zinc-400">{pendingCount}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">In Progress</p>
-              <p className="text-2xl font-bold text-blue-400">{inProgressCount}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Clock className="w-3.5 h-3.5 text-red-400" />
-                <p className="text-xs text-zinc-500 uppercase tracking-wide">Overdue</p>
-              </div>
-              <p className="text-2xl font-bold text-red-400">{overdueCount}</p>
-            </CardContent>
-          </Card>
+      <main className="flex-1 p-6 overflow-auto space-y-6">
+        <div className="grid grid-cols-4 gap-4">
+          {kpis.map(k => (
+            <Card key={k.label}>
+              <CardContent className="pt-5 pb-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-zinc-500 font-medium">{k.label}</span>
+                  <div className={`w-8 h-8 rounded-lg ${k.bg} flex items-center justify-center`}>
+                    <k.icon className={`w-4 h-4 ${k.color}`} />
+                  </div>
+                </div>
+                <div className={`text-2xl font-bold ${k.color}`}>{loading ? '—' : k.value}</div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* Filter Tabs + Action */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex gap-1">
-            {TABS.map(tab => (
-              <Link
-                key={tab.value}
-                href={`/tasks?status=${tab.value}`}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeTab === tab.value
-                    ? 'bg-blue-600/20 text-blue-400'
-                    : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
-                }`}
-              >
-                {tab.label}
-              </Link>
-            ))}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-100">Task Lists</h2>
+            <p className="text-sm text-zinc-500">Manage and track operational task lists</p>
           </div>
           <Link href="/tasks/new">
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-1" />New Task
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              New Task List
             </Button>
           </Link>
         </div>
 
-        {filteredTasks.length === 0 ? (
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="flex flex-col items-center justify-center py-20 text-zinc-500">
-              <CheckSquare className="w-12 h-12 mb-4 opacity-30" />
-              <p className="text-base font-medium text-zinc-300 mb-2">No tasks</p>
-              <p className="text-sm mb-4">
-                {activeTab !== 'all' ? `No ${activeTab.replace('_', ' ')} tasks` : 'Create your first task'}
-              </p>
-              <Link href="/tasks/new">
-                <Button size="sm"><Plus className="w-4 h-4 mr-1" />New Task</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
+        <Card>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                  <th className="text-left pb-3 font-medium">Title</th>
-                  <th className="text-left pb-3 font-medium">Store</th>
-                  <th className="text-left pb-3 font-medium">Assigned To</th>
-                  <th className="text-left pb-3 font-medium">Due Date</th>
-                  <th className="text-center pb-3 font-medium">Priority</th>
-                  <th className="text-center pb-3 font-medium">Status</th>
+                <tr className="border-b border-zinc-800">
+                  <th className="text-left px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Name</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Store</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Assigned</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Tasks</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Due Date</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {filteredTasks.map(task => {
-                  const isOverdue = task.dueDate && new Date(task.dueDate) < now &&
-                    task.status !== 'completed' && task.status !== 'cancelled'
-                  return (
-                    <tr key={task.id} className="hover:bg-zinc-900/50">
-                      <td className="py-3 pr-4 font-medium text-zinc-100">
-                        <Link
-                          href={`/tasks/${task.id}`}
-                          className="hover:text-blue-400 transition-colors"
-                        >
-                          {task.title}
-                        </Link>
-                      </td>
-                      <td className="py-3 pr-4 text-zinc-400 text-sm">
-                        {task.store?.name ?? <span className="text-zinc-600">—</span>}
-                      </td>
-                      <td className="py-3 pr-4 text-zinc-400 text-sm">
-                        {task.assignedTo ?? <span className="text-zinc-600">Unassigned</span>}
-                      </td>
-                      <td className="py-3 pr-4 text-xs whitespace-nowrap">
-                        {task.dueDate ? (
-                          <span className={isOverdue ? 'text-red-400 font-semibold' : 'text-zinc-400'}>
-                            {formatDate(task.dueDate)}
-                            {isOverdue && ' ⚠'}
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center text-zinc-500">Loading...</td>
+                  </tr>
+                ) : lists.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center text-zinc-500">No task lists yet.</td>
+                  </tr>
+                ) : (
+                  lists.map(list => {
+                    const done = list.tasks.filter(t => t.status === 'completed').length
+                    const total = list.tasks.length
+                    const over = list.status === 'active' && isOverdue(list.dueDate)
+                    return (
+                      <tr key={list.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="font-medium text-zinc-100">{list.name}</div>
+                          {list.description && <div className="text-xs text-zinc-500 mt-0.5 truncate max-w-xs">{list.description}</div>}
+                        </td>
+                        <td className="px-4 py-3.5 text-zinc-400">{list.storeId ?? '—'}</td>
+                        <td className="px-4 py-3.5">
+                          {list.assignedTo ? (
+                            <div className="flex items-center gap-1.5 text-zinc-300">
+                              <User className="w-3 h-3 text-zinc-500" />
+                              {list.assignedTo}
+                            </div>
+                          ) : (
+                            <span className="text-zinc-600">Unassigned</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500 rounded-full"
+                                style={{ width: total > 0 ? `${(done / total) * 100}%` : '0%' }}
+                              />
+                            </div>
+                            <span className="text-xs text-zinc-400">{done}/{total}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {list.dueDate ? (
+                            <div className={`flex items-center gap-1.5 text-xs ${over ? 'text-red-400' : 'text-zinc-400'}`}>
+                              <Clock className="w-3 h-3" />
+                              {new Date(list.dueDate).toLocaleDateString()}
+                              {over && <span className="text-red-400 font-medium">Overdue</span>}
+                            </div>
+                          ) : (
+                            <span className="text-zinc-600 text-xs">No due date</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusBadge(list.status)}`}>
+                            {list.status}
                           </span>
-                        ) : (
-                          <span className="text-zinc-600">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 pr-4 text-center">
-                        <Badge variant={PRIORITY_VARIANT[task.priority] ?? 'secondary'} className="capitalize">
-                          {task.priority}
-                        </Badge>
-                      </td>
-                      <td className="py-3 text-center">
-                        <Badge variant={STATUS_VARIANT[task.status] ?? 'secondary'} className="capitalize">
-                          {task.status.replace('_', ' ')}
-                        </Badge>
-                      </td>
-                    </tr>
-                  )
-                })}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <Link href={`/tasks/${list.id}`}>
+                            <Button variant="ghost" size="sm" className="gap-1.5">
+                              View <ChevronRight className="w-3 h-3" />
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
-        )}
+        </Card>
       </main>
     </>
   )

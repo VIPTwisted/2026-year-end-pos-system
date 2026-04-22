@@ -30,29 +30,33 @@ export default function LoginPage() {
     }
   }
 
-  const inputCls = 'w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors pl-10'
+  const inputCls =
+    'w-full bg-[#0d1b2e] border border-blue-900/40 rounded-md px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors pl-9'
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div
+      className="min-h-[100dvh] flex items-center justify-center p-4"
+      style={{ background: 'linear-gradient(135deg, #0f0f1a 0%, #0d1b2e 50%, #1a1a2e 100%)' }}
+    >
+      <div className="w-full max-w-[400px]">
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4">
-            <Building2 className="w-6 h-6 text-white" />
+          <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center mb-3 shadow-lg shadow-blue-900/40">
+            <Building2 className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-zinc-100">NovaPOS</h1>
-          <p className="text-sm text-zinc-500 mt-1">Enterprise ERP & Commerce Platform</p>
+          <h1 className="text-lg font-bold text-zinc-100 tracking-tight">NovaPOS</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">Enterprise Platform</p>
         </div>
 
         {/* Card */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
-          <h2 className="text-base font-semibold text-zinc-100 mb-1">Sign in</h2>
-          <p className="text-xs text-zinc-500 mb-5">Enter your credentials to access the platform</p>
+        <div className="bg-[#16213e] border border-blue-900/30 rounded-xl p-6 shadow-2xl shadow-blue-950/50">
+          <h2 className="text-sm font-semibold text-zinc-100 mb-0.5">Sign in</h2>
+          <p className="text-xs text-zinc-500 mb-5">Enter your credentials to continue</p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3">
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
               <input
                 type="email"
                 value={email}
@@ -65,7 +69,7 @@ export default function LoginPage() {
             </div>
 
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
               <input
                 type="password"
                 value={password}
@@ -78,7 +82,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="text-xs text-red-400 bg-red-950/30 border border-red-900/40 rounded-lg px-3 py-2">
+              <div className="text-xs text-red-400 bg-red-950/20 border border-red-900/30 rounded-md px-3 py-2">
                 {error}
               </div>
             )}
@@ -86,15 +90,16 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+              className="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2 rounded-md transition-colors mt-1"
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
 
-          <div className="mt-5 pt-4 border-t border-zinc-800">
-            <p className="text-xs text-zinc-600 mb-2 font-medium">Demo credentials</p>
-            <div className="space-y-1 text-xs text-zinc-600 font-mono">
+          {/* Demo credentials */}
+          <div className="mt-5 pt-4 border-t border-blue-900/30">
+            <p className="text-[11px] text-zinc-600 mb-2 font-medium uppercase tracking-wider">Demo credentials</p>
+            <div className="space-y-1 text-[11px] text-zinc-600 font-mono">
               <div>admin@bc.local / Admin1234!</div>
               <div>manager@bc.local / Manager1234!</div>
               <div>cashier@bc.local / Cashier1234!</div>
@@ -102,6 +107,10 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+
+        <p className="text-center text-[11px] text-zinc-700 mt-6">
+          Microsoft Dynamics 365 Business Central — NovaPOS Edition
+        </p>
       </div>
     </div>
   )

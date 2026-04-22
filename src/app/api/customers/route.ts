@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET() {
-  const customers = await prisma.customer.findMany({ orderBy: { lastName: 'asc' } })
+export async function GET(req: NextRequest) {
+  const search = req.nextUrl.searchParams.get('search') ?? ''
+
+  const customers = await prisma.customer.findMany({
+    where: search
+      ? {
+          OR: [
+            { firstName: { contains: search } },
+            { lastName: { contains: search } },
+            { email: { contains: search } },
+            { phone: { contains: search } },
+          ],
+        }
+      : undefined,
+    orderBy: { lastName: 'asc' },
+    take: 20,
+  })
   return NextResponse.json(customers)
 }
 

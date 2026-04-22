@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const sitemap = await prisma.siteMap.findUnique({ where: { id: params.id } })
+export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const sitemap = await prisma.siteMap.findUnique({ where: { id } })
   if (!sitemap) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://example.com'
@@ -53,7 +54,7 @@ ${urls.join('\n')}
 </urlset>`
 
   const updated = await prisma.siteMap.update({
-    where: { id: params.id },
+    where: { id },
     data: { generatedXml: xml, lastGenerated: new Date() },
   })
 

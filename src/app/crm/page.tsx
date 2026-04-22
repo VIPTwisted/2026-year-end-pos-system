@@ -1,141 +1,160 @@
-import { TopBar } from '@/components/layout/TopBar'
-import { prisma } from '@/lib/prisma'
-import { formatCurrency, formatDate } from '@/lib/utils'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { TrendingUp, DollarSign, Target, Trophy } from 'lucide-react'
+import { prisma } from '@/lib/prisma'
+import { Building2, Users, CheckSquare, FileText, AlertTriangle, ArrowRight, Phone, Mail, Calendar } from 'lucide-react'
 
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary' | 'outline'> = {
-  open: 'default',
-  won: 'success',
-  lost: 'destructive',
-  cancelled: 'secondary',
+async function getDashboardData() {
+  const now = new Date()
+  const [
+    totalAccounts,
+    totalContacts,
+    openActivities,
+    activeContracts,
+    overdueActivities,
+    recentActivities,
+    accountsByType,
+  ] = await Promise.all([
+    prisma.cRMAccount.count(),
+    prisma.cRMContact.count(),
+    prisma.cRMActivity.count({ where: { status: 'open' } }),
+    prisma.cRMServiceContract.count({ where: { status: 'active' } }),
+    prisma.cRMActivity.count({ where: { status: 'open', dueDate: { lt: now } } }),
+    prisma.cRMActivity.findMany({
+      take: 8,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        account: { select: { id: true, name: true } },
+        contact: { select: { id: true, firstName: true, lastName: true } },
+      },
+    }),
+    prisma.cRMAccount.groupBy({ by: ['accountType'], _count: { id: true } }),
+  ])
+  return { totalAccounts, totalContacts, openActivities, activeContracts, overdueActivities, recentActivities, accountsByType }
 }
 
-export default async function CRMPage() {
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+const TYPE_ICON: Record<string, React.ElementType> = {
+  call: Phone,
+  email: Mail,
+  meeting: Calendar,
+  task: CheckSquare,
+}
 
-  const [opportunities, wonThisMonth] = await Promise.all([
-    prisma.opportunity.findMany({
-      include: {
-        contact: { select: { id: true, firstName: true, lastName: true, email: true } },
-        customer: { select: { id: true, firstName: true, lastName: true } },
-        salesCycle: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.opportunity.count({
-      where: { status: 'won', updatedAt: { gte: startOfMonth } },
-    }),
-  ])
+const TYPE_COLOR: Record<string, string> = {
+  call: 'text-green-400',
+  email: 'text-blue-400',
+  meeting: 'text-purple-400',
+  task: 'text-zinc-400',
+}
 
-  const openOpps = opportunities.filter(o => o.status === 'open')
-  const totalPipeline = openOpps.reduce((s, o) => s + o.estimatedValue, 0)
-  const avgProbability = openOpps.length > 0
-    ? openOpps.reduce((s, o) => s + o.probability, 0) / openOpps.length
-    : 0
+export default async function CRMDashboardPage() {
+  const data = await getDashboardData()
+
+  const kpis = [
+    { label: 'Total Accounts', value: data.totalAccounts, icon: Building2, color: 'text-blue-400', bg: 'bg-blue-500/10', href: '/crm/accounts' },
+    { label: 'Total Contacts', value: data.totalContacts, icon: Users, color: 'text-purple-400', bg: 'bg-purple-500/10', href: '/crm/contacts' },
+    { label: 'Open Activities', value: data.openActivities, icon: CheckSquare, color: 'text-green-400', bg: 'bg-green-500/10', href: '/crm/activities' },
+    { label: 'Active Contracts', value: data.activeContracts, icon: FileText, color: 'text-orange-400', bg: 'bg-orange-500/10', href: '/crm/contracts' },
+    { label: 'Overdue', value: data.overdueActivities, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/10', href: '/crm/activities' },
+  ]
 
   return (
-    <>
-      <TopBar title="CRM Pipeline" />
-      <main className="flex-1 p-6 overflow-auto space-y-6">
-
-        {/* KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: 'Open Opportunities', value: openOpps.length.toString(), icon: TrendingUp, color: 'text-blue-400' },
-            { label: 'Total Pipeline', value: formatCurrency(totalPipeline), icon: DollarSign, color: 'text-emerald-400' },
-            { label: 'Avg Probability', value: `${avgProbability.toFixed(0)}%`, icon: Target, color: 'text-amber-400' },
-            { label: 'Won This Month', value: wonThisMonth.toString(), icon: Trophy, color: 'text-purple-400' },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <Card key={label}>
-              <CardContent className="pt-5 pb-5 flex items-center gap-3">
-                <Icon className={`w-5 h-5 shrink-0 ${color}`} />
-                <div>
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">{label}</p>
-                  <p className={`text-xl font-bold tabular-nums ${color}`}>{value}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Customer Engagement</h1>
+          <p className="text-zinc-400 text-sm mt-1">D365-style CRM — Accounts, Contacts, Activities &amp; Entitlements</p>
         </div>
+      </div>
 
-        {/* Header + Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-zinc-200">Opportunities</h2>
-          <Link href="/crm/new">
-            <Button size="sm">+ New Opportunity</Button>
-          </Link>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+        {kpis.map((k) => {
+          const Icon = k.icon
+          return (
+            <Link key={k.label} href={k.href} className={`${k.bg} border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition-colors`}>
+              <div className="flex items-center justify-between mb-3">
+                <Icon className={`w-5 h-5 ${k.color}`} />
+                <ArrowRight className="w-4 h-4 text-zinc-600" />
+              </div>
+              <div className={`text-2xl font-bold ${k.color}`}>{k.value}</div>
+              <div className="text-zinc-400 text-xs mt-1">{k.label}</div>
+            </Link>
+          )
+        })}
+      </div>
 
-        {/* Table */}
-        {opportunities.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-14 text-zinc-600">
-              <TrendingUp className="w-8 h-8 mb-3 opacity-30" />
-              <p className="text-sm">No opportunities yet. Start by creating one.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wide">
-                  <th className="text-left pb-3 font-medium">Title</th>
-                  <th className="text-left pb-3 font-medium">Contact / Customer</th>
-                  <th className="text-left pb-3 font-medium">Sales Cycle</th>
-                  <th className="text-right pb-3 font-medium">Value</th>
-                  <th className="text-right pb-3 font-medium">Probability</th>
-                  <th className="text-left pb-3 font-medium">Close Date</th>
-                  <th className="text-center pb-3 font-medium">Status</th>
-                  <th className="text-right pb-3 font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {opportunities.map(opp => (
-                  <tr key={opp.id} className="hover:bg-zinc-900/50">
-                    <td className="py-3 pr-4 text-zinc-100 font-medium max-w-[200px] truncate">{opp.title}</td>
-                    <td className="py-3 pr-4 text-zinc-400 text-xs">
-                      {opp.contact
-                        ? `${opp.contact.firstName} ${opp.contact.lastName}`
-                        : opp.customer
-                        ? `${opp.customer.firstName} ${opp.customer.lastName}`
-                        : <span className="text-zinc-600">—</span>}
-                    </td>
-                    <td className="py-3 pr-4 text-zinc-400 text-xs">
-                      {opp.salesCycle?.name ?? <span className="text-zinc-600">—</span>}
-                    </td>
-                    <td className="py-3 pr-4 text-right text-emerald-400 font-medium tabular-nums">
-                      {formatCurrency(opp.estimatedValue)}
-                    </td>
-                    <td className="py-3 pr-4 text-right tabular-nums">
-                      <span className={opp.probability >= 70 ? 'text-emerald-400' : opp.probability >= 40 ? 'text-amber-400' : 'text-zinc-400'}>
-                        {opp.probability.toFixed(0)}%
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-zinc-500 text-xs">
-                      {opp.expectedCloseDate ? formatDate(opp.expectedCloseDate) : <span className="text-zinc-600">—</span>}
-                    </td>
-                    <td className="py-3 pr-4 text-center">
-                      <Badge variant={STATUS_VARIANT[opp.status] ?? 'secondary'} className="capitalize">
-                        {opp.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 text-right">
-                      <Link href={`/crm/${opp.id}`}>
-                        <Button variant="outline" size="sm">View</Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+            <h2 className="text-sm font-semibold text-white">Recent Activities</h2>
+            <Link href="/crm/activities" className="text-xs text-zinc-400 hover:text-white transition-colors">View all →</Link>
           </div>
-        )}
-      </main>
-    </>
+          <div className="divide-y divide-zinc-800">
+            {data.recentActivities.length === 0 && (
+              <div className="px-5 py-8 text-center text-zinc-500 text-sm">No activities yet</div>
+            )}
+            {data.recentActivities.map((a) => {
+              const Icon = TYPE_ICON[a.activityType] ?? CheckSquare
+              const color = TYPE_COLOR[a.activityType] ?? 'text-zinc-400'
+              return (
+                <div key={a.id} className="px-5 py-3 flex items-start gap-3 hover:bg-zinc-800/40 transition-colors">
+                  <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${color}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">{a.subject}</p>
+                    <p className="text-xs text-zinc-500">
+                      {a.account?.name ?? '—'}{a.contact ? ` · ${a.contact.firstName} ${a.contact.lastName}` : ''}
+                    </p>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${
+                    a.status === 'completed' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                    a.status === 'open' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                    'bg-zinc-800 border-zinc-700 text-zinc-400'
+                  }`}>{a.status}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+            <h2 className="text-sm font-semibold text-white">Account Pipeline</h2>
+            <Link href="/crm/accounts" className="text-xs text-zinc-400 hover:text-white transition-colors">View all →</Link>
+          </div>
+          <div className="p-5 space-y-3">
+            {data.accountsByType.length === 0 && (
+              <div className="text-center text-zinc-500 text-sm py-4">No accounts yet</div>
+            )}
+            {data.accountsByType.map((row) => {
+              const pct = data.totalAccounts > 0 ? Math.round((row._count.id / data.totalAccounts) * 100) : 0
+              const colors: Record<string, string> = {
+                prospect: 'bg-yellow-500',
+                customer: 'bg-green-500',
+                partner: 'bg-blue-500',
+                competitor: 'bg-red-500',
+              }
+              const barColor = colors[row.accountType] ?? 'bg-zinc-500'
+              return (
+                <div key={row.accountType}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-zinc-300 capitalize">{row.accountType}</span>
+                    <span className="text-zinc-500">{row._count.id}</span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="border-t border-zinc-800 px-5 py-3 flex gap-4 text-xs">
+            <Link href="/crm/entitlements" className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors">
+              <FileText className="w-3.5 h-3.5" /> Entitlements
+            </Link>
+            <Link href="/crm/contracts" className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors">
+              <FileText className="w-3.5 h-3.5" /> Contracts
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

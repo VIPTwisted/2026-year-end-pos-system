@@ -3,173 +3,285 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { Gift, RefreshCw, Save } from 'lucide-react'
 
-interface Customer { id: string; firstName: string; lastName: string; email: string }
+interface Customer {
+  id: string
+  firstName: string
+  lastName: string
+  email: string | null
+}
 
 function generateCardNumber(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let num = 'GC-'
-  for (let i = 0; i < 10; i++) {
-    num += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return num
+  const seg = () => Math.random().toString(36).toUpperCase().slice(2, 6).padEnd(4, '0').slice(0, 4)
+  return `GC-${seg()}-${seg()}-${seg()}`
 }
 
 export default function NewGiftCardPage() {
   const router = useRouter()
+
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(false)
+  const [manualNumber, setManualNumber] = useState(false)
+  const [cardNumber, setCardNumber] = useState(generateCardNumber)
+  const [initialBalance, setInitialBalance] = useState('25.00')
+  const [expiresAt, setExpiresAt] = useState('')
+  const [customerId, setCustomerId] = useState('')
+  const [issuedBy, setIssuedBy] = useState('')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const [form, setForm] = useState({
-    cardNumber: generateCardNumber(),
-    initialValue: '',
-    customerId: '',
-    expiresAt: '',
-  })
-
   useEffect(() => {
-    fetch('/api/customers').then(r => r.json()).then(setCustomers).catch(() => setCustomers([]))
+    fetch('/api/customers')
+      .then(r => r.json())
+      .then(data => setCustomers(Array.isArray(data) ? data : data.customers ?? []))
+      .catch(() => setCustomers([]))
   }, [])
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(prev => ({ ...prev, [k]: e.target.value }))
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.initialValue || parseFloat(form.initialValue) <= 0) {
-      setError('Initial value must be greater than 0')
+    const balance = parseFloat(initialBalance)
+    if (!balance || balance <= 0) {
+      setError('Initial balance must be greater than $0.00')
       return
     }
-    setLoading(true)
+    if (!cardNumber.trim()) {
+      setError('Card number is required')
+      return
+    }
     setError('')
+    setSaving(true)
     try {
       const res = await fetch('/api/gift-cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cardNumber: form.cardNumber.trim(),
-          initialValue: parseFloat(form.initialValue),
-          customerId: form.customerId || undefined,
-          expiresAt: form.expiresAt || undefined,
+          cardNumber: cardNumber.trim(),
+          initialBalance: balance,
+          expiresAt: expiresAt || undefined,
+          customerId: customerId || undefined,
+          issuedBy: issuedBy.trim() || undefined,
+          notes: notes.trim() || undefined,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Create failed')
-      router.push(`/gift-cards/${data.id}`)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error || 'Failed to issue gift card')
+        setSaving(false)
+        return
+      }
+      const card = await res.json()
+      router.push(`/gift-cards/${card.id}`)
+    } catch {
+      setError('Network error. Please try again.')
+      setSaving(false)
     }
   }
 
-  const inputCls = 'w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors'
-  const labelCls = 'block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide'
+  const QUICK_AMOUNTS = [10, 25, 50, 100, 150, 200]
 
   return (
     <>
       <TopBar title="Issue Gift Card" />
-      <main className="flex-1 p-6 overflow-auto">
-        <div className="max-w-xl mx-auto">
-          <Link
-            href="/gift-cards"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-5"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Gift Cards
-          </Link>
+      <main className="flex-1 p-6 overflow-auto space-y-6 max-w-2xl">
 
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base">Issue New Gift Card</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-100">Issue New Gift Card</h2>
+            <p className="text-sm text-zinc-500">Fill in the details below to create a gift card</p>
+          </div>
+        </div>
 
-                {/* Card Number */}
-                <div>
-                  <label className={labelCls}>Card Number <span className="text-red-400">*</span></label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={form.cardNumber}
-                      onChange={set('cardNumber')}
-                      className={inputCls + ' font-mono'}
-                      required
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setForm(prev => ({ ...prev, cardNumber: generateCardNumber() }))}
-                    >
-                      Regenerate
-                    </Button>
-                  </div>
-                </div>
+        {error && (
+          <div className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-400">
+            {error}
+          </div>
+        )}
 
-                {/* Initial Value */}
-                <div>
-                  <label className={labelCls}>Initial Value ($) <span className="text-red-400">*</span></label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* Card Number */}
+          <Card>
+            <CardContent className="pt-5 pb-5 space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide flex items-center gap-2">
+                <Gift className="w-4 h-4" />Card Number
+              </h3>
+
+              <div className="flex items-center gap-3 mb-2">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={form.initialValue}
-                    onChange={set('initialValue')}
-                    placeholder="e.g. 50.00"
-                    className={inputCls}
-                    required
+                    type="radio"
+                    name="numberMode"
+                    checked={!manualNumber}
+                    onChange={() => {
+                      setManualNumber(false)
+                      setCardNumber(generateCardNumber())
+                    }}
+                    className="accent-blue-500"
                   />
-                </div>
-
-                {/* Customer (optional) */}
-                <div>
-                  <label className={labelCls}>Customer (optional)</label>
-                  <select value={form.customerId} onChange={set('customerId')} className={inputCls}>
-                    <option value="">— Guest / No customer —</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.firstName} {c.lastName} ({c.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Expiry */}
-                <div>
-                  <label className={labelCls}>Expiry Date (optional)</label>
+                  <span className="text-sm text-zinc-300">Auto-generate</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
-                    type="date"
-                    value={form.expiresAt}
-                    onChange={set('expiresAt')}
-                    className={inputCls}
+                    type="radio"
+                    name="numberMode"
+                    checked={manualNumber}
+                    onChange={() => setManualNumber(true)}
+                    className="accent-blue-500"
                   />
-                </div>
+                  <span className="text-sm text-zinc-300">Enter manually</span>
+                </label>
+              </div>
 
-                {error && (
-                  <div className="text-xs text-red-400 bg-red-950/30 border border-red-900/50 rounded px-3 py-2">
-                    {error}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-end gap-3 pt-1">
-                  <Link href="/gift-cards">
-                    <Button type="button" variant="outline" size="sm">Cancel</Button>
-                  </Link>
-                  <Button type="submit" size="sm" disabled={loading}>
-                    {loading ? 'Issuing…' : 'Issue Gift Card'}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={cardNumber}
+                  onChange={e => setCardNumber(e.target.value)}
+                  readOnly={!manualNumber}
+                  placeholder="GC-XXXX-XXXX-XXXX"
+                  className="flex-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm px-3 py-2 font-mono tracking-wider focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                />
+                {!manualNumber && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCardNumber(generateCardNumber())}
+                    title="Regenerate"
+                  >
+                    <RefreshCw className="w-4 h-4" />
                   </Button>
-                </div>
-              </form>
+                )}
+              </div>
             </CardContent>
           </Card>
-        </div>
+
+          {/* Balance */}
+          <Card>
+            <CardContent className="pt-5 pb-5 space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">Initial Balance</h3>
+
+              {/* Quick select */}
+              <div className="flex flex-wrap gap-2">
+                {QUICK_AMOUNTS.map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setInitialBalance(amt.toFixed(2))}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold border transition-colors ${
+                      initialBalance === amt.toFixed(2)
+                        ? 'bg-blue-600 border-blue-600 text-white'
+                        : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                    }`}
+                  >
+                    ${amt}
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <label className="block text-xs text-zinc-500 uppercase tracking-wide mb-1">
+                  Custom Amount *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
+                  <input
+                    type="number"
+                    value={initialBalance}
+                    onChange={e => setInitialBalance(e.target.value)}
+                    min="0.01"
+                    step="0.01"
+                    required
+                    className="w-full rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm pl-7 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Optional Details */}
+          <Card>
+            <CardContent className="pt-5 pb-5 space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide">Optional Details</h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Expiry */}
+                <div>
+                  <label className="block text-xs text-zinc-500 uppercase tracking-wide mb-1">
+                    Expiry Date
+                  </label>
+                  <input
+                    type="date"
+                    value={expiresAt}
+                    onChange={e => setExpiresAt(e.target.value)}
+                    min={new Date().toISOString().slice(0, 10)}
+                    className="w-full rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-zinc-600 mt-1">Leave blank for no expiry</p>
+                </div>
+
+                {/* Issued By */}
+                <div>
+                  <label className="block text-xs text-zinc-500 uppercase tracking-wide mb-1">
+                    Issued By
+                  </label>
+                  <input
+                    type="text"
+                    value={issuedBy}
+                    onChange={e => setIssuedBy(e.target.value)}
+                    placeholder="Staff name or ID"
+                    className="w-full rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Customer Link */}
+              <div>
+                <label className="block text-xs text-zinc-500 uppercase tracking-wide mb-1">
+                  Link to Customer (optional)
+                </label>
+                <select
+                  value={customerId}
+                  onChange={e => setCustomerId(e.target.value)}
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">— No customer link —</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.firstName} {c.lastName}{c.email ? ` (${c.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs text-zinc-500 uppercase tracking-wide mb-1">Notes</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Optional internal notes..."
+                  className="w-full rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pb-4">
+            <Button type="button" variant="outline" onClick={() => router.push('/gift-cards')} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              <Save className="w-4 h-4 mr-1" />
+              {saving ? 'Issuing…' : 'Issue Gift Card'}
+            </Button>
+          </div>
+
+        </form>
       </main>
     </>
   )
