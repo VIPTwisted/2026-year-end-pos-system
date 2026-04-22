@@ -111,15 +111,19 @@ export default async function RoutingDetailPage({
                         <td className="px-4 py-2.5 text-xs font-mono text-zinc-400">{line.operationNo}</td>
                         <td className="px-4 py-2.5 text-xs text-zinc-300">{line.description}</td>
                         <td className="px-4 py-2.5">
-                          <Link href={`/manufacturing/work-centers/${line.workCenter.id}`} className="text-xs text-blue-400 hover:underline">
-                            {line.workCenter.code} — {line.workCenter.name}
-                          </Link>
+                          {line.workCenter ? (
+                            <Link href={`/manufacturing/work-centers/${line.workCenter.id}`} className="text-xs text-blue-400 hover:underline">
+                              {line.workCenter.code} — {line.workCenter.name}
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-zinc-600">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-xs text-zinc-400">{line.setupTime}</td>
                         <td className="px-4 py-2.5 text-xs text-zinc-300 font-semibold">{line.runTime}</td>
                         <td className="px-4 py-2.5 text-xs text-zinc-400">{line.waitTime}</td>
                         <td className="px-4 py-2.5 text-xs text-zinc-400">{line.moveTime}</td>
-                        <td className="px-4 py-2.5 text-xs text-emerald-400">${line.workCenter.costPerHour}/h</td>
+                        <td className="px-4 py-2.5 text-xs text-emerald-400">{line.workCenter ? `$${line.workCenter.costPerHour}/h` : '—'}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -2,25 +2,33 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const status = searchParams.get('status')
-  const supplierId = searchParams.get('supplierId')
+  try {
+    const { searchParams } = new URL(req.url)
+    const status = searchParams.get('status')
+    const supplierId = searchParams.get('supplierId')
 
-  const pos = await prisma.purchaseOrder.findMany({
-    where: {
-      ...(status ? { status } : {}),
-      ...(supplierId ? { supplierId } : {}),
-    },
-    include: {
-      supplier: true,
-      store: { select: { id: true, name: true } },
-      items: true,
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 200,
-  })
+    const pos = await prisma.purchaseOrder.findMany({
+      where: {
+        ...(status ? { status } : {}),
+        ...(supplierId ? { supplierId } : {}),
+      },
+      include: {
+        supplier: true,
+        store: { select: { id: true, name: true } },
+        items: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    })
 
-  return NextResponse.json(pos)
+    return NextResponse.json(pos)
+  } catch (err) {
+    console.error('[GET /api/purchasing]', err)
+    return NextResponse.json(
+      { error: 'Failed to fetch purchase orders', detail: String(err) },
+      { status: 500 }
+    )
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -76,22 +84,30 @@ export async function POST(req: NextRequest) {
   const shipping = Number(shippingCost) || 0
   const totalAmount = subtotal + shipping
 
-  const po = await prisma.purchaseOrder.create({
-    data: {
-      poNumber,
-      supplierId,
-      storeId,
-      status: 'draft',
-      subtotal,
-      taxAmount: 0,
-      shippingCost: shipping,
-      totalAmount,
-      expectedDate: expectedDate ? new Date(expectedDate) : null,
-      notes: notes || null,
-      items: { create: processedLines },
-    },
-    include: { supplier: true, store: true, items: true },
-  })
+  try {
+    const po = await prisma.purchaseOrder.create({
+      data: {
+        poNumber,
+        supplierId,
+        storeId,
+        status: 'draft',
+        subtotal,
+        taxAmount: 0,
+        shippingCost: shipping,
+        totalAmount,
+        expectedDate: expectedDate ? new Date(expectedDate) : null,
+        notes: notes || null,
+        items: { create: processedLines },
+      },
+      include: { supplier: true, store: true, items: true },
+    })
 
-  return NextResponse.json(po, { status: 201 })
+    return NextResponse.json(po, { status: 201 })
+  } catch (err) {
+    console.error('[POST /api/purchasing]', err)
+    return NextResponse.json(
+      { error: 'Failed to create purchase order', detail: String(err) },
+      { status: 500 }
+    )
+  }
 }

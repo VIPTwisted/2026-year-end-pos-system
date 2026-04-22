@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { Settings2, ArrowLeft, Activity, DollarSign, Cpu } from 'lucide-react'
+import { Settings2, ArrowLeft, Activity, DollarSign, Cpu, ChevronRight } from 'lucide-react'
 
 export default async function WorkCentersPage() {
   const workCenters = await prisma.workCenter.findMany({
@@ -74,7 +74,7 @@ export default async function WorkCentersPage() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-zinc-800/30 bg-zinc-900/30">
-                {['Code', 'Name', 'Capacity', 'Cost/Hr', 'Efficiency', 'Machines', 'Used In', 'Status'].map(h => (
+                {['Code', 'Name', 'Capacity', 'Cost/Hr', 'Efficiency', 'Machines', 'Used In', 'Status', ''].map(h => (
                   <th key={h} className="text-left px-4 py-2 text-[10px] uppercase text-zinc-500 font-medium tracking-wide">
                     {h}
                   </th>
@@ -84,7 +84,7 @@ export default async function WorkCentersPage() {
             <tbody>
               {workCenters.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-[13px] text-zinc-600">
+                  <td colSpan={9} className="px-4 py-8 text-center text-[13px] text-zinc-600">
                     No work centers.{' '}
                     <Link href="/manufacturing/work-centers/new" className="text-blue-400 hover:text-blue-300 hover:underline">
                       Create one
@@ -93,9 +93,9 @@ export default async function WorkCentersPage() {
                 </tr>
               ) : (
                 workCenters.map(wc => (
-                  <tr key={wc.id} className="py-2 border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
+                  <tr key={wc.id} className="py-2 border-b border-zinc-800/30 hover:bg-zinc-900/50 transition-colors group">
                     <td className="px-4 py-2">
-                      <Link href={`/manufacturing/work-centers/${wc.id}`} className="font-mono text-[13px] text-blue-400 hover:text-blue-300 hover:underline">
+                      <Link href={`/manufacturing/work-centers/${wc.id}`} className="font-mono text-[13px] font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
                         {wc.code}
                       </Link>
                     </td>
@@ -117,6 +117,11 @@ export default async function WorkCentersPage() {
                       ) : (
                         <span className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium border bg-zinc-700/40 text-zinc-400 border-zinc-600/40">Inactive</span>
                       )}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Link href={`/manufacturing/work-centers/${wc.id}`}>
+                        <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
+                      </Link>
                     </td>
                   </tr>
                 ))

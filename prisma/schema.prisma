@@ -21,15 +21,16 @@ model Store {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  employees      Employee[]
-  orders         Order[]
-  inventory      Inventory[]
-  shifts         Shift[]
-  purchaseOrders PurchaseOrder[]
-  workOrders     WorkOrder[]
-  posShifts      PosShift[]
-  warehouseZones WarehouseZone[]
-  salesQuotes    SalesQuote[]
+  employees         Employee[]
+  orders            Order[]
+  inventory         Inventory[]
+  shifts            Shift[]
+  purchaseOrders    PurchaseOrder[]
+  workOrders        WorkOrder[]
+  posShifts         PosShift[]
+  warehouseZones    WarehouseZone[]
+  salesQuotes       SalesQuote[]
+  productionOrders  ProductionOrder[]
 }
 
 model User {
@@ -127,6 +128,13 @@ model Product {
   variantGroup       ProductVariantGroup?
   planningLines      ProjectPlanLine[]
   quoteLines         SalesQuoteLine[]
+  serviceItems       ServiceItem[]       @relation("ProductServiceItems")
+  // Manufacturing relations
+  bomOutputs         ProductionBOM[]     @relation("BOMOutputProduct")
+  bomComponents      ProductionBOMLine[] @relation("BOMComponent")
+  productionOrders   ProductionOrder[]   @relation("ProductionOrderProduct")
+  productionLines    ProductionOrderLine[] @relation("ProductionOrderLineProduct")
+  subcontractingLines SubcontractingLine[] @relation("SubcontractingLineProduct")
 }
 
 model ProductAttribute {
@@ -242,6 +250,9 @@ model Customer {
   projects           Project[]
   contracts          Contract[]
   salesQuotes        SalesQuote[]
+  serviceContracts   ServiceContract[] @relation("CustomerServiceContracts")
+  serviceItems       ServiceItem[]     @relation("CustomerServiceItems")
+  serviceOrders      ServiceOrder[]    @relation("CustomerServiceOrders")
 }
 
 model Order {
@@ -628,11 +639,12 @@ model Vendor {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  vendorGroup     VendorGroup?           @relation(fields: [vendorGroupId], references: [id])
-  invoices        VendorInvoice[]
-  payments        VendorPayment[]
-  purchaseOrders  VendorPO[]
-  scorecards      VendorScorecard[]
+  vendorGroup          VendorGroup?          @relation(fields: [vendorGroupId], references: [id])
+  invoices             VendorInvoice[]
+  payments             VendorPayment[]
+  purchaseOrders       VendorPO[]
+  scorecards           VendorScorecard[]
+  subcontractingOrders SubcontractingOrder[]
 }
 
 model VendorInvoice {
@@ -4069,31 +4081,35 @@ model ReturnRefund {
 // ─── Customer Service & Contact Center (Wave 8) ──────────────────────────────
 
 model ServiceCase2 {
-  id             String             @id @default(cuid())
-  caseNumber     String             @unique @default(cuid())
-  subject        String
-  description    String?
-  status         String             @default("open")
-  priority       String             @default("medium")
-  channel        String?
-  customerId     String?
-  customerName   String?
-  customerEmail  String?
-  assignedTo     String?
-  queueId        String?
-  queue          CaseQueue?         @relation(fields: [queueId], references: [id])
-  slaId          String?
-  sla            CaseSLA?           @relation(fields: [slaId], references: [id])
-  slaDueAt       DateTime?
-  slaBreached    Boolean            @default(false)
-  resolvedAt     DateTime?
-  closedAt       DateTime?
-  notes          CaseNote[]
-  satisfaction   CaseSatisfaction?
-  tags           String?
-  orderId        String?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id              String             @id @default(cuid())
+  caseNumber      String             @unique @default(cuid())
+  subject         String
+  description     String?
+  status          String             @default("open")
+  priority        String             @default("medium")
+  channel         String?
+  customerId      String?
+  customerName    String?
+  customerEmail   String?
+  assignedTo      String?
+  queueId         String?
+  queue           CaseQueue?         @relation(fields: [queueId], references: [id])
+  slaId           String?
+  sla             CaseSLA?           @relation(fields: [slaId], references: [id])
+  slaDueAt        DateTime?
+  slaBreached     Boolean            @default(false)
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  notes           CaseNote[]
+  satisfaction    CaseSatisfaction?
+  tags            String?
+  orderId         String?
+  serviceItemId   String?
+  serviceItem     ServiceItem?       @relation("ServiceItemCases", fields: [serviceItemId], references: [id])
+  contractId      String?
+  contract        ServiceContract?   @relation("ServiceContractCases", fields: [contractId], references: [id])
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 }
 
 model CaseQueue {
@@ -6788,9 +6804,16 @@ model CouponRedemption {
 }
 
 model CreditMemo {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String    @id @default(cuid())
+  memoNumber String    @unique
+  customerId String?
+  orderId    String?
+  amount     Float     @default(0)
+  reason     String?
+  status     String    @default("draft")
+  issuedAt   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model CreditMemoTransaction {
@@ -7106,9 +7129,16 @@ model OrchestrationError {
 }
 
 model OrchestrationLine {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String             @id @default(cuid())
+  orchestrationId      String
+  lineNumber           Int                @default(1)
+  productId            String?
+  quantity             Float              @default(0)
+  status               String             @default("pending")
+  fulfillmentType      String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  orchestration        OrderOrchestration @relation(fields: [orchestrationId], references: [id], onDelete: Cascade)
 }
 
 model OrchestrationStateHistory {
@@ -7118,9 +7148,15 @@ model OrchestrationStateHistory {
 }
 
 model OrderOrchestration {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String               @id @default(cuid())
+  orderId         String?
+  status          String               @default("pending")
+  channel         String?
+  fulfillmentType String?
+  errorCount      Int                  @default(0)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  lines           OrchestrationLine[]
 }
 
 model OrderQueue {
@@ -7154,15 +7190,26 @@ model PhysicalCountLine {
 }
 
 model PriceList {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String          @id @default(cuid())
+  name      String
+  currency  String          @default("USD")
+  startDate DateTime?
+  endDate   DateTime?
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  lines     PriceListLine[]
 }
 
 model PriceListLine {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(cuid())
+  priceListId String
+  productId   String?
+  price       Float     @default(0)
+  minQty      Float     @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
 }
 
 model ProductBundle {
@@ -7195,25 +7242,98 @@ model ProductVariantAttributeValue {
   updatedAt DateTime @updatedAt
 }
 
+// TODO: expand with version control, multi-level BOM support
 model ProductionBOM {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String             @id @default(cuid())
+  bomNumber       String             @unique
+  description     String
+  status          String             @default("new") // new | certified | closed
+  unitOfMeasure   String             @default("EACH")
+  outputProductId String?
+  outputProduct   Product?           @relation("BOMOutputProduct", fields: [outputProductId], references: [id])
+  lines           ProductionBOMLine[]
+  productionOrders ProductionOrder[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 }
 
+// TODO: expand with scrap/yield tracking, substitution components
+model ProductionBOMLine {
+  id                   String       @id @default(cuid())
+  bomId                String
+  bom                  ProductionBOM @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  lineNo               Int           @default(1)
+  componentProductId   String
+  component            Product       @relation("BOMComponent", fields: [componentProductId], references: [id])
+  quantity             Float         @default(1)
+  unitOfMeasure        String        @default("EACH")
+  scrapPct             Float         @default(0)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+// TODO: expand with lot/serial tracking, co-product/by-product support
 model ProductionOrder {
-  id            String    @id @default(cuid())
-  orderNumber   String    @unique
-  productId     String
-  quantity      Float     @default(0)
-  status        String    @default("planned")
-  plannedStart  DateTime?
-  plannedEnd    DateTime?
-  actualStart   DateTime?
-  actualEnd     DateTime?
-  storeId       String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String                @id @default(cuid())
+  orderNumber       String                @unique
+  sourceType        String                @default("item") // item | sales | project
+  status            String                @default("simulated") // simulated | planned | firm_planned | released | finished
+  productId         String
+  product           Product               @relation("ProductionOrderProduct", fields: [productId], references: [id])
+  bomId             String?
+  bom               ProductionBOM?        @relation(fields: [bomId], references: [id])
+  routingId         String?
+  routing           Routing?              @relation(fields: [routingId], references: [id])
+  storeId           String?
+  store             Store?                @relation(fields: [storeId], references: [id])
+  quantity          Float                 @default(0)
+  quantityFinished  Float                 @default(0)
+  unitOfMeasure     String                @default("EACH")
+  dueDate           DateTime?
+  startingDate      DateTime?
+  endingDate        DateTime?
+  plannedStart      DateTime?
+  plannedEnd        DateTime?
+  actualStart       DateTime?
+  actualEnd         DateTime?
+  notes             String?
+  lines             ProductionOrderLine[]
+  capacityNeeds     CapacityNeed[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+}
+
+// TODO: expand with lot numbers, bin tracking, pick/issue workflows
+model ProductionOrderLine {
+  id                String         @id @default(cuid())
+  productionOrderId String
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  lineNo            Int            @default(1)
+  productId         String
+  product           Product        @relation("ProductionOrderLineProduct", fields: [productId], references: [id])
+  quantity          Float          @default(0)
+  quantityPicked    Float          @default(0)
+  quantityConsumed  Float          @default(0)
+  unitOfMeasure     String         @default("EACH")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+// TODO: expand with actual vs planned variance reporting
+model CapacityNeed {
+  id                String         @id @default(cuid())
+  productionOrderId String
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  operationNo       String
+  description       String         @default("")
+  workCenterId      String?
+  allocatedTime     Float          @default(0)
+  remainingTime     Float          @default(0)
+  startingDateTime  DateTime?
+  endingDateTime    DateTime?
+  status            String         @default("pending") // pending | active | finished
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 }
 
 model ProjectEntry {
@@ -7258,27 +7378,50 @@ model ReturnStateHistory {
   updatedAt DateTime @updatedAt
 }
 
+// TODO: expand with version control, effectivity dates
 model Routing {
-  id            String       @id @default(cuid())
-  routingNumber String       @unique
-  name          String
-  productId     String?
-  isActive      Boolean      @default(true)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  steps         RoutingRule[]
+  id              String        @id @default(cuid())
+  routingNumber   String        @unique
+  description     String        @default("")
+  status          String        @default("new") // new | certified | closed
+  type            String        @default("serial") // serial | parallel
+  productId       String?
+  isActive        Boolean       @default(true)
+  lines           RoutingLine[]
+  productionOrders ProductionOrder[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
-model RoutingRule {
-  id        String   @id @default(cuid())
-  routingId String
-  stepOrder Int      @default(1)
-  name      String
+// TODO: expand with machine center assignment, yield/scrap, parallel operations
+model RoutingLine {
+  id           String      @id @default(cuid())
+  routingId    String
+  routing      Routing     @relation(fields: [routingId], references: [id], onDelete: Cascade)
+  operationNo  String
+  description  String      @default("")
   workCenterId String?
-  cycleTime Float    @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  routing   Routing  @relation(fields: [routingId], references: [id], onDelete: Cascade)
+  workCenter   WorkCenter? @relation(fields: [workCenterId], references: [id])
+  setupTime    Float       @default(0)  // hours
+  runTime      Float       @default(0)  // hours per unit
+  waitTime     Float       @default(0)  // hours
+  moveTime     Float       @default(0)  // hours
+  lotSize      Float       @default(1)
+  concurrent   Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+// Legacy stub — kept for backward compatibility
+// TODO: migrate any RoutingRule data to RoutingLine then drop this model
+model RoutingRule {
+  id           String   @id @default(cuid())
+  stepOrder    Int      @default(1)
+  name         String
+  workCenterId String?
+  cycleTime    Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model SLAItem {
@@ -7318,27 +7461,102 @@ model SerialNumber {
 }
 
 model ServiceContract {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(cuid())
+  contractNumber String    @unique @default(cuid())
+  name           String    @default("")
+  customerId     String?
+  customer       Customer? @relation("CustomerServiceContracts", fields: [customerId], references: [id])
+  status         String    @default("active")
+  coverageType   String    @default("standard")
+  startDate      DateTime?
+  endDate        DateTime?
+  value          Float     @default(0)
+  billingCycle   String    @default("monthly")
+  responseTimeSla String?
+  description    String?
+  terms          String?
+  contractNo     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  serviceItems   ServiceItem[]
+  serviceOrders  ServiceOrder[]
+  serviceCases   ServiceCase2[] @relation("ServiceContractCases")
 }
 
 model ServiceItem {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(cuid())
+  description     String
+  serialNumber    String?
+  customerId      String?
+  customer        Customer? @relation("CustomerServiceItems", fields: [customerId], references: [id])
+  productId       String?
+  product         Product?  @relation("ProductServiceItems", fields: [productId], references: [id])
+  contractId      String?
+  contract        ServiceContract? @relation(fields: [contractId], references: [id])
+  status          String    @default("active")
+  purchaseDate    DateTime?
+  warrantyStart   DateTime?
+  warrantyEnd     DateTime?
+  lastServiceDate DateTime?
+  nextServiceDate DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  serviceOrders   ServiceOrder[]
+  serviceCases    ServiceCase2[] @relation("ServiceItemCases")
 }
 
 model ServiceOrder {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(cuid())
+  orderNumber     String    @unique @default(cuid())
+  customerId      String?
+  customer        Customer? @relation("CustomerServiceOrders", fields: [customerId], references: [id])
+  serviceItemId   String?
+  serviceItem     ServiceItem? @relation(fields: [serviceItemId], references: [id])
+  contractId      String?
+  contract        ServiceContract? @relation(fields: [contractId], references: [id])
+  description     String
+  priority        String    @default("normal")
+  status          String    @default("open")
+  assignedTech    String?
+  estimatedHours  Float?
+  actualHours     Float?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  resolutionNotes String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  parts           ServiceOrderPart[]
+  laborLogs       ServiceOrderLabor[]
 }
 
 model ServiceOrderPart {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  productId    String?
+  partName     String
+  partNumber   String?
+  quantity     Float        @default(1)
+  unitCost     Float        @default(0)
+  lineTotal    Float        @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model ServiceOrderLabor {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  techName       String
+  hoursWorked    Float
+  notes          String?
+  logDate        DateTime     @default(now())
+  createdAt      DateTime     @default(now())
 }
 
 model ServiceQueueItem {
@@ -7377,10 +7595,42 @@ model StoreTask {
   updatedAt DateTime @updatedAt
 }
 
+// TODO: expand with PO linkage, quality inspection on receipt, landed costs
 model SubcontractingOrder {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String                  @id @default(cuid())
+  orderNumber       String                  @unique
+  vendorId          String
+  vendor            Vendor                  @relation(fields: [vendorId], references: [id])
+  productionOrderId String?
+  workCenterId      String?
+  operationNo       String?
+  description       String
+  status            String                  @default("open") // open | sent | received | closed
+  quantity          Float                   @default(0)
+  unitOfMeasure     String                  @default("EACH")
+  unitCost          Float                   @default(0)
+  totalCost         Float                   @default(0)
+  expectedDate      DateTime?
+  sentDate          DateTime?
+  receivedDate      DateTime?
+  notes             String?
+  lines             SubcontractingLine[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+}
+
+// TODO: expand with lot/serial tracking, inspection results
+model SubcontractingLine {
+  id                     String              @id @default(cuid())
+  subcontractingOrderId  String
+  subcontractingOrder    SubcontractingOrder @relation(fields: [subcontractingOrderId], references: [id], onDelete: Cascade)
+  productId              String
+  product                Product             @relation("SubcontractingLineProduct", fields: [productId], references: [id])
+  quantity               Float               @default(0)
+  type                   String              @default("component") // component | output
+  unitOfMeasure          String              @default("EACH")
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 }
 
 model TradeAgreement {
@@ -7400,15 +7650,26 @@ model TradeAgreement {
 }
 
 model TransferLine {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String        @id @default(cuid())
+  transferOrderId String
+  productId       String?
+  quantity        Float         @default(0)
+  status          String        @default("draft")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  transferOrder   TransferOrder @relation(fields: [transferOrderId], references: [id], onDelete: Cascade)
 }
 
 model TransferOrder {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String         @id @default(cuid())
+  transferNumber String         @unique
+  fromStoreId    String?
+  toStoreId      String?
+  status         String         @default("draft")
+  requestedDate  DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  lines          TransferLine[]
 }
 
 model VariantAttributeAssignment {
@@ -7477,10 +7738,38 @@ model WarehouseShipmentLine {
   updatedAt DateTime @updatedAt
 }
 
+// TODO: expand with calendar/shift scheduling, queue management, subcontracting flag
 model WorkCenter {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String          @id @default(cuid())
+  code           String          @unique
+  name           String
+  description    String?
+  type           String          @default("machine") // machine | labor | subcontract
+  departmentId   String?
+  capacity       Float           @default(1)
+  unitOfMeasure  String          @default("hours")
+  efficiency     Float           @default(100)
+  queueTime      Float           @default(0) // hours
+  costPerHour    Float           @default(0)
+  isActive       Boolean         @default(true)
+  machineCenters MachineCenter[]
+  routingLines   RoutingLine[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+// TODO: expand with maintenance schedules, downtime tracking
+model MachineCenter {
+  id            String     @id @default(cuid())
+  code          String     @unique
+  name          String
+  workCenterId  String
+  workCenter    WorkCenter @relation(fields: [workCenterId], references: [id], onDelete: Cascade)
+  capacity      Float      @default(1)
+  costPerHour   Float      @default(0)
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 }
 
 model WorkSchedule {

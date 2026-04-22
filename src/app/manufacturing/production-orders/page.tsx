@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatDate } from '@/lib/utils'
-import { ClipboardList, ArrowLeft } from 'lucide-react'
+import { ClipboardList, ArrowLeft, ChevronRight } from 'lucide-react'
 
 const STATUS_CHIP: Record<string, string> = {
   simulated: 'bg-zinc-700/40 text-zinc-400 border-zinc-600/40',
@@ -107,7 +107,7 @@ export default async function ProductionOrdersPage({
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-zinc-800/30 bg-zinc-900/30">
-                {['Order #', 'Product', 'BOM', 'Quantity', 'Qty Finished', 'Progress', 'Due Date', 'Status', 'Store'].map(h => (
+                {['Order #', 'Product', 'BOM', 'Quantity', 'Qty Finished', 'Progress', 'Due Date', 'Status', 'Store', ''].map(h => (
                   <th key={h} className="text-left px-4 py-2 text-[10px] uppercase text-zinc-500 font-medium tracking-wide">
                     {h}
                   </th>
@@ -117,7 +117,7 @@ export default async function ProductionOrdersPage({
             <tbody>
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-[13px] text-zinc-600">
+                  <td colSpan={10} className="px-4 py-8 text-center text-[13px] text-zinc-600">
                     No orders found.{' '}
                     <Link href="/manufacturing/production-orders/new" className="text-blue-400 hover:text-blue-300 hover:underline">
                       Create one
@@ -129,9 +129,9 @@ export default async function ProductionOrdersPage({
                   const pct = PROGRESS_PCT[order.status] ?? 0
                   const bar = PROGRESS_COLOR[order.status] ?? 'bg-zinc-600'
                   return (
-                    <tr key={order.id} className="py-2 border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
+                    <tr key={order.id} className="py-2 border-b border-zinc-800/30 hover:bg-zinc-900/50 transition-colors group">
                       <td className="px-4 py-2">
-                        <Link href={`/manufacturing/production-orders/${order.id}`} className="font-mono text-[13px] text-blue-400 hover:text-blue-300 hover:underline">
+                        <Link href={`/manufacturing/production-orders/${order.id}`} className="font-mono text-[13px] font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
                           {order.orderNumber}
                         </Link>
                       </td>
@@ -159,7 +159,12 @@ export default async function ProductionOrdersPage({
                       <td className="px-4 py-2">
                         <StatusChip status={order.status} />
                       </td>
-                      <td className="px-4 py-2 text-zinc-400">{order.store.name}</td>
+                      <td className="px-4 py-2 text-zinc-400">{order.store?.name ?? '—'}</td>
+                      <td className="px-4 py-2 text-right">
+                        <Link href={`/manufacturing/production-orders/${order.id}`}>
+                          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
+                        </Link>
+                      </td>
                     </tr>
                   )
                 })

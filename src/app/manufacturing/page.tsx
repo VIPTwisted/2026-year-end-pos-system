@@ -234,7 +234,7 @@ export default async function ManufacturingPage() {
                     <td className="px-4 py-2 text-zinc-500">
                       {order.dueDate ? formatDate(order.dueDate) : '—'}
                     </td>
-                    <td className="px-4 py-2 text-zinc-400">{order.store.name}</td>
+                    <td className="px-4 py-2 text-zinc-400">{order.store?.name ?? '—'}</td>
                     <td className="px-4 py-2">
                       <StatusChip status={order.status} />
                     </td>

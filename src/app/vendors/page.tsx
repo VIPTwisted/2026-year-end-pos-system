@@ -5,7 +5,7 @@ import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Building2, Plus, AlertTriangle, DollarSign, Users, XCircle } from 'lucide-react'
+import { Building2, Plus, AlertTriangle, DollarSign, Users, XCircle, ChevronRight } from 'lucide-react'
 
 export default async function VendorsPage() {
   const now = new Date()
@@ -152,6 +152,7 @@ export default async function VendorsPage() {
                     <th className="text-right pb-3 font-medium">Open Inv.</th>
                     <th className="text-right pb-3 font-medium">Open Balance</th>
                     <th className="text-center pb-3 font-medium">Status</th>
+                    <th className="pb-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800">
@@ -161,10 +162,10 @@ export default async function VendorsPage() {
                       0
                     )
                     return (
-                      <tr key={v.id} className="hover:bg-zinc-900/50">
+                      <tr key={v.id} className="hover:bg-zinc-900/50 transition-colors group">
                         <td className="py-3 pr-4 font-mono text-xs text-zinc-500">{v.vendorCode}</td>
                         <td className="py-3 pr-4">
-                          <Link href={`/vendors/${v.id}`} className="font-medium text-zinc-100 hover:text-blue-400 transition-colors">
+                          <Link href={`/vendors/${v.id}`} className="font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
                             {v.name}
                           </Link>
                           {v.city && (
@@ -185,6 +186,11 @@ export default async function VendorsPage() {
                           <Badge variant={v.isActive ? 'success' : 'destructive'}>
                             {v.isActive ? 'Active' : 'On Hold'}
                           </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Link href={`/vendors/${v.id}`}>
+                            <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
+                          </Link>
                         </td>
                       </tr>
                     )

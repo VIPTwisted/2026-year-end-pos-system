@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { Layers, ArrowLeft } from 'lucide-react'
+import { Layers, ArrowLeft, ChevronRight } from 'lucide-react'
 
 function StatusChip({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -85,7 +85,7 @@ export default async function BOMsPage({
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-zinc-800/30 bg-zinc-900/30">
-                {['BOM #', 'Description', 'Output Product', 'Lines', 'Status'].map(h => (
+                {['BOM #', 'Description', 'Output Product', 'Lines', 'Status', ''].map(h => (
                   <th key={h} className="text-left px-4 py-2 text-[10px] uppercase text-zinc-500 font-medium tracking-wide">
                     {h}
                   </th>
@@ -95,7 +95,7 @@ export default async function BOMsPage({
             <tbody>
               {boms.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-[13px] text-zinc-600">
+                  <td colSpan={6} className="px-4 py-8 text-center text-[13px] text-zinc-600">
                     No BOMs found.{' '}
                     <Link href="/manufacturing/boms/new" className="text-blue-400 hover:text-blue-300 hover:underline">
                       Create one
@@ -104,9 +104,9 @@ export default async function BOMsPage({
                 </tr>
               ) : (
                 boms.map(bom => (
-                  <tr key={bom.id} className="py-2 border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
+                  <tr key={bom.id} className="py-2 border-b border-zinc-800/30 hover:bg-zinc-900/50 transition-colors group">
                     <td className="px-4 py-2">
-                      <Link href={`/manufacturing/boms/${bom.id}`} className="font-mono text-[13px] text-blue-400 hover:text-blue-300 hover:underline">
+                      <Link href={`/manufacturing/boms/${bom.id}`} className="font-mono text-[13px] font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
                         {bom.bomNumber}
                       </Link>
                     </td>
@@ -124,6 +124,11 @@ export default async function BOMsPage({
                     <td className="px-4 py-2 text-zinc-400">{bom._count.lines}</td>
                     <td className="px-4 py-2">
                       <StatusChip status={bom.status} />
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Link href={`/manufacturing/boms/${bom.id}`}>
+                        <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
+                      </Link>
                     </td>
                   </tr>
                 ))

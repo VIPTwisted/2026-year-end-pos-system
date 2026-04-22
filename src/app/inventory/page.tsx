@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -13,6 +14,7 @@ import {
   DollarSign,
   Layers,
   BrainCircuit,
+  ChevronRight,
 } from 'lucide-react'
 
 export default async function InventoryPage() {
@@ -214,6 +216,7 @@ export default async function InventoryPage() {
                       <th className="text-right pb-3 pr-4 font-medium">Available</th>
                       <th className="text-right pb-3 pr-4 font-medium">Stock Value</th>
                       <th className="text-center pb-3 font-medium">Status</th>
+                      <th className="pb-3" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800">
@@ -239,9 +242,11 @@ export default async function InventoryPage() {
                       const isLow = !isCritical && rp !== null && rp !== undefined && inv.quantity <= rp
 
                       return (
-                        <tr key={inv.id} className="hover:bg-zinc-800/40 transition-colors">
+                        <tr key={inv.id} className="hover:bg-zinc-800/40 transition-colors group">
                           <td className="py-3 pr-4">
-                            <span className="font-medium text-zinc-100">{inv.product.name}</span>
+                            <Link href={`/inventory/${inv.id}`} className="font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
+                              {inv.product.name}
+                            </Link>
                           </td>
                           <td className="py-3 pr-4">
                             <span className="text-xs text-zinc-400">
@@ -267,6 +272,11 @@ export default async function InventoryPage() {
                               {isCritical && <AlertTriangle className="w-3 h-3" />}
                               {statusLabel}
                             </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Link href={`/inventory/${inv.id}`}>
+                              <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400" />
+                            </Link>
                           </td>
                         </tr>
                       )

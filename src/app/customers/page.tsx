@@ -1,10 +1,11 @@
+import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, Plus, Star, TrendingUp, UserCheck } from 'lucide-react'
+import { Users, Plus, Star, TrendingUp, UserCheck, ChevronRight } from 'lucide-react'
 
 export default async function CustomersPage() {
   const customers = await prisma.customer.findMany({
@@ -48,7 +49,9 @@ export default async function CustomersPage() {
             <h2 className="text-lg font-semibold text-zinc-100">Customer Database</h2>
             <p className="text-sm text-zinc-500">{customers.length} customers</p>
           </div>
-          <Button><Plus className="w-4 h-4 mr-1" />Add Customer</Button>
+          <Link href="/customers/new">
+            <Button><Plus className="w-4 h-4 mr-1" />Add Customer</Button>
+          </Link>
         </div>
 
         {/* ── Customer Table ── */}
@@ -71,13 +74,16 @@ export default async function CustomersPage() {
                   <th className="text-right pb-3 font-medium">Visits</th>
                   <th className="text-right pb-3 font-medium">Points</th>
                   <th className="text-center pb-3 font-medium">Tier</th>
+                  <th className="pb-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
                 {customers.map(c => (
-                  <tr key={c.id} className="hover:bg-zinc-900/50">
+                  <tr key={c.id} className="hover:bg-zinc-900/50 transition-colors group">
                     <td className="py-3 pr-4">
-                      <div className="font-medium text-zinc-100">{c.firstName} {c.lastName}</div>
+                      <Link href={`/customers/${c.id}`} className="font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
+                        {c.firstName} {c.lastName}
+                      </Link>
                     </td>
                     <td className="py-3 pr-4 text-zinc-400">{c.email || '-'}</td>
                     <td className="py-3 pr-4 text-zinc-400">{c.phone || '-'}</td>
@@ -92,6 +98,11 @@ export default async function CustomersPage() {
                       <Badge variant={getTierVariant(c.loyaltyPoints)}>
                         {getTierLabel(c.loyaltyPoints)}
                       </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link href={`/customers/${c.id}`}>
+                        <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400" />
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -171,10 +182,12 @@ export default async function CustomersPage() {
                   </thead>
                   <tbody className="divide-y divide-zinc-800/40">
                     {keyAccounts.map((c, i) => (
-                      <tr key={c.id} className="hover:bg-zinc-900/40">
+                      <tr key={c.id} className="hover:bg-zinc-900/40 transition-colors group">
                         <td className="px-5 py-3 text-zinc-500 font-mono text-xs">#{i + 1}</td>
                         <td className="py-3 pr-4 font-medium text-zinc-100">
-                          {c.firstName} {c.lastName}
+                          <Link href={`/customers/${c.id}`} className="group-hover:text-blue-300 transition-colors">
+                            {c.firstName} {c.lastName}
+                          </Link>
                           {c.email && <span className="block text-xs text-zinc-500 font-normal">{c.email}</span>}
                         </td>
                         <td className="py-3 pr-4">

@@ -121,12 +121,20 @@ export default function CasesPage() {
             <h1 className="text-lg font-semibold">Service Cases</h1>
             <p className="text-xs text-zinc-500">{cases.length} case{cases.length !== 1 ? 's' : ''} shown</p>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" /> New Case
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/service/cases/new"
+              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm font-medium transition-colors text-zinc-200"
+            >
+              <Plus className="w-4 h-4" /> New Case
+            </Link>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Quick Create
+            </button>
+          </div>
         </div>
       </div>
 
@@ -216,17 +224,17 @@ export default function CasesPage() {
                 <td colSpan={10} className="px-4 py-12 text-center text-zinc-500">No cases found</td>
               </tr>
             ) : cases.map((c) => (
-              <tr key={c.id} className="hover:bg-zinc-900/50 transition-colors">
+              <tr key={c.id} className="hover:bg-zinc-900/50 transition-colors group">
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5">
+                  <Link href={`/service/cases/${c.id}`} className="flex items-center gap-1.5">
                     {c.channel && (
                       <span className="text-zinc-500">{CHANNEL_ICONS[c.channel] ?? <Users className="w-3 h-3" />}</span>
                     )}
-                    <span className="text-xs font-mono text-zinc-400">{c.caseNumber.slice(-8)}</span>
-                  </div>
+                    <span className="text-xs font-mono text-zinc-400 group-hover:text-indigo-300 transition-colors">{c.caseNumber.slice(-8)}</span>
+                  </Link>
                 </td>
                 <td className="px-4 py-3 max-w-[240px]">
-                  <span className="text-sm text-zinc-200 truncate block">{c.subject}</span>
+                  <Link href={`/service/cases/${c.id}`} className="text-sm text-zinc-200 group-hover:text-indigo-300 transition-colors truncate block">{c.subject}</Link>
                 </td>
                 <td className="px-4 py-3">
                   <div className="text-sm text-zinc-300">{c.customerName ?? '—'}</div>

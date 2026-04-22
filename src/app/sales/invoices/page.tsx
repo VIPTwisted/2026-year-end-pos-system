@@ -58,6 +58,12 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-semibold text-zinc-100">Invoices</h1>
           <p className="text-sm text-zinc-400 mt-1">Sales invoices and receivables</p>
         </div>
+        <Link
+          href="/sales/invoices/new"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
+        >
+          + New Invoice
+        </Link>
       </div>
 
       <div className="flex gap-1 border-b border-zinc-800">

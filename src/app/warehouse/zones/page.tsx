@@ -4,7 +4,7 @@ import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Map } from 'lucide-react'
+import { Map, ChevronRight } from 'lucide-react'
 import { NewZoneForm } from './NewZoneForm'
 
 export default async function ZonesPage() {
@@ -42,14 +42,15 @@ export default async function ZonesPage() {
                       <th className="text-center px-4 py-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Bin Type</th>
                       <th className="text-right px-4 py-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Rank</th>
                       <th className="text-right px-4 py-3 text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Bins</th>
+                      <th className="px-4 py-3" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/50">
                     {zones.map(z => (
-                      <tr key={z.id} className="hover:bg-zinc-900/40 transition-colors">
+                      <tr key={z.id} className="hover:bg-zinc-900/50 transition-colors group">
                         <td className="px-4 py-3 text-zinc-300 text-xs">{z.store?.name ?? '—'}</td>
                         <td className="px-4 py-3">
-                          <Link href={`/warehouse/zones/${z.id}`} className="font-mono text-xs font-semibold text-blue-400 hover:text-blue-300">
+                          <Link href={`/warehouse/zones/${z.id}`} className="font-mono text-xs font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
                             {z.code}
                           </Link>
                         </td>
@@ -59,6 +60,11 @@ export default async function ZonesPage() {
                         </td>
                         <td className="px-4 py-3 text-right text-zinc-500 tabular-nums text-xs">{z.rankNo}</td>
                         <td className="px-4 py-3 text-right text-zinc-200 tabular-nums font-semibold text-xs">{z.binCount}</td>
+                        <td className="px-4 py-3 text-right">
+                          <Link href={`/warehouse/zones/${z.id}`}>
+                            <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

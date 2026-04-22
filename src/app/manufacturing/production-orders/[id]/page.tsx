@@ -72,7 +72,7 @@ export default async function ProductionOrderDetailPage({
                   </div>
                   <h1 className="text-xl font-bold text-zinc-100 font-mono">{order.orderNumber}</h1>
                   <p className="text-sm text-zinc-400 mt-0.5">{order.product.name}</p>
-                  <p className="text-xs text-zinc-600">{order.product.sku} · {order.store.name}</p>
+                  <p className="text-xs text-zinc-600">{order.product.sku} · {order.store?.name ?? '—'}</p>
                 </div>
               </div>
               <div className="text-right">

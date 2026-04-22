@@ -5,7 +5,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, Plus } from 'lucide-react'
+import { Users, Plus, ChevronRight } from 'lucide-react'
 
 export default async function EmployeesPage() {
   const employees = await prisma.employee.findMany({
@@ -89,11 +89,11 @@ export default async function EmployeesPage() {
                 </thead>
                 <tbody className="divide-y divide-zinc-800">
                   {employees.map(e => (
-                    <tr key={e.id} className="hover:bg-zinc-900/50">
+                    <tr key={e.id} className="hover:bg-zinc-900/50 transition-colors group">
                       <td className="py-3 pr-4 font-medium text-zinc-100">
                         <Link
                           href={`/hr/employees/${e.id}`}
-                          className="hover:text-emerald-400 transition-colors"
+                          className="group-hover:text-blue-300 transition-colors"
                         >
                           {e.lastName}, {e.firstName}
                         </Link>
@@ -110,11 +110,9 @@ export default async function EmployeesPage() {
                           {e.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
-                      <td className="py-3 text-right">
+                      <td className="px-4 py-3 text-right">
                         <Link href={`/hr/employees/${e.id}`}>
-                          <Button size="sm" variant="ghost" className="text-xs">
-                            View
-                          </Button>
+                          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
                         </Link>
                       </td>
                     </tr>

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { prisma } from '@/lib/prisma'
-import { GitBranch, ArrowLeft } from 'lucide-react'
+import { GitBranch, ArrowLeft, ChevronRight } from 'lucide-react'
 
 function StatusChip({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -56,7 +56,7 @@ export default async function RoutingsPage() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-zinc-800/30 bg-zinc-900/30">
-                {['Routing #', 'Description', 'Operations', 'Type', 'Status'].map(h => (
+                {['Routing #', 'Description', 'Operations', 'Type', 'Status', ''].map(h => (
                   <th key={h} className="text-left px-4 py-2 text-[10px] uppercase text-zinc-500 font-medium tracking-wide">
                     {h}
                   </th>
@@ -66,7 +66,7 @@ export default async function RoutingsPage() {
             <tbody>
               {routings.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-[13px] text-zinc-600">
+                  <td colSpan={6} className="px-4 py-8 text-center text-[13px] text-zinc-600">
                     No routings.{' '}
                     <Link href="/manufacturing/routings/new" className="text-blue-400 hover:text-blue-300 hover:underline">
                       Create one
@@ -75,9 +75,9 @@ export default async function RoutingsPage() {
                 </tr>
               ) : (
                 routings.map(r => (
-                  <tr key={r.id} className="py-2 border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
+                  <tr key={r.id} className="py-2 border-b border-zinc-800/30 hover:bg-zinc-900/50 transition-colors group">
                     <td className="px-4 py-2">
-                      <Link href={`/manufacturing/routings/${r.id}`} className="font-mono text-[13px] text-blue-400 hover:text-blue-300 hover:underline">
+                      <Link href={`/manufacturing/routings/${r.id}`} className="font-mono text-[13px] font-medium text-zinc-100 group-hover:text-blue-300 transition-colors">
                         {r.routingNumber}
                       </Link>
                     </td>
@@ -90,6 +90,11 @@ export default async function RoutingsPage() {
                     </td>
                     <td className="px-4 py-2">
                       <StatusChip status={r.status} />
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Link href={`/manufacturing/routings/${r.id}`}>
+                        <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 inline" />
+                      </Link>
                     </td>
                   </tr>
                 ))

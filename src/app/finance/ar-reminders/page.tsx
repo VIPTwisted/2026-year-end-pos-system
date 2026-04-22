@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { TopBar } from '@/components/layout/TopBar'
 import { formatCurrency } from '@/lib/utils'
+import { ChevronRight } from 'lucide-react'
 
 interface ReminderCustomer {
   id: string
@@ -266,23 +267,24 @@ export default function ARRemindersPage() {
                     <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
                       Actions
                     </th>
+                    <th className="px-4 py-3 w-8" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/30">
                   {reminders.map((r) => (
                     <tr
                       key={r.id}
-                      className="hover:bg-zinc-800/20 transition-colors"
+                      className="hover:bg-zinc-800/20 transition-colors group"
                     >
                       <td className="px-5 py-3">
-                        <span className="font-mono text-xs text-blue-400 bg-blue-400/5 px-2 py-0.5 rounded">
+                        <Link href={`/finance/ar-reminders/${r.id}`} className="font-mono text-xs text-blue-400 bg-blue-400/5 px-2 py-0.5 rounded hover:text-blue-300 transition-colors">
                           {r.reminderNo}
-                        </span>
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm text-zinc-200 font-medium">
+                        <Link href={`/finance/ar-reminders/${r.id}`} className="text-sm text-zinc-200 font-medium hover:text-blue-300 transition-colors">
                           {r.customer.firstName} {r.customer.lastName}
-                        </div>
+                        </Link>
                         {r.customer.email && (
                           <div className="text-xs text-zinc-500">
                             {r.customer.email}
@@ -332,6 +334,11 @@ export default function ARRemindersPage() {
                             Mark Sent
                           </button>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link href={`/finance/ar-reminders/${r.id}`}>
+                          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                        </Link>
                       </td>
                     </tr>
                   ))}
